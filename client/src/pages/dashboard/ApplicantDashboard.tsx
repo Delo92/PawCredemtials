@@ -71,7 +71,7 @@ export default function ApplicantDashboard() {
           <Button asChild data-testid="button-fill-registration">
             <Link href="/dashboard/applicant/registration">
               <FileText className="mr-2 h-4 w-4" />
-              Complete Registration
+              Edit Registration
             </Link>
           </Button>
         </div>
@@ -139,7 +139,7 @@ export default function ApplicantDashboard() {
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/applicant/registration">
-                View All
+                View
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -202,7 +202,7 @@ export default function ApplicantDashboard() {
                 <Button asChild>
                   <Link href="/dashboard/applicant/registration">
                     <FileText className="mr-2 h-4 w-4" />
-                    Complete Registration
+                    Edit Registration
                   </Link>
                 </Button>
               </div>
