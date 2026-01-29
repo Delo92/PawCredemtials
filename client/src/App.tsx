@@ -40,6 +40,11 @@ const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsP
 const SharedMessagesPage = lazy(() => import("@/pages/dashboard/shared/MessagesPage"));
 const SharedQueuePage = lazy(() => import("@/pages/dashboard/shared/QueuePage"));
 const SharedCompletedPage = lazy(() => import("@/pages/dashboard/shared/CompletedPage"));
+const SharedApplicationsListPage = lazy(() => import("@/pages/dashboard/shared/ApplicationsListPage"));
+const SharedPaymentsManagementPage = lazy(() => import("@/pages/dashboard/shared/PaymentsManagementPage"));
+const SharedAnalyticsPage = lazy(() => import("@/pages/dashboard/shared/AnalyticsPage"));
+const SharedCommissionsPage = lazy(() => import("@/pages/dashboard/shared/CommissionsPage"));
+const SharedReferralsPage = lazy(() => import("@/pages/dashboard/shared/ReferralsPage"));
 
 // Generic placeholder for pages not yet implemented
 const PlaceholderPage = lazy(() => import("@/pages/dashboard/placeholders/PlaceholderPage"));
@@ -154,12 +159,12 @@ function App() {
                   </Route>
                   <Route path="/dashboard/agent/referrals">
                     <ProtectedRoute minLevel={3}>
-                      <PlaceholderPage />
+                      <SharedReferralsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/agent/commissions">
                     <ProtectedRoute minLevel={3}>
-                      <PlaceholderPage />
+                      <SharedCommissionsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/agent/messages">
@@ -187,6 +192,21 @@ function App() {
                   <Route path="/dashboard/admin/packages">
                     <ProtectedRoute minLevel={4}>
                       <PackagesManagement />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/applications">
+                    <ProtectedRoute minLevel={4}>
+                      <SharedApplicationsListPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/payments">
+                    <ProtectedRoute minLevel={4}>
+                      <SharedPaymentsManagementPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/analytics">
+                    <ProtectedRoute minLevel={4}>
+                      <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/queue">
@@ -226,6 +246,11 @@ function App() {
                       <PackagesManagement />
                     </ProtectedRoute>
                   </Route>
+                  <Route path="/dashboard/owner/applications">
+                    <ProtectedRoute minLevel={5}>
+                      <SharedApplicationsListPage />
+                    </ProtectedRoute>
+                  </Route>
                   <Route path="/dashboard/owner/site-settings">
                     <ProtectedRoute minLevel={5}>
                       <SiteSettings />
@@ -238,17 +263,17 @@ function App() {
                   </Route>
                   <Route path="/dashboard/owner/payments">
                     <ProtectedRoute minLevel={5}>
-                      <PlaceholderPage />
+                      <SharedPaymentsManagementPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/commissions">
                     <ProtectedRoute minLevel={5}>
-                      <PlaceholderPage />
+                      <SharedCommissionsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/analytics">
                     <ProtectedRoute minLevel={5}>
-                      <PlaceholderPage />
+                      <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner">
