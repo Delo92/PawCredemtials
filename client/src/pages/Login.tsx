@@ -54,7 +54,7 @@ export default function Login() {
   useEffect(() => {
     if (selectedLevel) {
       form.setValue("email", `Level${selectedLevel}@test.com`);
-      form.setValue("password", "password123");
+      form.setValue("password", "ChronicBrands");
     }
   }, [selectedLevel, form]);
 
