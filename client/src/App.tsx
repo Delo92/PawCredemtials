@@ -51,217 +51,6 @@ function PageLoader() {
   );
 }
 
-function DashboardRouter() {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        {/* Applicant Routes (Level 1+) */}
-        <Route path="/dashboard/applicant/applications/new">
-          <ProtectedRoute minLevel={1}>
-            <NewApplication />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant/applications">
-          <ProtectedRoute minLevel={1}>
-            <ApplicationsPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant/documents">
-          <ProtectedRoute minLevel={1}>
-            <DocumentsPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant/messages">
-          <ProtectedRoute minLevel={1}>
-            <MessagesPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant/payments">
-          <ProtectedRoute minLevel={1}>
-            <PaymentsPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant/settings">
-          <ProtectedRoute minLevel={1}>
-            <SettingsPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/applicant">
-          <ProtectedRoute minLevel={1}>
-            <ApplicantDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        {/* Reviewer Routes (Level 2+) */}
-        <Route path="/dashboard/reviewer/queue">
-          <ProtectedRoute minLevel={2}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/reviewer/completed">
-          <ProtectedRoute minLevel={2}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/reviewer/messages">
-          <ProtectedRoute minLevel={2}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/reviewer/settings">
-          <ProtectedRoute minLevel={2}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/reviewer">
-          <ProtectedRoute minLevel={2}>
-            <ReviewerDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        {/* Agent Routes (Level 3+) */}
-        <Route path="/dashboard/agent/queue">
-          <ProtectedRoute minLevel={3}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/agent/referrals">
-          <ProtectedRoute minLevel={3}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/agent/commissions">
-          <ProtectedRoute minLevel={3}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/agent/messages">
-          <ProtectedRoute minLevel={3}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/agent/settings">
-          <ProtectedRoute minLevel={3}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/agent">
-          <ProtectedRoute minLevel={3}>
-            <AgentDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        {/* Admin Routes (Level 4+) */}
-        <Route path="/dashboard/admin/users">
-          <ProtectedRoute minLevel={4}>
-            <UsersManagement />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/applications">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/queue">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/packages">
-          <ProtectedRoute minLevel={4}>
-            <PackagesManagement />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/payments">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/analytics">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/messages">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin/settings">
-          <ProtectedRoute minLevel={4}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/admin">
-          <ProtectedRoute minLevel={4}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        {/* Owner Routes (Level 5) */}
-        <Route path="/dashboard/owner/site-settings">
-          <ProtectedRoute minLevel={5}>
-            <SiteSettings />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/users">
-          <ProtectedRoute minLevel={5}>
-            <UsersManagement />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/applications">
-          <ProtectedRoute minLevel={5}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/packages">
-          <ProtectedRoute minLevel={5}>
-            <PackagesManagement />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/payments">
-          <ProtectedRoute minLevel={5}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/commissions">
-          <ProtectedRoute minLevel={5}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner/analytics">
-          <ProtectedRoute minLevel={5}>
-            <PlaceholderPage />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard/owner">
-          <ProtectedRoute minLevel={5}>
-            <OwnerDashboard />
-          </ProtectedRoute>
-        </Route>
-
-        {/* Fallback */}
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
-  );
-}
-
-function PublicRouter() {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/login" component={Login} />
-        <Route path="/register" component={Register} />
-        <Route path="/packages" component={Packages} />
-        <Route path="/setup" component={SetupRequired} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
-  );
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -270,18 +59,201 @@ function App() {
           <ConfigProvider>
             <TooltipProvider>
               <Toaster />
-              <Switch>
-                {/* Dashboard routes don't use AppShell (they have their own layout) */}
-                <Route path="/dashboard/:rest*">
-                  <DashboardRouter />
-                </Route>
-                {/* All other routes use AppShell */}
-                <Route>
-                  <AppShell>
-                    <PublicRouter />
-                  </AppShell>
-                </Route>
-              </Switch>
+              <Suspense fallback={<PageLoader />}>
+                <Switch>
+                  {/* Public routes with AppShell */}
+                  <Route path="/">
+                    <AppShell><Home /></AppShell>
+                  </Route>
+                  <Route path="/login">
+                    <AppShell><Login /></AppShell>
+                  </Route>
+                  <Route path="/register">
+                    <AppShell><Register /></AppShell>
+                  </Route>
+                  <Route path="/packages">
+                    <AppShell><Packages /></AppShell>
+                  </Route>
+                  <Route path="/setup">
+                    <AppShell><SetupRequired /></AppShell>
+                  </Route>
+
+                  {/* Applicant Routes (Level 1+) */}
+                  <Route path="/dashboard/applicant/applications/new">
+                    <ProtectedRoute minLevel={1}>
+                      <NewApplication />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/applications">
+                    <ProtectedRoute minLevel={1}>
+                      <ApplicationsPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/documents">
+                    <ProtectedRoute minLevel={1}>
+                      <DocumentsPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/messages">
+                    <ProtectedRoute minLevel={1}>
+                      <MessagesPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/payments">
+                    <ProtectedRoute minLevel={1}>
+                      <PaymentsPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/settings">
+                    <ProtectedRoute minLevel={1}>
+                      <SettingsPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant">
+                    <ProtectedRoute minLevel={1}>
+                      <ApplicantDashboard />
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Reviewer Routes (Level 2+) */}
+                  <Route path="/dashboard/reviewer/queue">
+                    <ProtectedRoute minLevel={2}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/reviewer/completed">
+                    <ProtectedRoute minLevel={2}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/reviewer/messages">
+                    <ProtectedRoute minLevel={2}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/reviewer/settings">
+                    <ProtectedRoute minLevel={2}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/reviewer">
+                    <ProtectedRoute minLevel={2}>
+                      <ReviewerDashboard />
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Agent Routes (Level 3+) */}
+                  <Route path="/dashboard/agent/queue">
+                    <ProtectedRoute minLevel={3}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/agent/referrals">
+                    <ProtectedRoute minLevel={3}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/agent/commissions">
+                    <ProtectedRoute minLevel={3}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/agent/messages">
+                    <ProtectedRoute minLevel={3}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/agent/settings">
+                    <ProtectedRoute minLevel={3}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/agent">
+                    <ProtectedRoute minLevel={3}>
+                      <AgentDashboard />
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Admin Routes (Level 4+) */}
+                  <Route path="/dashboard/admin/users">
+                    <ProtectedRoute minLevel={4}>
+                      <UsersManagement />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/packages">
+                    <ProtectedRoute minLevel={4}>
+                      <PackagesManagement />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/queue">
+                    <ProtectedRoute minLevel={4}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/reports">
+                    <ProtectedRoute minLevel={4}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/messages">
+                    <ProtectedRoute minLevel={4}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin/settings">
+                    <ProtectedRoute minLevel={4}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/admin">
+                    <ProtectedRoute minLevel={4}>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Owner Routes (Level 5) */}
+                  <Route path="/dashboard/owner/users">
+                    <ProtectedRoute minLevel={5}>
+                      <UsersManagement />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/packages">
+                    <ProtectedRoute minLevel={5}>
+                      <PackagesManagement />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/settings">
+                    <ProtectedRoute minLevel={5}>
+                      <SiteSettings />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/payments">
+                    <ProtectedRoute minLevel={5}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/commissions">
+                    <ProtectedRoute minLevel={5}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/analytics">
+                    <ProtectedRoute minLevel={5}>
+                      <PlaceholderPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner">
+                    <ProtectedRoute minLevel={5}>
+                      <OwnerDashboard />
+                    </ProtectedRoute>
+                  </Route>
+
+                  {/* Fallback */}
+                  <Route>
+                    <AppShell><NotFound /></AppShell>
+                  </Route>
+                </Switch>
+              </Suspense>
             </TooltipProvider>
           </ConfigProvider>
         </AuthProvider>
