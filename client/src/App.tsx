@@ -31,7 +31,7 @@ const OwnerDashboard = lazy(() => import("@/pages/dashboard/OwnerDashboard"));
 const SiteSettings = lazy(() => import("@/pages/dashboard/owner/SiteSettings"));
 
 // Applicant sub-pages
-const ApplicationsPage = lazy(() => import("@/pages/dashboard/placeholders/ApplicationsPage"));
+const RegistrationPage = lazy(() => import("@/pages/dashboard/applicant/RegistrationPage"));
 const DocumentsPage = lazy(() => import("@/pages/dashboard/applicant/DocumentsPage"));
 const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage"));
 
@@ -93,9 +93,9 @@ function App() {
                       <NewApplication />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/applicant/applications">
+                  <Route path="/dashboard/applicant/registration">
                     <ProtectedRoute minLevel={1}>
-                      <ApplicationsPage />
+                      <RegistrationPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/applicant/documents">

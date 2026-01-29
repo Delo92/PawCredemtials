@@ -62,7 +62,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       case 1: // Applicant
         return [
           { title: "Dashboard", href: "/dashboard/applicant", icon: Home },
-          { title: "My Applications", href: "/dashboard/applicant/applications", icon: FileText },
+          { title: "Registration", href: "/dashboard/applicant/registration", icon: FileText },
           { title: "Documents", href: "/dashboard/applicant/documents", icon: FolderOpen },
           { title: "Payments", href: "/dashboard/applicant/payments", icon: CreditCard },
           { title: "Messages", href: "/dashboard/applicant/messages", icon: MessageSquare },
