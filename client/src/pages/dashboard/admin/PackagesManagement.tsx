@@ -48,6 +48,7 @@ const packageSchema = z.object({
   price: z.string().min(1, "Price is required"),
   features: z.string().optional(),
   processingTime: z.string().optional(),
+  requiresLevel2Interaction: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
 
@@ -72,6 +73,7 @@ export default function PackagesManagement() {
       price: "",
       features: "",
       processingTime: "",
+      requiresLevel2Interaction: false,
       isActive: true,
     },
   });
@@ -160,6 +162,7 @@ export default function PackagesManagement() {
       price: "",
       features: "",
       processingTime: "",
+      requiresLevel2Interaction: false,
       isActive: true,
     });
     setIsDialogOpen(true);
@@ -173,6 +176,7 @@ export default function PackagesManagement() {
       price: pkg.price.toString(),
       features: Array.isArray(pkg.features) ? pkg.features.join("\n") : "",
       processingTime: pkg.processingTime || "",
+      requiresLevel2Interaction: pkg.requiresLevel2Interaction || false,
       isActive: pkg.isActive,
     });
     setIsDialogOpen(true);
@@ -382,6 +386,28 @@ export default function PackagesManagement() {
                       </FormControl>
                       <FormDescription>Enter each feature on a new line</FormDescription>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="requiresLevel2Interaction"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Requires Level 2 Interaction</FormLabel>
+                        <FormDescription>
+                          Applicants must join call queue with a reviewer
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-package-level2"
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
