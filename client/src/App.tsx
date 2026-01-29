@@ -30,8 +30,14 @@ const PackagesManagement = lazy(() => import("@/pages/dashboard/admin/PackagesMa
 const OwnerDashboard = lazy(() => import("@/pages/dashboard/OwnerDashboard"));
 const SiteSettings = lazy(() => import("@/pages/dashboard/owner/SiteSettings"));
 
-// Placeholder pages
+// Applicant sub-pages
 const ApplicationsPage = lazy(() => import("@/pages/dashboard/placeholders/ApplicationsPage"));
+const DocumentsPage = lazy(() => import("@/pages/dashboard/applicant/DocumentsPage"));
+const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage"));
+const MessagesPage = lazy(() => import("@/pages/dashboard/applicant/MessagesPage"));
+const SettingsPage = lazy(() => import("@/pages/dashboard/applicant/SettingsPage"));
+
+// Generic placeholder for other pages
 const PlaceholderPage = lazy(() => import("@/pages/dashboard/placeholders/PlaceholderPage"));
 
 function PageLoader() {
@@ -62,22 +68,22 @@ function DashboardRouter() {
         </Route>
         <Route path="/dashboard/applicant/documents">
           <ProtectedRoute minLevel={1}>
-            <PlaceholderPage />
+            <DocumentsPage />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard/applicant/messages">
           <ProtectedRoute minLevel={1}>
-            <PlaceholderPage />
+            <MessagesPage />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard/applicant/payments">
           <ProtectedRoute minLevel={1}>
-            <PlaceholderPage />
+            <PaymentsPage />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard/applicant/settings">
           <ProtectedRoute minLevel={1}>
-            <PlaceholderPage />
+            <SettingsPage />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard/applicant">
