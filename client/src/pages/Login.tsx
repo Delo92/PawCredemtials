@@ -53,7 +53,7 @@ export default function Login() {
   // When level is selected, auto-fill email
   useEffect(() => {
     if (selectedLevel) {
-      form.setValue("email", `Level${selectedLevel}@test.com`);
+      form.setValue("email", `level${selectedLevel}@test.com`);
       form.setValue("password", "ChronicBrands");
     }
   }, [selectedLevel, form]);
