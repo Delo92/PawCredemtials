@@ -128,13 +128,13 @@ export default function ApplicantDashboard() {
           </Card>
         </div>
 
-        {/* Active Applications */}
-        <Card data-testid="card-active-applications">
+        {/* Registration */}
+        <Card data-testid="card-registration">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Your Applications</CardTitle>
+              <CardTitle>Your Registration</CardTitle>
               <CardDescription>
-                Track the progress of your active applications
+                Review and complete your registration information
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
@@ -145,68 +145,22 @@ export default function ApplicantDashboard() {
             </Button>
           </CardHeader>
           <CardContent>
-            {applicationsLoading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-12 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-3 w-1/4" />
-                    </div>
-                    <Skeleton className="h-6 w-20" />
-                  </div>
-                ))}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border hover-elevate transition-all">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <FileText className="h-6 w-6" />
               </div>
-            ) : activeApplications.length > 0 ? (
-              <div className="space-y-4">
-                {activeApplications.slice(0, 3).map((app) => (
-                  <div
-                    key={app.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border hover-elevate transition-all"
-                    data-testid={`application-${app.id}`}
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <FileText className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">Application #{app.id.slice(0, 8)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Step {app.currentStep} of {app.totalSteps}
-                      </p>
-                      <Progress
-                        value={(app.currentStep / app.totalSteps) * 100}
-                        className="h-1.5 mt-2"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {getStatusBadge(app.status)}
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/applicant/applications/${app.id}`}>
-                          View
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">No active applications</h3>
-                <p className="text-muted-foreground mb-4 max-w-sm">
-                  Complete your registration, then purchase a package to start your application.
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">Registration Details</p>
+                <p className="text-sm text-muted-foreground">
+                  Personal info, address, and communication preferences
                 </p>
-                <Button asChild>
-                  <Link href="/dashboard/applicant/registration">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Edit Registration
-                  </Link>
-                </Button>
               </div>
-            )}
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/applicant/registration">
+                  Edit
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
