@@ -39,6 +39,7 @@ const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage
 const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsPage"));
 const SharedMessagesPage = lazy(() => import("@/pages/dashboard/shared/MessagesPage"));
 const SharedQueuePage = lazy(() => import("@/pages/dashboard/shared/QueuePage"));
+const SharedCompletedPage = lazy(() => import("@/pages/dashboard/shared/CompletedPage"));
 
 // Generic placeholder for pages not yet implemented
 const PlaceholderPage = lazy(() => import("@/pages/dashboard/placeholders/PlaceholderPage"));
@@ -126,7 +127,7 @@ function App() {
                   </Route>
                   <Route path="/dashboard/reviewer/completed">
                     <ProtectedRoute minLevel={2}>
-                      <PlaceholderPage />
+                      <SharedCompletedPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/reviewer/messages">
