@@ -111,7 +111,7 @@ export default function Register() {
             </div>
             <CardTitle className="text-2xl" data-testid="text-register-title">Create an account</CardTitle>
             <CardDescription>
-              Get started with your application today
+              Get your doctor's note quickly and securely
             </CardDescription>
           </CardHeader>
           <CardContent>

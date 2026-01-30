@@ -117,7 +117,7 @@ export default function Login() {
             </div>
             <CardTitle className="text-2xl" data-testid="text-login-title">Welcome back</CardTitle>
             <CardDescription>
-              Sign in to your account to continue
+              Sign in to access your doctor's notes and orders
             </CardDescription>
           </CardHeader>
           <CardContent>

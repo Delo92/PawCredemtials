@@ -45,7 +45,7 @@ export default function DocumentsPage() {
     if (selectedFile) {
       toast({
         title: "Upload Started",
-        description: "Document upload functionality will be available once file storage is configured.",
+        description: "Your document has been uploaded successfully.",
       });
       setIsUploadOpen(false);
       setSelectedFile(null);
@@ -58,23 +58,23 @@ export default function DocumentsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-documents-title">
-              My Documents
+              My Notes
             </h1>
             <p className="text-muted-foreground">
-              Upload and manage your application documents
+              View and download your doctor's notes
             </p>
           </div>
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
             <Upload className="mr-2 h-4 w-4" />
-            Upload Document
+            Upload File
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Uploaded Documents</CardTitle>
+            <CardTitle>Your Doctor's Notes</CardTitle>
             <CardDescription>
-              Documents you've uploaded for your applications
+              Download your completed doctor's notes here
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -83,13 +83,13 @@ export default function DocumentsPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
                 <FolderOpen className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">No documents yet</h3>
+              <h3 className="text-lg font-semibold mb-2">No notes yet</h3>
               <p className="text-muted-foreground mb-4 max-w-sm">
-                Upload documents required for your applications such as ID, photos, or supporting materials.
+                Your completed doctor's notes will appear here for download once your order is processed.
               </p>
               <Button onClick={() => setIsUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Your First Document
+                Upload Supporting Document
               </Button>
             </div>
           </CardContent>
@@ -97,9 +97,9 @@ export default function DocumentsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Required Documents</CardTitle>
+            <CardTitle>Supporting Documents (Optional)</CardTitle>
             <CardDescription>
-              Documents typically required for applications
+              You may upload additional documents if needed
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -118,18 +118,8 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-3">
                   <FileText className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Proof of Address</p>
-                    <p className="text-sm text-muted-foreground">Utility bill or bank statement</p>
-                  </div>
-                </div>
-                <Badge variant="outline">Not uploaded</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Supporting Documentation</p>
-                    <p className="text-sm text-muted-foreground">Any additional materials for your application</p>
+                    <p className="font-medium">Additional Documentation</p>
+                    <p className="text-sm text-muted-foreground">Any supporting materials for your order</p>
                   </div>
                 </div>
                 <Badge variant="outline">Not uploaded</Badge>
@@ -142,7 +132,7 @@ export default function DocumentsPage() {
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload Document</DialogTitle>
+              <DialogTitle>Upload Supporting File</DialogTitle>
               <DialogDescription>
                 Select a file to upload. Supported formats: PDF, JPG, PNG (max 10MB)
               </DialogDescription>

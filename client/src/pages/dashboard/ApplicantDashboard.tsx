@@ -43,13 +43,13 @@ export default function ApplicantDashboard() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending" },
-      in_review: { variant: "default", label: "In Review" },
-      awaiting_documents: { variant: "outline", label: "Documents Needed" },
-      awaiting_payment: { variant: "outline", label: "Payment Needed" },
+      pending: { variant: "secondary", label: "Processing" },
+      in_review: { variant: "default", label: "Under Review" },
+      awaiting_documents: { variant: "outline", label: "Info Needed" },
+      awaiting_payment: { variant: "outline", label: "Payment Pending" },
       approved: { variant: "default", label: "Approved" },
-      rejected: { variant: "destructive", label: "Rejected" },
-      completed: { variant: "default", label: "Completed" },
+      rejected: { variant: "destructive", label: "Declined" },
+      completed: { variant: "default", label: "Ready for Download" },
     };
     const config = statusConfig[status] || { variant: "secondary", label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -65,13 +65,13 @@ export default function ApplicantDashboard() {
               Welcome back, {user?.firstName}!
             </h1>
             <p className="text-muted-foreground">
-              Track your applications and manage your documents.
+              Track your orders and download your doctor's notes.
             </p>
           </div>
           <Button asChild data-testid="button-fill-registration">
             <Link href="/dashboard/applicant/registration">
               <FileText className="mr-2 h-4 w-4" />
-              Edit Registration
+              Edit Profile
             </Link>
           </Button>
         </div>
@@ -80,7 +80,7 @@ export default function ApplicantDashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-stat-active">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Active Applications</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -108,7 +108,7 @@ export default function ApplicantDashboard() {
 
           <Card data-testid="card-stat-documents">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Documents</CardTitle>
+              <CardTitle className="text-sm font-medium">Notes Received</CardTitle>
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -132,9 +132,9 @@ export default function ApplicantDashboard() {
         <Card data-testid="card-registration">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Your Registration</CardTitle>
+              <CardTitle>Your Profile</CardTitle>
               <CardDescription>
-                Review and complete your registration information
+                Review and update your personal information
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
@@ -150,9 +150,9 @@ export default function ApplicantDashboard() {
                 <FileText className="h-6 w-6" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium">Registration Details</p>
+                <p className="font-medium">Profile Details</p>
                 <p className="text-sm text-muted-foreground">
-                  Personal info, address, and communication preferences
+                  Personal info, contact details, and preferences
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
@@ -167,9 +167,9 @@ export default function ApplicantDashboard() {
         {/* Available Services */}
         <Card data-testid="card-available-services">
           <CardHeader>
-            <CardTitle>Available Services</CardTitle>
+            <CardTitle>Order a Doctor's Note</CardTitle>
             <CardDescription>
-              Browse our available service packages
+              Choose the type of note you need
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -210,7 +210,7 @@ export default function ApplicantDashboard() {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                No packages available at this time.
+                No note types available at this time.
               </div>
             )}
           </CardContent>

@@ -92,8 +92,8 @@ export default function PackagesManagement() {
       setIsDialogOpen(false);
       form.reset();
       toast({
-        title: "Package Created",
-        description: "The package has been created successfully.",
+        title: "Note Type Created",
+        description: "The note type has been created successfully.",
       });
     },
     onError: (error: any) => {
@@ -120,8 +120,8 @@ export default function PackagesManagement() {
       setEditingPackage(null);
       form.reset();
       toast({
-        title: "Package Updated",
-        description: "The package has been updated successfully.",
+        title: "Note Type Updated",
+        description: "The note type has been updated successfully.",
       });
     },
     onError: (error: any) => {
@@ -141,8 +141,8 @@ export default function PackagesManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setDeleteConfirmId(null);
       toast({
-        title: "Package Deleted",
-        description: "The package has been deleted successfully.",
+        title: "Note Type Deleted",
+        description: "The note type has been deleted successfully.",
       });
     },
     onError: (error: any) => {
@@ -198,23 +198,23 @@ export default function PackagesManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-packages-title">
-              Package Management
+              Note Types Management
             </h1>
             <p className="text-muted-foreground">
-              Create and manage service packages
+              Create and manage doctor's note types
             </p>
           </div>
           <Button onClick={openCreateDialog} data-testid="button-create-package">
             <Plus className="mr-2 h-4 w-4" />
-            Add Package
+            Add Note Type
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Packages</CardTitle>
+            <CardTitle>All Note Types</CardTitle>
             <CardDescription>
-              {packages?.length || 0} total packages
+              {packages?.length || 0} total note types
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -277,7 +277,7 @@ export default function PackagesManagement() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No packages found. Create your first package to get started.
+                          No note types found. Create your first note type to get started.
                         </TableCell>
                       </TableRow>
                     )}
@@ -293,12 +293,12 @@ export default function PackagesManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingPackage ? "Edit Package" : "Create Package"}
+                {editingPackage ? "Edit Note Type" : "Create Note Type"}
               </DialogTitle>
               <DialogDescription>
                 {editingPackage
-                  ? "Update the package details below."
-                  : "Fill in the details to create a new service package."}
+                  ? "Update the note type details below."
+                  : "Fill in the details to create a new doctor's note type."}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -308,9 +308,9 @@ export default function PackagesManagement() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Package Name</FormLabel>
+                      <FormLabel>Note Type Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Standard License" data-testid="input-package-name" {...field} />
+                        <Input placeholder="e.g., Work Excuse Note" data-testid="input-package-name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -325,7 +325,7 @@ export default function PackagesManagement() {
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Brief description of the package..."
+                          placeholder="Brief description of the note type..."
                           data-testid="input-package-description"
                           {...field}
                         />

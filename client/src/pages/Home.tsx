@@ -48,41 +48,41 @@ export default function Home() {
   const features = [
     {
       icon: FileText,
-      title: "Easy Applications",
-      description: "Simple step-by-step application process with real-time status tracking.",
+      title: "Legitimate Documentation",
+      description: "Professionally prepared medical notes that meet standard requirements for work or school.",
     },
     {
       icon: CreditCard,
-      title: "Secure Payments",
-      description: "Safe and secure payment processing with multiple payment options.",
+      title: "Secure Payment",
+      description: "Safe and discreet payment processing with multiple payment options available.",
     },
     {
       icon: Users,
-      title: "Expert Review",
-      description: "Qualified professionals review your application thoroughly.",
+      title: "Medical Review",
+      description: "Licensed medical professionals review and approve all documentation.",
     },
     {
       icon: Shield,
-      title: "Data Protection",
-      description: "Your information is encrypted and protected at all times.",
+      title: "100% Confidential",
+      description: "Your personal information is encrypted and never shared with third parties.",
     },
     {
       icon: Clock,
-      title: "Fast Processing",
-      description: "Quick turnaround times with automated workflow management.",
+      title: "Fast Delivery",
+      description: "Receive your doctor's note within hours, not days. Same-day options available.",
     },
     {
       icon: MessageSquare,
-      title: "Direct Support",
-      description: "Get help anytime through our integrated messaging system.",
+      title: "24/7 Support",
+      description: "Get help anytime through our secure messaging system or live chat.",
     },
   ];
 
   const steps = [
-    { step: 1, title: "Create Account", description: "Sign up with your email and basic information" },
-    { step: 2, title: "Select Service", description: "Choose the package that fits your needs" },
-    { step: 3, title: "Submit Application", description: "Complete the application form and upload documents" },
-    { step: 4, title: "Get Approved", description: "Our team reviews and approves your application" },
+    { step: 1, title: "Create Account", description: "Quick signup with just your email and basic info" },
+    { step: 2, title: "Choose Your Note", description: "Select the type of doctor's note you need" },
+    { step: 3, title: "Provide Details", description: "Enter the dates and any specific requirements" },
+    { step: 4, title: "Receive Your Note", description: "Get your verified doctor's note delivered digitally" },
   ];
 
   return (
@@ -179,7 +179,7 @@ export default function Home() {
               Why Choose Us
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our platform provides everything you need for a smooth application experience.
+              We make getting a doctor's note simple, fast, and completely confidential.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -203,14 +203,14 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20">
+      <section className="py-20" id="how-it-works">
         <div className="container">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-4" data-testid="text-steps-title">
               How It Works
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our streamlined process makes it easy to get started and get approved.
+              Get your doctor's note in four simple steps. No appointments, no waiting rooms.
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
@@ -237,15 +237,15 @@ export default function Home() {
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-bold tracking-tight mb-4" data-testid="text-cta-title">
-              Ready to Get Started?
+              Need a Doctor's Note Now?
             </h2>
             <p className="text-primary-foreground/80 mb-8 text-lg">
-              Join thousands of satisfied customers who have trusted us with their applications.
+              Join thousands of satisfied customers who got their documentation quickly and discreetly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" variant="secondary" asChild data-testid="button-cta-start">
                 <Link href="/register">
-                  Start Your Application
+                  Get Your Note Today
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

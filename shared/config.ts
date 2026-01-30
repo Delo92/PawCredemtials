@@ -47,41 +47,44 @@ export interface WhiteLabelConfig {
 }
 
 export const defaultConfig: WhiteLabelConfig = {
-  siteName: "Application Portal",
-  tagline: "Your trusted application processing platform",
-  description: "A comprehensive platform for managing applications, documents, and approvals.",
+  siteName: "Doctor's Note",
+  tagline: "Fast, discreet medical documentation when you need it",
+  description: "Get legitimate doctor's notes for work, school, or personal needs. Quick approval, secure delivery, and complete privacy.",
   primaryColor: "#3b82f6",
   secondaryColor: "#6366f1",
   accentColor: "#0ea5e9",
-  heroButtonText: "Get Started",
+  heroTitle: "Get Your Doctor's Note Today",
+  heroSubtitle: "Need documentation for work or school? We provide fast, legitimate medical notes with quick turnaround times. Discreet, secure, and hassle-free.",
+  heroButtonText: "Get Your Note",
   heroButtonLink: "/register",
-  heroSecondaryButtonText: "View Services",
+  heroSecondaryButtonText: "View Pricing",
   heroSecondaryButtonLink: "/packages",
   footerQuickLinks: [
     { label: "Home", url: "/" },
-    { label: "Services", url: "/packages" },
-    { label: "About Us", url: "/about" },
+    { label: "Pricing", url: "/packages" },
+    { label: "How It Works", url: "/#how-it-works" },
     { label: "Contact", url: "/contact" }
   ],
   footerLegalLinks: [
     { label: "Privacy Policy", url: "/privacy" },
-    { label: "Terms of Service", url: "/terms" }
+    { label: "Terms of Service", url: "/terms" },
+    { label: "Disclaimer", url: "/disclaimer" }
   ],
   levelNames: {
-    level1: "Applicant",
-    level2: "Reviewer",
+    level1: "Customer",
+    level2: "Medical Staff",
     level3: "Agent",
     level4: "Admin",
     level5: "Owner",
   },
   workflowSteps: [
-    "Registration",
-    "Package Selection",
+    "Create Account",
+    "Select Note Type",
     "Payment",
-    "Document Upload",
-    "Review",
-    "Approval",
-    "Completed"
+    "Provide Details",
+    "Medical Review",
+    "Note Issued",
+    "Delivered"
   ],
   features: {
     enableMessaging: true,

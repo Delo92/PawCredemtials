@@ -86,7 +86,7 @@ export function Footer() {
             {config.footerText || `© ${currentYear} ${config.siteName}. All rights reserved.`}
           </p>
           <p className="text-xs text-muted-foreground">
-            White-label platform template
+            Fast, discreet medical documentation
           </p>
         </div>
       </div>

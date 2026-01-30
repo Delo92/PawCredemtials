@@ -30,10 +30,10 @@ export default function ApplicationsListPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-applications-title">
-              All Applications
+              All Orders
             </h1>
             <p className="text-muted-foreground">
-              View and manage all applications in the system
+              View and manage all doctor's note orders in the system
             </p>
           </div>
         </div>
@@ -47,7 +47,7 @@ export default function ApplicationsListPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{applications?.length || 0}</div>
-              <p className="text-xs text-muted-foreground">All applications</p>
+              <p className="text-xs text-muted-foreground">All orders</p>
             </CardContent>
           </Card>
           <Card>
@@ -85,8 +85,8 @@ export default function ApplicationsListPage() {
         {/* Applications List */}
         <Card>
           <CardHeader>
-            <CardTitle>Applications</CardTitle>
-            <CardDescription>All applications in the system</CardDescription>
+            <CardTitle>Orders</CardTitle>
+            <CardDescription>All doctor's note orders in the system</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -114,9 +114,9 @@ export default function ApplicationsListPage() {
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
                   <FileText className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
+                <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
                 <p className="text-muted-foreground max-w-sm">
-                  Applications will appear here as users submit them.
+                  Orders will appear here as customers submit them.
                 </p>
               </div>
             )}

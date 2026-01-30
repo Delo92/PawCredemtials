@@ -96,8 +96,8 @@ export default function RegistrationPage() {
     setIsSaving(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     toast({
-      title: "Registration Saved",
-      description: "Your registration information has been updated.",
+      title: "Profile Saved",
+      description: "Your profile information has been updated.",
     });
     setIsSaving(false);
   };
@@ -110,16 +110,16 @@ export default function RegistrationPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-registration-title">
-              Registration Information
+              My Profile
             </h1>
             <p className="text-muted-foreground">
-              Review and update your registration details
+              Review and update your personal details
             </p>
           </div>
           <Link href="/packages">
             <Button data-testid="button-buy-package">
               <ShoppingCart className="mr-2 h-4 w-4" />
-              Purchase Package
+              Order Doctor's Note
             </Button>
           </Link>
         </div>
@@ -154,7 +154,7 @@ export default function RegistrationPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
-                <CardDescription>This information will be used on your forms</CardDescription>
+                <CardDescription>This information will be used on your doctor's notes</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -235,7 +235,7 @@ export default function RegistrationPage() {
               <CardHeader>
                 <CardTitle>Address Information</CardTitle>
                 <CardDescription>
-                  Please verify your address does not have a P.O. Box. This information will be used on your forms.
+                  Please verify your address does not have a P.O. Box. This information will be used on your doctor's notes.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -397,7 +397,7 @@ export default function RegistrationPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Communication Consent</CardTitle>
-                <CardDescription>Required consents for processing your application</CardDescription>
+                <CardDescription>Required consents for processing your order</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -459,7 +459,7 @@ export default function RegistrationPage() {
                       <div className="space-y-1 leading-none">
                         <FormLabel>Charge Understanding</FormLabel>
                         <FormDescription>
-                          I understand the charge name that will appear on my bank statement and that disputed charges may delay my application.
+                          I understand the charge name that will appear on my bank statement and that disputed charges may delay my order.
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -481,7 +481,7 @@ export default function RegistrationPage() {
                       <div className="space-y-1 leading-none">
                         <FormLabel>Patient Authorization</FormLabel>
                         <FormDescription>
-                          I authorize the platform and its staff to access my State patient portal to assist with submitting my application.
+                          I authorize the platform and its staff to access my information to assist with processing my order.
                         </FormDescription>
                       </div>
                     </FormItem>

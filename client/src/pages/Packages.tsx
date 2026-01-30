@@ -21,10 +21,10 @@ export default function Packages() {
     <div className="container py-12">
       <div className="text-center mb-12">
         <h1 className="text-3xl font-bold tracking-tight mb-4" data-testid="text-packages-title">
-          Our Services
+          Doctor's Note Pricing
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Choose the service package that best fits your needs. All packages include professional review and support.
+          Choose the type of doctor's note you need. All notes are reviewed by licensed medical professionals and delivered digitally.
         </p>
       </div>
 
@@ -72,26 +72,26 @@ export default function Packages() {
                 <ul className="space-y-2">
                   <li className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                    <span>Professional review</span>
+                    <span>Medical professional review</span>
                   </li>
                   <li className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                    <span>Document processing</span>
+                    <span>Digital delivery</span>
                   </li>
                   <li className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                    <span>Fast turnaround</span>
+                    <span>Same-day processing</span>
                   </li>
                   <li className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                    <span>Dedicated support</span>
+                    <span>100% confidential</span>
                   </li>
                 </ul>
               </CardContent>
               <CardFooter>
                 <Button className="w-full" asChild data-testid={`button-select-${pkg.id}`}>
                   <Link href={isAuthenticated ? `/dashboard/applicant/applications/new?package=${pkg.id}` : `/register?package=${pkg.id}`}>
-                    Get Started
+                    Get This Note
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -112,7 +112,7 @@ export default function Packages() {
       <div className="mt-16 text-center">
         <h2 className="text-2xl font-bold mb-4">Have Questions?</h2>
         <p className="text-muted-foreground mb-6">
-          Our team is here to help you choose the right package.
+          Our support team is available 24/7 to help you get the right documentation.
         </p>
         <Button variant="outline" asChild>
           <Link href="/contact">Contact Us</Link>
