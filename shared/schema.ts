@@ -15,6 +15,26 @@ export const siteConfig = pgTable("site_config", {
   logoUrl: text("logo_url"),
   faviconUrl: text("favicon_url"),
   primaryColor: text("primary_color").default("#3b82f6"),
+  secondaryColor: text("secondary_color").default("#6366f1"),
+  accentColor: text("accent_color").default("#0ea5e9"),
+  heroTitle: text("hero_title"),
+  heroSubtitle: text("hero_subtitle"),
+  heroBackgroundUrl: text("hero_background_url"),
+  heroButtonText: text("hero_button_text").default("Get Started"),
+  heroButtonLink: text("hero_button_link").default("/register"),
+  heroSecondaryButtonText: text("hero_secondary_button_text").default("View Services"),
+  heroSecondaryButtonLink: text("hero_secondary_button_link").default("/packages"),
+  footerQuickLinks: jsonb("footer_quick_links").$type<{label: string; url: string}[]>().default([
+    { label: "Home", url: "/" },
+    { label: "Services", url: "/packages" },
+    { label: "About Us", url: "/about" },
+    { label: "Contact", url: "/contact" }
+  ]),
+  footerLegalLinks: jsonb("footer_legal_links").$type<{label: string; url: string}[]>().default([
+    { label: "Privacy Policy", url: "/privacy" },
+    { label: "Terms of Service", url: "/terms" }
+  ]),
+  footerText: text("footer_text"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   address: text("address"),

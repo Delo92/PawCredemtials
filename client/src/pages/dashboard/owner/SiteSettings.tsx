@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,12 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2 } from "lucide-react";
+
+const footerLinkSchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  url: z.string().min(1, "URL is required"),
+});
 
 const configSchema = z.object({
   siteName: z.string().min(1, "Site name is required"),
@@ -30,6 +35,18 @@ const configSchema = z.object({
   logoUrl: z.string().url().optional().or(z.literal("")),
   faviconUrl: z.string().url().optional().or(z.literal("")),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color"),
+  secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color").optional().or(z.literal("")),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color").optional().or(z.literal("")),
+  heroTitle: z.string().optional(),
+  heroSubtitle: z.string().optional(),
+  heroBackgroundUrl: z.string().url().optional().or(z.literal("")),
+  heroButtonText: z.string().optional(),
+  heroButtonLink: z.string().optional(),
+  heroSecondaryButtonText: z.string().optional(),
+  heroSecondaryButtonLink: z.string().optional(),
+  footerQuickLinks: z.array(footerLinkSchema).optional(),
+  footerLegalLinks: z.array(footerLinkSchema).optional(),
+  footerText: z.string().optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
   contactPhone: z.string().optional(),
   address: z.string().optional(),
@@ -58,6 +75,26 @@ export default function SiteSettings() {
       logoUrl: "",
       faviconUrl: "",
       primaryColor: "#3b82f6",
+      secondaryColor: "#6366f1",
+      accentColor: "#0ea5e9",
+      heroTitle: "",
+      heroSubtitle: "",
+      heroBackgroundUrl: "",
+      heroButtonText: "Get Started",
+      heroButtonLink: "/register",
+      heroSecondaryButtonText: "View Services",
+      heroSecondaryButtonLink: "/packages",
+      footerQuickLinks: [
+        { label: "Home", url: "/" },
+        { label: "Services", url: "/packages" },
+        { label: "About Us", url: "/about" },
+        { label: "Contact", url: "/contact" }
+      ],
+      footerLegalLinks: [
+        { label: "Privacy Policy", url: "/privacy" },
+        { label: "Terms of Service", url: "/terms" }
+      ],
+      footerText: "",
       contactEmail: "",
       contactPhone: "",
       address: "",
@@ -69,6 +106,16 @@ export default function SiteSettings() {
     },
   });
 
+  const { fields: quickLinkFields, append: appendQuickLink, remove: removeQuickLink } = useFieldArray({
+    control: form.control,
+    name: "footerQuickLinks",
+  });
+
+  const { fields: legalLinkFields, append: appendLegalLink, remove: removeLegalLink } = useFieldArray({
+    control: form.control,
+    name: "footerLegalLinks",
+  });
+
   useEffect(() => {
     if (config) {
       form.reset({
@@ -78,6 +125,26 @@ export default function SiteSettings() {
         logoUrl: config.logoUrl || "",
         faviconUrl: config.faviconUrl || "",
         primaryColor: config.primaryColor || "#3b82f6",
+        secondaryColor: config.secondaryColor || "#6366f1",
+        accentColor: config.accentColor || "#0ea5e9",
+        heroTitle: config.heroTitle || "",
+        heroSubtitle: config.heroSubtitle || "",
+        heroBackgroundUrl: config.heroBackgroundUrl || "",
+        heroButtonText: config.heroButtonText || "Get Started",
+        heroButtonLink: config.heroButtonLink || "/register",
+        heroSecondaryButtonText: config.heroSecondaryButtonText || "View Services",
+        heroSecondaryButtonLink: config.heroSecondaryButtonLink || "/packages",
+        footerQuickLinks: config.footerQuickLinks || [
+          { label: "Home", url: "/" },
+          { label: "Services", url: "/packages" },
+          { label: "About Us", url: "/about" },
+          { label: "Contact", url: "/contact" }
+        ],
+        footerLegalLinks: config.footerLegalLinks || [
+          { label: "Privacy Policy", url: "/privacy" },
+          { label: "Terms of Service", url: "/terms" }
+        ],
+        footerText: config.footerText || "",
         contactEmail: config.contactEmail || "",
         contactPhone: config.contactPhone || "",
         address: config.address || "",
@@ -140,16 +207,24 @@ export default function SiteSettings() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <Tabs defaultValue="branding" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="branding">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="branding" data-testid="tab-branding">
                   <Palette className="mr-2 h-4 w-4" />
                   Branding
                 </TabsTrigger>
-                <TabsTrigger value="roles">
+                <TabsTrigger value="hero" data-testid="tab-hero">
+                  <LayoutTemplate className="mr-2 h-4 w-4" />
+                  Hero Section
+                </TabsTrigger>
+                <TabsTrigger value="footer" data-testid="tab-footer">
+                  <LinkIcon className="mr-2 h-4 w-4" />
+                  Footer
+                </TabsTrigger>
+                <TabsTrigger value="roles" data-testid="tab-roles">
                   <Users className="mr-2 h-4 w-4" />
                   Role Names
                 </TabsTrigger>
-                <TabsTrigger value="contact">
+                <TabsTrigger value="contact" data-testid="tab-contact">
                   <Building2 className="mr-2 h-4 w-4" />
                   Contact Info
                 </TabsTrigger>
@@ -213,31 +288,87 @@ export default function SiteSettings() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="primaryColor"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Primary Color</FormLabel>
-                          <FormControl>
-                            <div className="flex gap-2">
-                              <Input
-                                type="color"
-                                className="w-16 h-10 p-1 cursor-pointer"
-                                {...field}
-                              />
-                              <Input
-                                placeholder="#3b82f6"
-                                className="flex-1"
-                                data-testid="input-primary-color"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="primaryColor"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Color</FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="color"
+                                  className="w-12 h-10 p-1 cursor-pointer"
+                                  {...field}
+                                />
+                                <Input
+                                  placeholder="#3b82f6"
+                                  className="flex-1"
+                                  data-testid="input-primary-color"
+                                  {...field}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="secondaryColor"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secondary Color</FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="color"
+                                  className="w-12 h-10 p-1 cursor-pointer"
+                                  value={field.value || "#6366f1"}
+                                  onChange={field.onChange}
+                                />
+                                <Input
+                                  placeholder="#6366f1"
+                                  className="flex-1"
+                                  data-testid="input-secondary-color"
+                                  {...field}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="accentColor"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Accent Color</FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="color"
+                                  className="w-12 h-10 p-1 cursor-pointer"
+                                  value={field.value || "#0ea5e9"}
+                                  onChange={field.onChange}
+                                />
+                                <Input
+                                  placeholder="#0ea5e9"
+                                  className="flex-1"
+                                  data-testid="input-accent-color"
+                                  {...field}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <FormField
                       control={form.control}
@@ -254,6 +385,281 @@ export default function SiteSettings() {
                     />
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="hero">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Hero Section</CardTitle>
+                    <CardDescription>
+                      Customize the main landing page hero area
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="heroTitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hero Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Leave blank to use site name" data-testid="input-hero-title" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            The main headline on your landing page. Leave blank to use the site name.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="heroSubtitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hero Subtitle</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="A compelling subtitle for your hero section..."
+                              data-testid="input-hero-subtitle"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Appears below the main title. Leave blank to use the description.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="heroBackgroundUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hero Background Image URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://example.com/hero-bg.jpg" data-testid="input-hero-bg" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Optional background image for the hero section
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="heroButtonText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Button Text</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Get Started" data-testid="input-hero-btn-text" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="heroButtonLink"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Button Link</FormLabel>
+                            <FormControl>
+                              <Input placeholder="/register" data-testid="input-hero-btn-link" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="heroSecondaryButtonText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secondary Button Text</FormLabel>
+                            <FormControl>
+                              <Input placeholder="View Services" data-testid="input-hero-sec-btn-text" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="heroSecondaryButtonLink"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secondary Button Link</FormLabel>
+                            <FormControl>
+                              <Input placeholder="/packages" data-testid="input-hero-sec-btn-link" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="footer">
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Quick Links</CardTitle>
+                      <CardDescription>
+                        Navigation links displayed in the footer
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {quickLinkFields.map((field, index) => (
+                        <div key={field.id} className="flex gap-2 items-start">
+                          <FormField
+                            control={form.control}
+                            name={`footerQuickLinks.${index}.label`}
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Input placeholder="Link Label" data-testid={`input-quick-link-label-${index}`} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`footerQuickLinks.${index}.url`}
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Input placeholder="/page-url" data-testid={`input-quick-link-url-${index}`} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeQuickLink(index)}
+                            data-testid={`button-remove-quick-link-${index}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendQuickLink({ label: "", url: "" })}
+                        data-testid="button-add-quick-link"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Quick Link
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Legal Links</CardTitle>
+                      <CardDescription>
+                        Legal and policy links for the footer
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {legalLinkFields.map((field, index) => (
+                        <div key={field.id} className="flex gap-2 items-start">
+                          <FormField
+                            control={form.control}
+                            name={`footerLegalLinks.${index}.label`}
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Input placeholder="Link Label" data-testid={`input-legal-link-label-${index}`} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`footerLegalLinks.${index}.url`}
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Input placeholder="/privacy" data-testid={`input-legal-link-url-${index}`} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLegalLink(index)}
+                            data-testid={`button-remove-legal-link-${index}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendLegalLink({ label: "", url: "" })}
+                        data-testid="button-add-legal-link"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Legal Link
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Footer Text</CardTitle>
+                      <CardDescription>
+                        Additional text or copyright notice for the footer
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FormField
+                        control={form.control}
+                        name="footerText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Textarea
+                                placeholder="© 2026 Your Company. All rights reserved."
+                                data-testid="input-footer-text"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Custom copyright or additional footer text
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="roles">

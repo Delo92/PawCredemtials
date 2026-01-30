@@ -1,6 +1,11 @@
 // White-label configuration defaults
 // These can be overridden per deployment via environment variables or database settings
 
+export interface FooterLink {
+  label: string;
+  url: string;
+}
+
 export interface WhiteLabelConfig {
   siteName: string;
   tagline: string;
@@ -8,6 +13,18 @@ export interface WhiteLabelConfig {
   logoUrl?: string;
   faviconUrl?: string;
   primaryColor: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+  heroBackgroundUrl?: string;
+  heroButtonText?: string;
+  heroButtonLink?: string;
+  heroSecondaryButtonText?: string;
+  heroSecondaryButtonLink?: string;
+  footerQuickLinks?: FooterLink[];
+  footerLegalLinks?: FooterLink[];
+  footerText?: string;
   contactEmail?: string;
   contactPhone?: string;
   address?: string;
@@ -33,6 +50,22 @@ export const defaultConfig: WhiteLabelConfig = {
   tagline: "Your trusted application processing platform",
   description: "A comprehensive platform for managing applications, documents, and approvals.",
   primaryColor: "#3b82f6",
+  secondaryColor: "#6366f1",
+  accentColor: "#0ea5e9",
+  heroButtonText: "Get Started",
+  heroButtonLink: "/register",
+  heroSecondaryButtonText: "View Services",
+  heroSecondaryButtonLink: "/packages",
+  footerQuickLinks: [
+    { label: "Home", url: "/" },
+    { label: "Services", url: "/packages" },
+    { label: "About Us", url: "/about" },
+    { label: "Contact", url: "/contact" }
+  ],
+  footerLegalLinks: [
+    { label: "Privacy Policy", url: "/privacy" },
+    { label: "Terms of Service", url: "/terms" }
+  ],
   levelNames: {
     level1: "Applicant",
     level2: "Reviewer",

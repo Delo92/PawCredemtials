@@ -74,18 +74,31 @@ export default function Home() {
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 py-20 md:py-32">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+      <section 
+        className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 py-20 md:py-32"
+        style={config.heroBackgroundUrl ? {
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${config.heroBackgroundUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : undefined}
+      >
+        {!config.heroBackgroundUrl && <div className="absolute inset-0 bg-grid-pattern opacity-5" />}
         <div className="container relative">
           <div className="mx-auto max-w-3xl text-center">
             <Badge variant="secondary" className="mb-4" data-testid="badge-tagline">
               {config.tagline}
             </Badge>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6" data-testid="text-hero-title">
-              {config.siteName}
+            <h1 
+              className={`text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6 ${config.heroBackgroundUrl ? 'text-white' : ''}`} 
+              data-testid="text-hero-title"
+            >
+              {config.heroTitle || config.siteName}
             </h1>
-            <p className="text-lg text-muted-foreground md:text-xl mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
-              {config.description || "A comprehensive platform for managing applications, documents, and approvals. Start your application today and get approved quickly."}
+            <p 
+              className={`text-lg md:text-xl mb-8 max-w-2xl mx-auto ${config.heroBackgroundUrl ? 'text-white/90' : 'text-muted-foreground'}`} 
+              data-testid="text-hero-description"
+            >
+              {config.heroSubtitle || config.description || "A comprehensive platform for managing applications, documents, and approvals. Start your application today and get approved quickly."}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {isAuthenticated ? (
@@ -98,13 +111,15 @@ export default function Home() {
               ) : (
                 <>
                   <Button size="lg" asChild data-testid="button-hero-start">
-                    <Link href="/register">
-                      Get Started
+                    <Link href={config.heroButtonLink || "/register"}>
+                      {config.heroButtonText || "Get Started"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" asChild data-testid="button-hero-learn">
-                    <Link href="/packages">View Services</Link>
+                  <Button size="lg" variant="outline" asChild data-testid="button-hero-learn" className={config.heroBackgroundUrl ? 'bg-white/10 border-white/20 text-white hover:bg-white/20' : ''}>
+                    <Link href={config.heroSecondaryButtonLink || "/packages"}>
+                      {config.heroSecondaryButtonText || "View Services"}
+                    </Link>
                   </Button>
                 </>
               )}
