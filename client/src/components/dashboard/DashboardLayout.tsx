@@ -91,9 +91,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       case 4: // Admin
         return [
           { title: "Dashboard", href: "/dashboard/admin", icon: Home },
+          { title: "Verification Queue", href: "/dashboard/admin/queue", icon: ClipboardList },
           { title: "Users", href: "/dashboard/admin/users", icon: Users },
           { title: "Applications", href: "/dashboard/admin/applications", icon: FileText },
-          { title: "Queue Management", href: "/dashboard/admin/queue", icon: ClipboardList },
           { title: "Packages", href: "/dashboard/admin/packages", icon: Building2 },
           { title: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
           { title: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
