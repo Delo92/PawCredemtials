@@ -344,13 +344,200 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
-  // QUEUE ROUTES
+  // QUEUE ROUTES (Call Queue System)
   // ===========================================================================
 
+  // Get all waiting queue entries (for Level 2+ reviewers)
   app.get("/api/queue", requireAuth, requireLevel(2), async (req, res) => {
     try {
       const entries = await storage.getWaitingQueueEntries();
       res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get queue stats for Level 2 dashboard
+  app.get("/api/queue/stats", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const waiting = await storage.getWaitingQueueEntries();
+      const myActive = await storage.getQueueEntriesByReviewer(req.session.userId!);
+      const inCall = myActive.filter(e => e.status === "in_call");
+      const completedToday = myActive.filter(e => {
+        if (!e.completedAt) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return new Date(e.completedAt) >= today;
+      });
+      res.json({
+        waitingCount: waiting.length,
+        inCallCount: inCall.length,
+        completedTodayCount: completedToday.length,
+        waiting,
+        inCall,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 1: Join the call queue
+  app.post("/api/queue/join", requireAuth, async (req, res) => {
+    try {
+      const { packageId, applicationId, phone } = req.body;
+      
+      // Check if user already in queue
+      const existing = await storage.getWaitingQueueEntries();
+      const alreadyInQueue = existing.find(e => e.applicantId === req.session.userId && e.status === "waiting");
+      if (alreadyInQueue) {
+        res.status(400).json({ message: "You are already in the queue", queueEntry: alreadyInQueue });
+        return;
+      }
+
+      // Calculate position
+      const position = existing.length + 1;
+
+      const entry = await storage.createQueueEntry({
+        applicantId: req.session.userId!,
+        packageId,
+        applicationId,
+        applicantPhone: phone,
+        queueType: "consultation",
+        status: "waiting",
+        position,
+        priority: 0,
+      });
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 1: Check my queue status
+  app.get("/api/queue/my-status", requireAuth, async (req, res) => {
+    try {
+      const entries = await storage.getWaitingQueueEntries();
+      const myEntry = entries.find(e => e.applicantId === req.session.userId);
+      if (!myEntry) {
+        res.json({ inQueue: false });
+        return;
+      }
+      const position = entries.filter(e => e.createdAt <= myEntry.createdAt && e.status === "waiting").length;
+      res.json({ inQueue: true, position, entry: myEntry });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 1: Leave the queue
+  app.post("/api/queue/leave", requireAuth, async (req, res) => {
+    try {
+      const entries = await storage.getWaitingQueueEntries();
+      const myEntry = entries.find(e => e.applicantId === req.session.userId && e.status === "waiting");
+      if (!myEntry) {
+        res.status(404).json({ message: "Not in queue" });
+        return;
+      }
+      await storage.updateQueueEntry(myEntry.id, { status: "cancelled" });
+      res.json({ message: "Left the queue" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 2+: Claim a caller from the queue
+  app.post("/api/queue/:id/claim", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const entry = await storage.getQueueEntry(req.params.id);
+      if (!entry) {
+        res.status(404).json({ message: "Queue entry not found" });
+        return;
+      }
+      if (entry.status !== "waiting") {
+        res.status(400).json({ message: "This caller has already been claimed" });
+        return;
+      }
+      const updated = await storage.updateQueueEntry(req.params.id, {
+        reviewerId: req.session.userId!,
+        status: "claimed",
+        claimedAt: new Date(),
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 2+: Start call with claimed caller
+  app.post("/api/queue/:id/start-call", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const entry = await storage.getQueueEntry(req.params.id);
+      if (!entry) {
+        res.status(404).json({ message: "Queue entry not found" });
+        return;
+      }
+      if (entry.reviewerId !== req.session.userId) {
+        res.status(403).json({ message: "This caller is not assigned to you" });
+        return;
+      }
+      
+      // Here is where Twilio/GHL integration would generate a call
+      // For now, just update status
+      const updated = await storage.updateQueueEntry(req.params.id, {
+        status: "in_call",
+        callStartedAt: new Date(),
+        // roomId would be set here when Twilio/GHL is integrated
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 2+: Complete a call
+  app.post("/api/queue/:id/complete", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const { notes, outcome } = req.body;
+      const entry = await storage.getQueueEntry(req.params.id);
+      if (!entry) {
+        res.status(404).json({ message: "Queue entry not found" });
+        return;
+      }
+      if (entry.reviewerId !== req.session.userId) {
+        res.status(403).json({ message: "This caller is not assigned to you" });
+        return;
+      }
+      const updated = await storage.updateQueueEntry(req.params.id, {
+        status: "completed",
+        callEndedAt: new Date(),
+        completedAt: new Date(),
+        notes,
+        outcome,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Level 2+: Release a claimed caller back to queue
+  app.post("/api/queue/:id/release", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const entry = await storage.getQueueEntry(req.params.id);
+      if (!entry) {
+        res.status(404).json({ message: "Queue entry not found" });
+        return;
+      }
+      if (entry.reviewerId !== req.session.userId) {
+        res.status(403).json({ message: "This caller is not assigned to you" });
+        return;
+      }
+      const updated = await storage.updateQueueEntry(req.params.id, {
+        reviewerId: null,
+        status: "waiting",
+        claimedAt: null,
+      });
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

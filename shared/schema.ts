@@ -281,15 +281,24 @@ export type Message = typeof messages.$inferSelect;
 
 export const queueEntries = pgTable("queue_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  applicationId: varchar("application_id").notNull().references(() => applications.id),
+  applicationId: varchar("application_id").references(() => applications.id),
+  packageId: varchar("package_id").references(() => packages.id),
   applicantId: varchar("applicant_id").notNull().references(() => users.id),
   reviewerId: varchar("reviewer_id").references(() => users.id),
-  status: text("status").notNull().default("waiting"),
+  queueType: text("queue_type").notNull().default("consultation"), // consultation, review, support
+  status: text("status").notNull().default("waiting"), // waiting, claimed, in_call, completed, cancelled
   priority: integer("priority").default(0),
+  position: integer("position"), // Position in queue
+  roomId: text("room_id"), // Video room ID (Twilio/GHL)
+  roomToken: text("room_token"), // Access token for video room
+  applicantPhone: text("applicant_phone"),
   claimedAt: timestamp("claimed_at"),
+  callStartedAt: timestamp("call_started_at"),
+  callEndedAt: timestamp("call_ended_at"),
   timerExpiresAt: timestamp("timer_expires_at"),
   completedAt: timestamp("completed_at"),
   notes: text("notes"),
+  outcome: text("outcome"), // approved, denied, follow_up, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

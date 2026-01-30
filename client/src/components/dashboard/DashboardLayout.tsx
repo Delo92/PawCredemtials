@@ -28,6 +28,7 @@ import {
   BarChart3,
   FolderOpen,
   ClipboardList,
+  Phone,
   UserCheck,
   Building2,
   DollarSign,
@@ -63,6 +64,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         return [
           { title: "Dashboard", href: "/dashboard/applicant", icon: Home },
           { title: "Registration", href: "/dashboard/applicant/registration", icon: FileText },
+          { title: "Call Queue", href: "/dashboard/applicant/call-queue", icon: Phone },
           { title: "Documents", href: "/dashboard/applicant/documents", icon: FolderOpen },
           { title: "Payments", href: "/dashboard/applicant/payments", icon: CreditCard },
           { title: "Messages", href: "/dashboard/applicant/messages", icon: MessageSquare },
@@ -71,6 +73,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       case 2: // Reviewer
         return [
           { title: "Dashboard", href: "/dashboard/reviewer", icon: Home },
+          { title: "Call Queue", href: "/dashboard/reviewer/call-queue", icon: Phone },
           { title: "Review Queue", href: "/dashboard/reviewer/queue", icon: ClipboardList },
           { title: "Completed Reviews", href: "/dashboard/reviewer/completed", icon: UserCheck },
           { title: "Messages", href: "/dashboard/reviewer/messages", icon: MessageSquare },

@@ -98,10 +98,17 @@ Role names are configurable per deployment via the `siteConfig` table.
 - **Authentication**: Session-based login/registration with bcrypt password hashing
 - **5 Role-Based Dashboards**: Each with unique stats, actions, and navigation
 - **Application Workflow**: 3-step wizard for creating new applications
-- **Package Management**: Browse and select service packages
+- **Package Management**: Browse and select service packages with "Requires Level 2 Interaction" toggle
+- **Call Queue System**: Pooled voice call queue where Level 1 users join queue, Level 2 users claim and handle calls
 - **Owner Configuration**: Full white-label settings (branding, role names, contact info)
 - **Admin User Management**: Search, filter, and edit user levels/status
 - **Dark/Light Theme**: System-aware with manual toggle
+
+### Call Queue System (Voice Consultation)
+- **Level 1 (Applicant)**: Can join call queue, see position, leave queue
+- **Level 2 (Reviewer)**: Pooled queue - any reviewer can claim callers, start calls, complete calls with outcomes
+- **Flow**: Level 1 purchases package requiring Level 2 interaction → joins queue → Level 2 claims → call happens → Level 2 completes with notes
+- **Integration Ready**: Schema includes roomId, roomToken fields for Twilio/GHL voice integration
 
 ### API Endpoints
 - `POST /api/auth/register` - User registration
@@ -113,6 +120,14 @@ Role names are configurable per deployment via the `siteConfig` table.
 - `GET /api/applications` - Get user's applications
 - `POST /api/applications` - Create new application
 - `GET /api/queue` - Get review queue (Level 2+)
+- `GET /api/queue/stats` - Get queue stats (Level 2+)
+- `POST /api/queue/join` - Join call queue (Level 1)
+- `GET /api/queue/my-status` - Check queue position (Level 1)
+- `POST /api/queue/leave` - Leave call queue (Level 1)
+- `POST /api/queue/:id/claim` - Claim a caller (Level 2+)
+- `POST /api/queue/:id/start-call` - Start call with caller (Level 2+)
+- `POST /api/queue/:id/complete` - Complete call with notes/outcome (Level 2+)
+- `POST /api/queue/:id/release` - Release caller back to queue (Level 2+)
 - `GET /api/commissions` - Get commissions (Level 3+)
 - `GET /api/admin/users` - List all users (Level 4+)
 - `PUT /api/admin/users/:id` - Update user (Level 4+)
@@ -125,7 +140,9 @@ Role names are configurable per deployment via the `siteConfig` table.
 - `/packages` - Service packages listing
 - `/dashboard/applicant` - Applicant dashboard
 - `/dashboard/applicant/applications/new` - New application wizard
+- `/dashboard/applicant/call-queue` - Join call queue
 - `/dashboard/reviewer` - Reviewer dashboard with queue
+- `/dashboard/reviewer/call-queue` - Manage incoming calls
 - `/dashboard/agent` - Agent dashboard with referrals
 - `/dashboard/admin` - Admin dashboard
 - `/dashboard/admin/users` - User management

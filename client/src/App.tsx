@@ -34,6 +34,10 @@ const SiteSettings = lazy(() => import("@/pages/dashboard/owner/SiteSettings"));
 const RegistrationPage = lazy(() => import("@/pages/dashboard/applicant/RegistrationPage"));
 const DocumentsPage = lazy(() => import("@/pages/dashboard/applicant/DocumentsPage"));
 const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage"));
+const ApplicantCallQueuePage = lazy(() => import("@/pages/dashboard/applicant/CallQueuePage"));
+
+// Reviewer sub-pages
+const ReviewerCallQueuePage = lazy(() => import("@/pages/dashboard/reviewer/CallQueuePage"));
 
 // Shared pages (used across multiple levels)
 const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsPage"));
@@ -118,6 +122,11 @@ function App() {
                       <SharedSettingsPage />
                     </ProtectedRoute>
                   </Route>
+                  <Route path="/dashboard/applicant/call-queue">
+                    <ProtectedRoute minLevel={1}>
+                      <ApplicantCallQueuePage />
+                    </ProtectedRoute>
+                  </Route>
                   <Route path="/dashboard/applicant">
                     <ProtectedRoute minLevel={1}>
                       <ApplicantDashboard />
@@ -125,6 +134,11 @@ function App() {
                   </Route>
 
                   {/* Reviewer Routes (Level 2+) */}
+                  <Route path="/dashboard/reviewer/call-queue">
+                    <ProtectedRoute minLevel={2}>
+                      <ReviewerCallQueuePage />
+                    </ProtectedRoute>
+                  </Route>
                   <Route path="/dashboard/reviewer/queue">
                     <ProtectedRoute minLevel={2}>
                       <SharedQueuePage />
