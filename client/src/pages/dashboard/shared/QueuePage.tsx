@@ -4,7 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { UserProfileModal } from "@/components/shared/UserProfileModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +32,9 @@ import {
   RotateCcw,
   Mail,
   Calendar,
-  MapPin
+  MapPin,
+  Search,
+  UserCog
 } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Application, User as UserType, Package as PackageType } from "@shared/schema";
 
 type ApplicationWithDetails = Application & {
@@ -44,14 +57,16 @@ type Level4Tab = "pending" | "verified";
 
 export default function QueuePage() {
   const { user } = useAuth();
-  const { config } = useConfig();
+  const { config, getLevelName } = useConfig();
   const { toast } = useToast();
   const [selectedApp, setSelectedApp] = useState<ApplicationWithDetails | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [workNotes, setWorkNotes] = useState("");
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
   const [level3Tab, setLevel3Tab] = useState<Level3Tab>("waiting");
   const [level4Tab, setLevel4Tab] = useState<Level4Tab>("pending");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const level3Name = config?.levelNames?.level3 || "Agent";
   const level4Name = config?.levelNames?.level4 || "Admin";
@@ -158,6 +173,34 @@ export default function QueuePage() {
   // Level 4 queue data
   const pendingVerification = verifyQueue || [];
 
+  // Filter based on search
+  const filterApps = (apps: ApplicationWithDetails[]) => {
+    if (!searchQuery) return apps;
+    const query = searchQuery.toLowerCase();
+    return apps.filter(app => {
+      const name = `${app.formData?.firstName || ""} ${app.formData?.lastName || ""}`.toLowerCase();
+      const email = (app.formData?.email || "").toLowerCase();
+      return name.includes(query) || email.includes(query);
+    });
+  };
+
+  const getDisplayName = (app: ApplicationWithDetails) => {
+    return `${app.formData?.firstName || "Applicant"} ${app.formData?.lastName || ""}`;
+  };
+
+  const getQueueData = () => {
+    if (level3Tab === "waiting") return filterApps(waitingQueue);
+    if (level3Tab === "in_progress") return filterApps(myInProgress);
+    if (level3Tab === "completed") return filterApps(myCompleted);
+    return [];
+  };
+
+  const handleViewProfile = (app: ApplicationWithDetails) => {
+    if (app.user) {
+      setSelectedUser(app.user);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -256,90 +299,55 @@ export default function QueuePage() {
           </div>
         )}
 
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            {/* Level 3: WAITING TAB - Shared Queue */}
-            {isLevel3 && level3Tab === "waiting" && (
-              <Card>
-                <CardHeader>
+        {/* Level 3: Table-based Queue Display */}
+        {isLevel3 && (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Waiting Queue (Shared)
+                    {level3Tab === "waiting" && <Clock className="h-5 w-5" />}
+                    {level3Tab === "in_progress" && <Briefcase className="h-5 w-5" />}
+                    {level3Tab === "completed" && <CheckCircle className="h-5 w-5" />}
+                    {level3Tab === "waiting" && "Waiting Queue (Shared)"}
+                    {level3Tab === "in_progress" && "My In Progress"}
+                    {level3Tab === "completed" && `My Completed ${level1Name}s`}
                   </CardTitle>
                   <CardDescription>
-                    {level1Name}s waiting to be claimed by any {level3Name} ({waitingQueue.length})
+                    {level3Tab === "waiting" && `${level1Name}s waiting to be claimed by any ${level3Name} (${waitingQueue.length})`}
+                    {level3Tab === "in_progress" && `${level1Name}s you've claimed and are working on (${myInProgress.length})`}
+                    {level3Tab === "completed" && `All ${level1Name}s you've completed (${myCompleted.length})`}
                   </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {waitingQueue.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 w-full sm:w-64"
+                    data-testid="input-search-queue"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : getQueueData().length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {level3Tab === "waiting" && (
+                    <>
                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No {level1Name}s waiting in queue</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {waitingQueue.map((app) => (
-                        <div
-                          key={app.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
-                          data-testid={`card-waiting-${app.id}`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                              <User className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium">
-                                {app.formData?.firstName || "Applicant"} {app.formData?.lastName || ""}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Application #{app.id.slice(0, 8)}
-                              </p>
-                              {app.level2ApprovedAt && (
-                                <p className="text-xs text-green-600 dark:text-green-400">
-                                  Approved by Level 2 on {new Date(app.level2ApprovedAt).toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => claimMutation.mutate(app.id)}
-                            disabled={claimMutation.isPending}
-                            data-testid={`button-claim-${app.id}`}
-                          >
-                            {claimMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Claim"
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                    </>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Level 3: IN PROGRESS TAB - My Private Queue */}
-            {isLevel3 && level3Tab === "in_progress" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    My In Progress
-                  </CardTitle>
-                  <CardDescription>
-                    {level1Name}s you've claimed and are working on ({myInProgress.length})
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {myInProgress.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                  {level3Tab === "in_progress" && (
+                    <>
                       <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No {level1Name}s in progress</p>
                       <Button 
@@ -349,253 +357,213 @@ export default function QueuePage() {
                       >
                         Go to Waiting Queue to claim
                       </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {myInProgress.map((app) => (
-                        <div
-                          key={app.id}
-                          className="p-4 border rounded-lg bg-primary/5"
-                          data-testid={`card-in-progress-${app.id}`}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <User className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium">
-                                  {app.formData?.firstName || "Applicant"} {app.formData?.lastName || ""}
-                                </p>
-                                <Badge variant="secondary">In Progress</Badge>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedApp(app);
-                                setShowCompleteDialog(true);
-                              }}
-                              data-testid={`button-complete-${app.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Mark Complete
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            {app.formData?.email && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Mail className="h-3 w-3" />
-                                {app.formData.email}
-                              </div>
-                            )}
-                            {app.formData?.phone && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {app.formData.phone}
-                              </div>
-                            )}
-                            {app.formData?.city && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                {app.formData.city}, {app.formData.state}
-                              </div>
-                            )}
-                            {app.createdAt && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(app.createdAt).toLocaleDateString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    </>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Level 3: COMPLETED TAB - All My Completed */}
-            {isLevel3 && level3Tab === "completed" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    My Completed {level1Name}s
-                  </CardTitle>
-                  <CardDescription>
-                    All {level1Name}s you've completed with full details ({myCompleted.length})
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {myCompleted.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                  {level3Tab === "completed" && (
+                    <>
                       <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No completed {level1Name}s yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {myCompleted.map((app) => (
-                        <div
-                          key={app.id}
-                          className="p-4 border rounded-lg"
-                          data-testid={`card-completed-${app.id}`}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                              </div>
-                              <div>
-                                <p className="font-medium">
-                                  {app.formData?.firstName || "Applicant"} {app.formData?.lastName || ""}
-                                </p>
-                                <Badge variant="outline" className="text-green-600 border-green-600">
-                                  {app.status === "completed" ? "Verified" : "Pending Verification"}
-                                </Badge>
-                              </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Completed {app.level3CompletedAt ? new Date(app.level3CompletedAt).toLocaleDateString() : ""}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                            {app.formData?.email && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Mail className="h-3 w-3" />
-                                {app.formData.email}
-                              </div>
-                            )}
-                            {app.formData?.phone && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                {app.formData.phone}
-                              </div>
-                            )}
-                            {app.formData?.city && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                {app.formData.city}, {app.formData.state}
-                              </div>
-                            )}
-                            {app.formData?.dateOfBirth && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                DOB: {app.formData.dateOfBirth}
-                              </div>
-                            )}
-                          </div>
-                          {app.level3Notes && (
-                            <div className="bg-muted p-3 rounded-md text-sm">
-                              <p className="font-medium text-xs mb-1">Your Notes:</p>
-                              <p className="text-muted-foreground">{app.level3Notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    </>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Level 4: Verification Queue */}
-            {isLevel4 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5" />
-                    Pending Verification
-                  </CardTitle>
-                  <CardDescription>
-                    Applications completed by {level3Name} awaiting your verification ({pendingVerification.length})
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {pendingVerification.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No applications pending verification</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {pendingVerification.map((app) => (
-                        <div
-                          key={app.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
-                          data-testid={`card-verify-item-${app.id}`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                              <User className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium">
-                                {app.formData?.firstName || "Applicant"} {app.formData?.lastName || ""}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Application #{app.id.slice(0, 8)}
-                              </p>
-                              {app.level3CompletedAt && (
-                                <p className="text-xs text-blue-600 dark:text-blue-400">
-                                  Completed by {level3Name} on {new Date(app.level3CompletedAt).toLocaleDateString()}
-                                </p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getQueueData().map((app) => (
+                        <TableRow key={app.id} data-testid={`row-${level3Tab}-${app.id}`}>
+                          <TableCell className="font-medium">
+                            {getDisplayName(app)}
+                          </TableCell>
+                          <TableCell>{app.formData?.email || "-"}</TableCell>
+                          <TableCell>{app.formData?.phone || "-"}</TableCell>
+                          <TableCell>
+                            {level3Tab === "waiting" && (
+                              <Badge variant="secondary">Waiting</Badge>
+                            )}
+                            {level3Tab === "in_progress" && (
+                              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">In Progress</Badge>
+                            )}
+                            {level3Tab === "completed" && (
+                              <Badge className={app.status === "completed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""} variant={app.status === "completed" ? "default" : "outline"}>
+                                {app.status === "completed" ? "Verified" : "Pending Verification"}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {level3Tab === "completed" && app.level3CompletedAt
+                              ? new Date(app.level3CompletedAt).toLocaleDateString()
+                              : app.createdAt
+                                ? new Date(app.createdAt).toLocaleDateString()
+                                : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewProfile(app)}
+                                data-testid={`button-view-profile-${app.id}`}
+                                title="View Profile"
+                              >
+                                <UserCog className="h-4 w-4" />
+                              </Button>
+                              {level3Tab === "waiting" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => claimMutation.mutate(app.id)}
+                                  disabled={claimMutation.isPending}
+                                  data-testid={`button-claim-${app.id}`}
+                                >
+                                  {claimMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Claim"
+                                  )}
+                                </Button>
                               )}
-                              {app.level3Notes && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Notes: {app.level3Notes.substring(0, 50)}...
-                                </p>
+                              {level3Tab === "in_progress" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedApp(app);
+                                    setShowCompleteDialog(true);
+                                  }}
+                                  data-testid={`button-complete-${app.id}`}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Complete
+                                </Button>
                               )}
                             </div>
-                          </div>
-                          <Button
-                            onClick={() => {
-                              setSelectedApp(app);
-                              setShowVerifyDialog(true);
-                            }}
-                            data-testid={`button-verify-${app.id}`}
-                          >
-                            Review & Verify
-                          </Button>
-                        </div>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
-        {/* Level 3: Complete Dialog */}
+        {/* Level 4: Verification Queue (keep existing) */}
+        {isLevel4 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Pending Verification
+              </CardTitle>
+              <CardDescription>
+                Applications completed by {level3Name} awaiting your verification ({pendingVerification.length})
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {verifyLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : pendingVerification.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No applications pending verification</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Agent Notes</TableHead>
+                        <TableHead>Completed</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingVerification.map((app) => (
+                        <TableRow key={app.id} data-testid={`verify-row-${app.id}`}>
+                          <TableCell className="font-medium">
+                            {getDisplayName(app)}
+                          </TableCell>
+                          <TableCell>{app.formData?.email || "-"}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {app.level3Notes || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {app.level3CompletedAt
+                              ? new Date(app.level3CompletedAt).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewProfile(app)}
+                                data-testid={`button-view-profile-${app.id}`}
+                                title="View Profile"
+                              >
+                                <UserCog className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedApp(app);
+                                  setShowVerifyDialog(true);
+                                }}
+                                data-testid={`button-verify-${app.id}`}
+                              >
+                                Review
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* User Profile Modal */}
+        <UserProfileModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          canEditLevel={false}
+        />
+
+        {/* Complete Work Dialog (Level 3) */}
         <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Complete Work</DialogTitle>
               <DialogDescription>
-                Add notes about the work completed. This will send the application to {level4Name} for verification.
+                Add notes about your work with {selectedApp?.formData?.firstName} {selectedApp?.formData?.lastName}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium mb-1">{level1Name}</p>
-                <p className="text-muted-foreground">
-                  {selectedApp?.formData?.firstName} {selectedApp?.formData?.lastName}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Work Notes</label>
-                <Textarea
-                  placeholder="Describe the work completed..."
-                  value={workNotes}
-                  onChange={(e) => setWorkNotes(e.target.value)}
-                  className="mt-1"
-                  rows={4}
-                  data-testid="input-work-notes"
-                />
-              </div>
-            </div>
+            <Textarea
+              placeholder="Work notes (required)"
+              value={workNotes}
+              onChange={(e) => setWorkNotes(e.target.value)}
+              rows={4}
+              data-testid="input-work-notes"
+            />
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
                 Cancel
@@ -606,7 +574,7 @@ export default function QueuePage() {
                     completeMutation.mutate({ applicationId: selectedApp.id, notes: workNotes });
                   }
                 }}
-                disabled={completeMutation.isPending}
+                disabled={completeMutation.isPending || !workNotes.trim()}
                 data-testid="button-confirm-complete"
               >
                 {completeMutation.isPending ? (
@@ -614,64 +582,50 @@ export default function QueuePage() {
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-1" />
                 )}
-                Complete & Send to {level4Name}
+                Send to {level4Name}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Level 4: Verify Dialog */}
+        {/* Verify Dialog (Level 4) */}
         <Dialog open={showVerifyDialog} onOpenChange={setShowVerifyDialog}>
-          <DialogContent className="max-w-lg">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Verify Application</DialogTitle>
               <DialogDescription>
-                Review the work completed and approve or send back for rework.
+                Review work by {level3Name} for {selectedApp?.formData?.firstName} {selectedApp?.formData?.lastName}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium mb-1">{level1Name}</p>
-                <p className="text-muted-foreground">
-                  {selectedApp?.formData?.firstName} {selectedApp?.formData?.lastName}
-                </p>
+            {selectedApp?.level3Notes && (
+              <div className="bg-muted p-3 rounded-md text-sm">
+                <p className="font-medium text-xs mb-1">{level3Name} Notes:</p>
+                <p className="text-muted-foreground">{selectedApp.level3Notes}</p>
               </div>
-              {selectedApp?.level3Notes && (
-                <div>
-                  <p className="text-sm font-medium mb-1">{level3Name} Notes</p>
-                  <p className="text-muted-foreground text-sm bg-muted p-3 rounded-md">
-                    {selectedApp.level3Notes}
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="text-sm font-medium">Verification Notes</label>
-                <Textarea
-                  placeholder="Add your verification notes..."
-                  value={workNotes}
-                  onChange={(e) => setWorkNotes(e.target.value)}
-                  className="mt-1"
-                  rows={3}
-                  data-testid="input-verify-notes"
-                />
-              </div>
-            </div>
-            <DialogFooter className="flex gap-2">
+            )}
+            <Textarea
+              placeholder="Verification notes (optional)"
+              value={workNotes}
+              onChange={(e) => setWorkNotes(e.target.value)}
+              rows={3}
+              data-testid="input-verify-notes"
+            />
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={() => setShowVerifyDialog(false)}>
                 Cancel
               </Button>
               <Button
-                variant="secondary"
+                variant="destructive"
                 onClick={() => {
                   if (selectedApp) {
                     verifyMutation.mutate({ applicationId: selectedApp.id, notes: workNotes, approved: false });
                   }
                 }}
                 disabled={verifyMutation.isPending}
-                data-testid="button-send-rework"
+                data-testid="button-rework"
               >
                 <RotateCcw className="h-4 w-4 mr-1" />
-                Send Back
+                Send for Rework
               </Button>
               <Button
                 onClick={() => {
