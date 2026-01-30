@@ -607,16 +607,27 @@ export async function registerRoutes(
       const waiting = allApps.filter(a => !a.assignedAgentId).length;
       const inProgress = allApps.filter(a => a.assignedAgentId === req.session.userId).length;
       
-      // Get today's completions
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const completedApps = await storage.getApplicationsByStatus("level4_verification");
-      const completedToday = completedApps.filter(a => 
-        a.level3CompletedBy === req.session.userId && 
-        a.level3CompletedAt && new Date(a.level3CompletedAt) >= today
-      ).length;
+      // Get all completions by this agent (level4_verification + completed)
+      const pendingVerification = await storage.getApplicationsByStatus("level4_verification");
+      const completedApps = await storage.getApplicationsByStatus("completed");
+      const allCompleted = [...pendingVerification, ...completedApps];
+      const completedTotal = allCompleted.filter(a => a.level3CompletedBy === req.session.userId).length;
       
-      res.json({ waiting, inProgress, completedToday });
+      res.json({ waiting, inProgress, completedTotal });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get Level 3's completed applications (for their completed tab)
+  app.get("/api/agent/my-completed", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      // Get all apps completed by this agent (pending verification + fully completed)
+      const pendingVerification = await storage.getApplicationsByStatus("level4_verification");
+      const completedApps = await storage.getApplicationsByStatus("completed");
+      const allCompleted = [...pendingVerification, ...completedApps];
+      const myCompleted = allCompleted.filter(a => a.level3CompletedBy === req.session.userId);
+      res.json(myCompleted);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
