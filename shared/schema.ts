@@ -304,6 +304,11 @@ export const queueEntries = pgTable("queue_entries", {
   roomId: text("room_id"), // Video room ID (Twilio/GHL)
   roomToken: text("room_token"), // Access token for video room
   applicantPhone: text("applicant_phone"),
+  applicantFirstName: text("applicant_first_name"),
+  applicantLastName: text("applicant_last_name"),
+  applicantState: text("applicant_state"),
+  packageName: text("package_name"),
+  packagePrice: decimal("package_price", { precision: 10, scale: 2 }),
   claimedAt: timestamp("claimed_at"),
   callStartedAt: timestamp("call_started_at"),
   callEndedAt: timestamp("call_ended_at"),

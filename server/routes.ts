@@ -361,20 +361,16 @@ export async function registerRoutes(
   app.get("/api/queue/stats", requireAuth, requireLevel(2), async (req, res) => {
     try {
       const waiting = await storage.getWaitingQueueEntries();
-      const myActive = await storage.getQueueEntriesByReviewer(req.session.userId!);
-      const inCall = myActive.filter(e => e.status === "in_call");
-      const completedToday = myActive.filter(e => {
-        if (!e.completedAt) return false;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return new Date(e.completedAt) >= today;
-      });
+      const inCall = await storage.getInCallQueueEntries();
+      const completed = await storage.getCompletedQueueEntriesToday();
+      
       res.json({
         waitingCount: waiting.length,
         inCallCount: inCall.length,
-        completedTodayCount: completedToday.length,
+        completedTodayCount: completed.length,
         waiting,
         inCall,
+        completed,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -394,6 +390,13 @@ export async function registerRoutes(
         return;
       }
 
+      // Get user info for denormalized fields
+      const user = await storage.getUser(req.session.userId!);
+      let pkg = null;
+      if (packageId) {
+        pkg = await storage.getPackage(packageId);
+      }
+
       // Calculate position
       const position = existing.length + 1;
 
@@ -402,6 +405,11 @@ export async function registerRoutes(
         packageId,
         applicationId,
         applicantPhone: phone,
+        applicantFirstName: user?.firstName || null,
+        applicantLastName: user?.lastName || null,
+        applicantState: user?.state || null,
+        packageName: pkg?.name || null,
+        packagePrice: pkg?.price || null,
         queueType: "consultation",
         status: "waiting",
         position,

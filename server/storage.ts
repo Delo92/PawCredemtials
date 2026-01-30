@@ -93,6 +93,8 @@ export interface IStorage {
   // Queue Entries
   getQueueEntry(id: string): Promise<QueueEntry | undefined>;
   getWaitingQueueEntries(): Promise<QueueEntry[]>;
+  getInCallQueueEntries(): Promise<QueueEntry[]>;
+  getCompletedQueueEntriesToday(): Promise<QueueEntry[]>;
   getQueueEntriesByReviewer(reviewerId: string): Promise<QueueEntry[]>;
   createQueueEntry(entry: InsertQueueEntry): Promise<QueueEntry>;
   updateQueueEntry(id: string, data: Partial<InsertQueueEntry>): Promise<QueueEntry | undefined>;
@@ -340,6 +342,23 @@ export class DatabaseStorage implements IStorage {
 
   async getWaitingQueueEntries(): Promise<QueueEntry[]> {
     return db.select().from(queueEntries).where(eq(queueEntries.status, "waiting")).orderBy(desc(queueEntries.priority), asc(queueEntries.createdAt));
+  }
+
+  async getInCallQueueEntries(): Promise<QueueEntry[]> {
+    return db.select().from(queueEntries).where(
+      or(eq(queueEntries.status, "in_call"), eq(queueEntries.status, "claimed"))
+    ).orderBy(desc(queueEntries.createdAt));
+  }
+
+  async getCompletedQueueEntriesToday(): Promise<QueueEntry[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return db.select().from(queueEntries).where(
+      and(
+        eq(queueEntries.status, "completed"),
+        gte(queueEntries.completedAt, today)
+      )
+    ).orderBy(desc(queueEntries.completedAt));
   }
 
   async getQueueEntriesByReviewer(reviewerId: string): Promise<QueueEntry[]> {

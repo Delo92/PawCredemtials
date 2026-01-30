@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -23,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { Level2ProfileModal } from "@/components/shared/Level2ProfileModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,8 +45,9 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
-  User,
-  ArrowRight,
+  Search,
+  UserCog,
+  PhoneIncoming
 } from "lucide-react";
 
 interface QueueStats {
@@ -46,16 +56,22 @@ interface QueueStats {
   completedTodayCount: number;
   waiting: QueueEntry[];
   inCall: QueueEntry[];
+  completed: QueueEntry[];
 }
+
+type CallTab = "waiting" | "in_call" | "completed";
 
 export default function ReviewerCallQueuePage() {
   const { user } = useAuth();
   const { config } = useConfig();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<CallTab>("waiting");
   const [selectedEntry, setSelectedEntry] = useState<QueueEntry | null>(null);
+  const [profileEntry, setProfileEntry] = useState<QueueEntry | null>(null);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [outcome, setOutcome] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: stats, isLoading } = useQuery<QueueStats>({
     queryKey: ["/api/queue/stats"],
@@ -74,6 +90,7 @@ export default function ReviewerCallQueuePage() {
         title: "Caller Claimed",
         description: "You can now start the call.",
       });
+      setActiveTab("in_call");
     },
     onError: (error: any) => {
       toast({
@@ -155,18 +172,42 @@ export default function ReviewerCallQueuePage() {
 
   const level1Name = config?.levelNames?.level1 || "Applicant";
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const getWaitTime = (dateString: string) => {
-    const diff = Date.now() - new Date(dateString).getTime();
+  const getWaitTime = (dateInput: string | Date) => {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    const diff = Date.now() - date.getTime();
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return "Just now";
     if (minutes === 1) return "1 min";
     return `${minutes} mins`;
   };
+
+  const getDisplayName = (entry: QueueEntry) => {
+    if (entry.applicantFirstName || entry.applicantLastName) {
+      return `${entry.applicantFirstName || ""} ${entry.applicantLastName || ""}`.trim();
+    }
+    return `${level1Name} #${entry.id.slice(0, 6)}`;
+  };
+
+  const filterEntries = (entries: QueueEntry[] | undefined) => {
+    if (!entries) return [];
+    if (!searchQuery) return entries;
+    const query = searchQuery.toLowerCase();
+    return entries.filter(entry => {
+      const name = getDisplayName(entry).toLowerCase();
+      const state = (entry.applicantState || "").toLowerCase();
+      const pkg = (entry.packageName || "").toLowerCase();
+      return name.includes(query) || state.includes(query) || pkg.includes(query);
+    });
+  };
+
+  const getTabData = () => {
+    if (activeTab === "waiting") return filterEntries(stats?.waiting);
+    if (activeTab === "in_call") return filterEntries(stats?.inCall);
+    if (activeTab === "completed") return filterEntries(stats?.completed);
+    return [];
+  };
+
+  const myClaimedEntry = stats?.inCall?.find(e => e.reviewerId === user?.id);
 
   if (isLoading) {
     return (
@@ -196,167 +237,264 @@ export default function ReviewerCallQueuePage() {
           </p>
         </div>
 
-        {/* Stats */}
+        {/* Tab Cards */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${activeTab === "waiting" ? "ring-2 ring-primary bg-primary/5" : "hover-elevate"}`}
+            onClick={() => setActiveTab("waiting")}
+            data-testid="tab-waiting"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Waiting</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.waitingCount || 0}</div>
-              <p className="text-xs text-muted-foreground">In queue</p>
+              <div className="text-2xl font-bold" data-testid="text-waiting-count">
+                {stats?.waitingCount || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Shared queue - claim to start</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${activeTab === "in_call" ? "ring-2 ring-primary bg-primary/5" : "hover-elevate"}`}
+            onClick={() => setActiveTab("in_call")}
+            data-testid="tab-in-call"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">In Call</CardTitle>
               <PhoneCall className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.inCallCount || 0}</div>
-              <p className="text-xs text-muted-foreground">Active now</p>
+              <div className="text-2xl font-bold" data-testid="text-in-call-count">
+                {stats?.inCallCount || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Active calls across all reviewers</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className={`cursor-pointer transition-all ${activeTab === "completed" ? "ring-2 ring-primary bg-primary/5" : "hover-elevate"}`}
+            onClick={() => setActiveTab("completed")}
+            data-testid="tab-completed"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.completedTodayCount || 0}</div>
-              <p className="text-xs text-muted-foreground">Calls handled</p>
+              <div className="text-2xl font-bold" data-testid="text-completed-count">
+                {stats?.completedTodayCount || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">Calls handled today</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Active Call */}
-        {selectedEntry && (
-          <Card className="border-primary">
-            <CardHeader>
+        {/* Active Call Banner - Show when user has a claimed/in-call entry */}
+        {myClaimedEntry && (
+          <Card className="border-primary bg-primary/5">
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <PhoneCall className="h-5 w-5 text-primary" />
-                    {selectedEntry.status === "in_call" ? "Active Call" : "Claimed Caller"}
+                <div className="flex items-center gap-2">
+                  <PhoneIncoming className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">
+                    {myClaimedEntry.status === "in_call" ? "Active Call" : "Claimed Caller"}
                   </CardTitle>
-                  <CardDescription>
-                    {selectedEntry.applicantPhone || "No phone provided"}
-                  </CardDescription>
+                  <Badge variant={myClaimedEntry.status === "in_call" ? "default" : "secondary"}>
+                    {myClaimedEntry.status === "in_call" ? "In Call" : "Ready"}
+                  </Badge>
                 </div>
-                <Badge variant={selectedEntry.status === "in_call" ? "default" : "secondary"}>
-                  {selectedEntry.status === "in_call" ? "In Call" : "Ready"}
-                </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                {selectedEntry.status === "claimed" && (
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{getDisplayName(myClaimedEntry)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {myClaimedEntry.applicantState && `${myClaimedEntry.applicantState} • `}
+                    {myClaimedEntry.packageName || "No package"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {myClaimedEntry.status === "claimed" && (
+                    <Button
+                      onClick={() => startCall.mutate(myClaimedEntry.id)}
+                      disabled={startCall.isPending}
+                      data-testid="button-start-call"
+                    >
+                      {startCall.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Phone className="mr-2 h-4 w-4" />
+                      )}
+                      Start Call
+                    </Button>
+                  )}
+                  {myClaimedEntry.status === "in_call" && (
+                    <Button
+                      onClick={() => {
+                        setSelectedEntry(myClaimedEntry);
+                        setCompleteDialogOpen(true);
+                      }}
+                      data-testid="button-complete-call"
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Complete Call
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => startCall.mutate(selectedEntry.id)}
-                    disabled={startCall.isPending}
-                    data-testid="button-start-call"
+                    variant="outline"
+                    onClick={() => releaseCaller.mutate(myClaimedEntry.id)}
+                    disabled={releaseCaller.isPending}
+                    data-testid="button-release-caller"
                   >
-                    {startCall.isPending ? (
+                    {releaseCaller.isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Phone className="mr-2 h-4 w-4" />
+                      <PhoneOff className="mr-2 h-4 w-4" />
                     )}
-                    Start Call
+                    Release
                   </Button>
-                )}
-                {selectedEntry.status === "in_call" && (
-                  <Button
-                    onClick={() => setCompleteDialogOpen(true)}
-                    data-testid="button-complete-call"
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Complete Call
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() => releaseCaller.mutate(selectedEntry.id)}
-                  disabled={releaseCaller.isPending}
-                  data-testid="button-release-caller"
-                >
-                  {releaseCaller.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <PhoneOff className="mr-2 h-4 w-4" />
-                  )}
-                  Release Back to Queue
-                </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Queue List */}
+        {/* Table-based Queue Display */}
         <Card>
           <CardHeader>
-            <CardTitle>Waiting Queue</CardTitle>
-            <CardDescription>
-              {stats?.waitingCount || 0} {level1Name}s waiting for a call
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  {activeTab === "waiting" && <Clock className="h-5 w-5" />}
+                  {activeTab === "in_call" && <PhoneCall className="h-5 w-5" />}
+                  {activeTab === "completed" && <CheckCircle2 className="h-5 w-5" />}
+                  {activeTab === "waiting" && "Waiting Queue (Shared)"}
+                  {activeTab === "in_call" && "Active Calls"}
+                  {activeTab === "completed" && "Completed Today"}
+                </CardTitle>
+                <CardDescription>
+                  {activeTab === "waiting" && `${level1Name}s waiting to be claimed (${stats?.waitingCount || 0})`}
+                  {activeTab === "in_call" && `${level1Name}s currently in calls with reviewers (${stats?.inCallCount || 0})`}
+                  {activeTab === "completed" && `Calls completed today (${stats?.completedTodayCount || 0})`}
+                </CardDescription>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-full sm:w-64"
+                  data-testid="input-search-queue"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {stats?.waiting && stats.waiting.length > 0 ? (
-              <div className="space-y-3">
-                {stats.waiting.map((entry, index) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover-elevate transition-all"
-                    data-testid={`queue-entry-${entry.id}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {entry.applicantPhone || `${level1Name} #${entry.id.slice(0, 6)}`}
-                        </p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>Waiting {getWaitTime(entry.createdAt)}</span>
-                          <span>•</span>
-                          <span>Joined at {formatTime(entry.createdAt)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => claimCaller.mutate(entry.id)}
-                      disabled={claimCaller.isPending || !!selectedEntry}
-                      data-testid={`button-claim-${entry.id}`}
-                    >
-                      {claimCaller.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          Claim
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
+            {getTabData().length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                  <Users className="h-8 w-8 text-muted-foreground" />
+                  {activeTab === "waiting" && <Users className="h-8 w-8 text-muted-foreground" />}
+                  {activeTab === "in_call" && <PhoneCall className="h-8 w-8 text-muted-foreground" />}
+                  {activeTab === "completed" && <CheckCircle2 className="h-8 w-8 text-muted-foreground" />}
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Queue is Empty</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {activeTab === "waiting" && "Queue is Empty"}
+                  {activeTab === "in_call" && "No Active Calls"}
+                  {activeTab === "completed" && "No Completed Calls"}
+                </h3>
                 <p className="text-muted-foreground max-w-sm">
-                  No {level1Name}s are currently waiting. Check back soon!
+                  {activeTab === "waiting" && `No ${level1Name}s are currently waiting. Check back soon!`}
+                  {activeTab === "in_call" && `No ${level1Name}s are currently in a call.`}
+                  {activeTab === "completed" && "No calls have been completed today."}
                 </p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead>Package</TableHead>
+                      <TableHead>
+                        {activeTab === "waiting" && "Wait Time"}
+                        {activeTab === "in_call" && "Status"}
+                        {activeTab === "completed" && "Outcome"}
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getTabData().map((entry) => (
+                      <TableRow key={entry.id} data-testid={`row-${activeTab}-${entry.id}`}>
+                        <TableCell className="font-medium">
+                          {getDisplayName(entry)}
+                        </TableCell>
+                        <TableCell>{entry.applicantState || "-"}</TableCell>
+                        <TableCell>{entry.packageName || "-"}</TableCell>
+                        <TableCell>
+                          {activeTab === "waiting" && (
+                            <span className="text-muted-foreground">{getWaitTime(entry.createdAt)}</span>
+                          )}
+                          {activeTab === "in_call" && (
+                            <Badge className={entry.status === "in_call" 
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                              : ""} 
+                              variant={entry.status === "in_call" ? "default" : "secondary"}>
+                              {entry.status === "in_call" ? "In Call" : "Claimed"}
+                            </Badge>
+                          )}
+                          {activeTab === "completed" && (
+                            <Badge variant={entry.outcome === "approved" ? "default" : "secondary"}>
+                              {entry.outcome || "Completed"}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setProfileEntry(entry)}
+                              data-testid={`button-view-profile-${entry.id}`}
+                              title="View Profile"
+                            >
+                              <UserCog className="h-4 w-4" />
+                            </Button>
+                            {activeTab === "waiting" && (
+                              <Button
+                                size="sm"
+                                onClick={() => claimCaller.mutate(entry.id)}
+                                disabled={claimCaller.isPending || !!myClaimedEntry}
+                                data-testid={`button-claim-${entry.id}`}
+                              >
+                                {claimCaller.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Claim"
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Level 2 Profile Modal */}
+        <Level2ProfileModal
+          entry={profileEntry}
+          onClose={() => setProfileEntry(null)}
+        />
 
         {/* Complete Call Dialog */}
         <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
