@@ -21,7 +21,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload } from "lucide-react";
 
 const footerLinkSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -541,70 +541,158 @@ export default function SiteSettings() {
                   <CardHeader>
                     <CardTitle>Gallery Images</CardTitle>
                     <CardDescription>
-                      Manage the images displayed in the gallery section on your landing page. Add image URLs to showcase your facilities and team.
+                      Manage the images displayed in the gallery section on your landing page. Upload images or paste URLs to showcase your facilities and team.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
                     {galleryFields.length === 0 && (
                       <p className="text-sm text-muted-foreground py-4 text-center">
-                        No gallery images added yet. Click the button below to add your first image.
+                        No gallery images added yet. Upload an image or add a URL below.
                       </p>
                     )}
-                    {galleryFields.map((field, index) => (
-                      <div key={field.id} className="flex items-start gap-3" data-testid={`gallery-item-${index}`}>
-                        <div className="flex-1 space-y-2">
-                          <FormField
-                            control={form.control}
-                            name={`galleryImages.${index}.url`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className={index === 0 ? '' : 'sr-only'}>
-                                  Image {index + 1} URL
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="https://example.com/image.jpg"
-                                    data-testid={`input-gallery-url-${index}`}
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {galleryFields.map((field, index) => {
+                        const imageUrl = form.watch(`galleryImages.${index}.url`);
+                        return (
+                          <div key={field.id} className="group relative rounded-md border overflow-visible" data-testid={`gallery-item-${index}`}>
+                            {imageUrl ? (
+                              <div className="aspect-video bg-muted">
+                                <img
+                                  key={imageUrl}
+                                  src={imageUrl}
+                                  alt={`Gallery image ${index + 1}`}
+                                  className="h-full w-full object-cover rounded-t-md"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  data-testid={`img-gallery-preview-${index}`}
+                                />
+                              </div>
+                            ) : (
+                              <div className="aspect-video bg-muted flex items-center justify-center rounded-t-md">
+                                <Image className="h-8 w-8 text-muted-foreground" />
+                              </div>
                             )}
-                          />
-                          {form.watch(`galleryImages.${index}.url`) && (
-                            <div className="rounded-md overflow-hidden border h-20 w-32">
-                              <img
-                                key={form.watch(`galleryImages.${index}.url`)}
-                                src={form.watch(`galleryImages.${index}.url`)}
-                                alt={`Gallery preview ${index + 1}`}
-                                className="h-full w-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                data-testid={`img-gallery-preview-${index}`}
+                            <div className="p-2 space-y-2">
+                              <FormField
+                                control={form.control}
+                                name={`galleryImages.${index}.url`}
+                                render={({ field: urlField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="Paste image URL..."
+                                        className="text-xs"
+                                        data-testid={`input-gallery-url-${index}`}
+                                        {...urlField}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
                               />
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => {
+                                    const input = document.createElement("input");
+                                    input.type = "file";
+                                    input.accept = "image/jpeg,image/png,image/gif,image/webp,image/svg+xml";
+                                    input.onchange = async (e) => {
+                                      const file = (e.target as HTMLInputElement).files?.[0];
+                                      if (!file) return;
+                                      const formData = new FormData();
+                                      formData.append("image", file);
+                                      try {
+                                        const response = await fetch("/api/upload/gallery", {
+                                          method: "POST",
+                                          body: formData,
+                                          credentials: "include",
+                                        });
+                                        if (!response.ok) {
+                                          const err = await response.json();
+                                          throw new Error(err.message || "Upload failed");
+                                        }
+                                        const data = await response.json();
+                                        form.setValue(`galleryImages.${index}.url`, data.url);
+                                        toast({ title: "Image uploaded" });
+                                      } catch (err: any) {
+                                        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                                      }
+                                    };
+                                    input.click();
+                                  }}
+                                  data-testid={`button-upload-gallery-${index}`}
+                                >
+                                  <Upload className="mr-1 h-3 w-3" />
+                                  Upload
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeGallery(index)}
+                                  data-testid={`button-remove-gallery-${index}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeGallery(index)}
-                          data-testid={`button-remove-gallery-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => appendGallery({ url: "" })}
-                      data-testid="button-add-gallery"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Image
-                    </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-3 flex-wrap">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => appendGallery({ url: "" })}
+                        data-testid="button-add-gallery"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Image Slot
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/jpeg,image/png,image/gif,image/webp,image/svg+xml";
+                          input.multiple = true;
+                          input.onchange = async (e) => {
+                            const files = (e.target as HTMLInputElement).files;
+                            if (!files || files.length === 0) return;
+                            for (let i = 0; i < files.length; i++) {
+                              const formData = new FormData();
+                              formData.append("image", files[i]);
+                              try {
+                                const response = await fetch("/api/upload/gallery", {
+                                  method: "POST",
+                                  body: formData,
+                                  credentials: "include",
+                                });
+                                if (!response.ok) {
+                                  const err = await response.json();
+                                  throw new Error(err.message || "Upload failed");
+                                }
+                                const data = await response.json();
+                                appendGallery({ url: data.url });
+                              } catch (err: any) {
+                                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                              }
+                            }
+                            toast({ title: `${files.length} image(s) uploaded` });
+                          };
+                          input.click();
+                        }}
+                        data-testid="button-upload-multiple-gallery"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Images
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

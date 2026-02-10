@@ -5,6 +5,34 @@ import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { defaultConfig } from "@shared/config";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.join(process.cwd(), "uploads", "gallery");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const galleryUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `gallery-${uniqueSuffix}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files (JPEG, PNG, GIF, WebP, SVG) are allowed"));
+    }
+  },
+});
 
 // Session augmentation
 declare module "express-session" {
@@ -54,6 +82,37 @@ export async function registerRoutes(
       },
     })
   );
+
+  // Serve uploaded gallery images as static files
+  const express = await import("express");
+  app.use("/uploads/gallery", express.default.static(uploadsDir));
+
+  // ===========================================================================
+  // FILE UPLOAD ROUTES
+  // ===========================================================================
+
+  app.post("/api/upload/gallery", requireAuth, requireLevel(5), (req, res, next) => {
+    galleryUpload.single("image")(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ message: "File size must be under 10MB" });
+          return;
+        }
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+      const url = `/uploads/gallery/${req.file.filename}`;
+      res.json({ url });
+    });
+  });
 
   // ===========================================================================
   // AUTH ROUTES
