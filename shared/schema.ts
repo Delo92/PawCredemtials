@@ -44,6 +44,7 @@ export const siteConfig = pgTable("site_config", {
   level3Name: text("level_3_name").notNull().default("Agent"),
   level4Name: text("level_4_name").notNull().default("Admin"),
   level5Name: text("level_5_name").notNull().default("Owner"),
+  galleryImages: jsonb("gallery_images").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -96,7 +96,7 @@ export default function Home() {
     { name: "Lisa T.", role: "Graduate Student", text: "Simple process, legitimate documentation. Exactly what I needed for my university. The customer service was excellent too.", rating: 5, img: "/images/medilab/testimonials/testimonials-5.jpg" },
   ];
 
-  const galleryImages = [
+  const defaultGalleryImages = [
     "/images/medilab/gallery/gallery-1.jpg",
     "/images/medilab/gallery/gallery-2.jpg",
     "/images/medilab/gallery/gallery-3.jpg",
@@ -106,6 +106,9 @@ export default function Home() {
     "/images/medilab/gallery/gallery-7.jpg",
     "/images/medilab/gallery/gallery-8.jpg",
   ];
+  const galleryImages = config.galleryImages && config.galleryImages.length > 0
+    ? config.galleryImages
+    : defaultGalleryImages;
 
   return (
     <div className="flex flex-col">

@@ -242,6 +242,7 @@ export async function registerRoutes(
           contactEmail: config.contactEmail,
           contactPhone: config.contactPhone,
           address: config.address,
+          galleryImages: config.galleryImages || [],
           levelNames: {
             level1: config.level1Name,
             level2: config.level2Name,
@@ -855,7 +856,12 @@ export async function registerRoutes(
         level3Name,
         level4Name,
         level5Name,
+        galleryImages: rawGalleryImages,
       } = req.body;
+
+      const galleryImages = Array.isArray(rawGalleryImages)
+        ? rawGalleryImages.filter((item: unknown) => typeof item === 'string' && item.length > 0)
+        : undefined;
 
       const config = await storage.updateSiteConfig({
         siteName,
@@ -885,6 +891,7 @@ export async function registerRoutes(
         level3Name,
         level4Name,
         level5Name,
+        galleryImages,
       });
 
       res.json(config);

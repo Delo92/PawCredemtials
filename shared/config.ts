@@ -29,6 +29,7 @@ export interface WhiteLabelConfig {
   contactEmail?: string;
   contactPhone?: string;
   address?: string;
+  galleryImages?: string[];
   levelNames: {
     level1: string;
     level2: string;
