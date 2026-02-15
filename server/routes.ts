@@ -300,6 +300,7 @@ export async function registerRoutes(
         user: {
           ...user,
           passwordHash: undefined,
+          password: undefined,
         },
       });
     } catch (error: any) {
@@ -1433,18 +1434,48 @@ export async function registerRoutes(
         results.packages = `${existingPackages.length}_already_exist`;
       }
 
-      // 6. Owner user
+      // 6. Test accounts for all 5 levels (ChronicDocs pattern)
+      const testPassword = "ChronicBrands";
+      const hashedTestPassword = await bcrypt.hash(testPassword, 10);
+      const testAccounts = [
+        { email: "level1@test.com", firstName: "Test", lastName: "Applicant", userLevel: 1, referralCode: "TEST_L1" },
+        { email: "level2@test.com", firstName: "Test", lastName: "Reviewer", userLevel: 2, referralCode: "TEST_L2" },
+        { email: "level3@test.com", firstName: "Test", lastName: "Agent", userLevel: 3, referralCode: "TEST_L3" },
+        { email: "level4@test.com", firstName: "Test", lastName: "Admin", userLevel: 4, referralCode: "TEST_L4" },
+        { email: "level5@test.com", firstName: "Test", lastName: "Owner", userLevel: 5, referralCode: "TEST_L5" },
+      ];
+
+      results.testAccounts = [] as string[];
+      for (const acct of testAccounts) {
+        try {
+          const existing = await storage.getUserByEmail(acct.email);
+          if (existing && !existing.passwordHash) {
+            await storage.updateUser(existing.id, { passwordHash: hashedTestPassword } as any);
+            (results.testAccounts as string[]).push(`${acct.email} (Level ${acct.userLevel}) - fixed passwordHash`);
+          } else if (!existing) {
+            await storage.createUser({
+              ...acct,
+              passwordHash: hashedTestPassword,
+              isActive: true,
+            } as any);
+            (results.testAccounts as string[]).push(`${acct.email} (Level ${acct.userLevel}) - created`);
+          }
+        } catch (e: any) {
+          (results.errors as string[]).push(`Failed to create ${acct.email}: ${e.message}`);
+        }
+      }
+
+      // Also ensure owner@doctorsnote.com exists as Level 5
       const allUsers = await storage.getAllUsers();
-      const hasOwner = allUsers.some((u: any) => u.userLevel === 5);
+      const hasOwner = allUsers.some((u: any) => u.userLevel === 5 && u.email === "owner@doctorsnote.com");
       if (!hasOwner) {
         try {
           const ownerEmail = req.body?.email || "owner@doctorsnote.com";
-          const generatedPassword = randomBytes(16).toString("hex");
-          const ownerPassword = req.body?.password || generatedPassword;
-          const hashedPassword = await bcrypt.hash(ownerPassword, 10);
+          const ownerPassword = req.body?.password || testPassword;
+          const hashedOwnerPw = await bcrypt.hash(ownerPassword, 10);
           await storage.createUser({
             email: ownerEmail,
-            password: hashedPassword,
+            passwordHash: hashedOwnerPw,
             firstName: "Platform",
             lastName: "Owner",
             userLevel: 5,
@@ -1452,8 +1483,6 @@ export async function registerRoutes(
             referralCode: "OWNER001",
           } as any);
           results.ownerUser = true;
-          results.ownerEmail = ownerEmail;
-          results.ownerPassword = ownerPassword;
         } catch (e: any) {
           (results.errors as string[]).push(`Failed to create owner: ${e.message}`);
         }
