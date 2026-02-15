@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -34,12 +35,13 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { config, getLevelName } = useConfig();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<string>("");
 
   const form = useForm<LoginFormData>({
@@ -57,6 +59,39 @@ export default function Login() {
     }
   }, [selectedLevel, form]);
 
+  const navigateToDashboard = (user: any) => {
+    switch (user.userLevel) {
+      case 1: setLocation("/dashboard/applicant"); break;
+      case 2: setLocation("/dashboard/reviewer"); break;
+      case 3: setLocation("/dashboard/agent"); break;
+      case 4: setLocation("/dashboard/admin"); break;
+      case 5: setLocation("/dashboard/owner"); break;
+      default: setLocation("/");
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const user = await loginWithGoogle();
+      toast({
+        title: "Welcome!",
+        description: `Signed in as ${user.firstName} ${user.lastName}`,
+      });
+      navigateToDashboard(user);
+    } catch (error: any) {
+      if (error?.code !== "auth/popup-closed-by-user") {
+        toast({
+          title: "Sign in failed",
+          description: error.message || "Could not sign in with Google",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
@@ -65,15 +100,7 @@ export default function Login() {
         title: "Welcome back!",
         description: `Logged in as ${user.firstName} ${user.lastName}`,
       });
-      
-      switch (user.userLevel) {
-        case 1: setLocation("/dashboard/applicant"); break;
-        case 2: setLocation("/dashboard/reviewer"); break;
-        case 3: setLocation("/dashboard/agent"); break;
-        case 4: setLocation("/dashboard/admin"); break;
-        case 5: setLocation("/dashboard/owner"); break;
-        default: setLocation("/");
-      }
+      navigateToDashboard(user);
     } catch (error: any) {
       toast({
         title: "Login failed",
@@ -216,7 +243,7 @@ export default function Login() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={isLoading || isGoogleLoading}
                     data-testid="button-submit-login"
                   >
                     {isLoading ? (
@@ -230,6 +257,33 @@ export default function Login() {
                   </Button>
                 </form>
               </Form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isGoogleLoading}
+                data-testid="button-google-signin"
+              >
+                {isGoogleLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <SiGoogle className="mr-2 h-4 w-4" />
+                )}
+                Sign in with Google
+              </Button>
 
               <div className="mt-6 text-center text-sm">
                 <span className="text-muted-foreground">Don't have an account? </span>

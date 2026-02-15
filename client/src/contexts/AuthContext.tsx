@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { User } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { signInWithGoogle, firebaseSignOut } from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
+  loginWithGoogle: () => Promise<User>;
   register: (data: RegisterData) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -61,6 +63,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (): Promise<User> => {
+    setIsLoading(true);
+    try {
+      const { idToken } = await signInWithGoogle();
+      const response = await apiRequest("POST", "/api/auth/firebase", { idToken });
+      const data = await response.json();
+      setUser(data.user);
+      return data.user;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const register = async (data: RegisterData): Promise<User> => {
     setIsLoading(true);
     try {
@@ -76,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
+      try { await firebaseSignOut(); } catch {}
     } finally {
       setUser(null);
     }
@@ -90,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!user,
     login,
+    loginWithGoogle,
     register,
     logout,
     refreshUser,

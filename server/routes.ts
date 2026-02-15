@@ -239,6 +239,98 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/auth/firebase", async (req, res) => {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) {
+        res.status(400).json({ message: "ID token required" });
+        return;
+      }
+
+      const { initializeApp, cert, getApps } = await import("firebase-admin/app");
+      const { getAuth: getAdminAuth } = await import("firebase-admin/auth");
+
+      if (getApps().length === 0) {
+        initializeApp({
+          projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        });
+      }
+
+      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+      const { uid, email, name, picture } = decodedToken;
+
+      if (!email) {
+        res.status(400).json({ message: "Email not available from Google account" });
+        return;
+      }
+
+      let user = await storage.getUserByFirebaseUid(uid);
+
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          await storage.updateUser(user.id, { firebaseUid: uid, avatarUrl: picture || user.avatarUrl });
+          user = (await storage.getUser(user.id))!;
+        }
+      }
+
+      if (!user) {
+        const nameParts = (name || email.split("@")[0]).split(" ");
+        const firstName = nameParts[0] || "User";
+        const lastName = nameParts.slice(1).join(" ") || "User";
+        const profileId = randomBytes(4).toString("hex").toUpperCase();
+        const userReferralCode = randomBytes(4).toString("hex").toUpperCase();
+
+        user = await storage.createUser({
+          email,
+          firebaseUid: uid,
+          firstName,
+          lastName,
+          passwordHash: null,
+          userLevel: 1,
+          profileId,
+          referralCode: userReferralCode,
+          avatarUrl: picture || null,
+          isActive: true,
+        });
+
+        await storage.createActivityLog({
+          userId: user.id,
+          action: "user_registered",
+          entityType: "user",
+          entityId: user.id,
+          details: { method: "google" },
+        });
+      }
+
+      if (!user.isActive) {
+        res.status(401).json({ message: "Account is deactivated" });
+        return;
+      }
+
+      req.session.userId = user.id;
+      req.session.userLevel = user.userLevel;
+
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "user_login",
+        entityType: "user",
+        entityId: user.id,
+        details: { method: "google" },
+      });
+
+      res.json({
+        user: {
+          ...user,
+          passwordHash: undefined,
+        },
+      });
+    } catch (error: any) {
+      console.error("Firebase auth error:", error);
+      res.status(401).json({ message: "Authentication failed" });
+    }
+  });
+
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
