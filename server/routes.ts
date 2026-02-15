@@ -8,21 +8,10 @@ import { defaultConfig } from "@shared/config";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { firebaseStorage, firebaseAuth } from "./firebase-admin";
 
-const uploadsDir = path.join(process.cwd(), "uploads", "gallery");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const galleryUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadsDir),
-    filename: (_req, file, cb) => {
-      const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
-      const ext = path.extname(file.originalname) || ".jpg";
-      cb(null, `gallery-${uniqueSuffix}${ext}`);
-    },
-  }),
+const memoryUpload = multer({
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
@@ -83,16 +72,12 @@ export async function registerRoutes(
     })
   );
 
-  // Serve uploaded gallery images as static files
-  const express = await import("express");
-  app.use("/uploads/gallery", express.default.static(uploadsDir));
-
   // ===========================================================================
-  // FILE UPLOAD ROUTES
+  // FILE UPLOAD ROUTES (Firebase Storage)
   // ===========================================================================
 
   app.post("/api/upload/gallery", requireAuth, requireLevel(5), (req, res, next) => {
-    galleryUpload.single("image")(req, res, (err) => {
+    memoryUpload.single("image")(req, res, async (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
           res.status(400).json({ message: "File size must be under 10MB" });
@@ -109,8 +94,27 @@ export async function registerRoutes(
         res.status(400).json({ message: "No file uploaded" });
         return;
       }
-      const url = `/uploads/gallery/${req.file.filename}`;
-      res.json({ url });
+
+      try {
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
+        const fileName = `gallery/gallery-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype,
+          },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        res.json({ url });
+      } catch (error: any) {
+        console.error("Firebase Storage upload error:", error);
+        res.status(500).json({ message: "Failed to upload image" });
+      }
     });
   });
 
@@ -247,16 +251,7 @@ export async function registerRoutes(
         return;
       }
 
-      const { initializeApp, cert, getApps } = await import("firebase-admin/app");
-      const { getAuth: getAdminAuth } = await import("firebase-admin/auth");
-
-      if (getApps().length === 0) {
-        initializeApp({
-          projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-        });
-      }
-
-      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+      const decodedToken = await firebaseAuth.verifyIdToken(idToken);
       const { uid, email, name, picture } = decodedToken;
 
       if (!email) {
@@ -1232,6 +1227,67 @@ export async function registerRoutes(
       
       res.json(appsWithPackages);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
+  // DATA MIGRATION ENDPOINT (PostgreSQL + Local Files -> Firebase)
+  // ===========================================================================
+
+  app.post("/api/admin/migrate-to-firebase", requireAuth, requireLevel(5), async (req, res) => {
+    try {
+      const results: Record<string, any> = { images: 0, errors: [] as string[] };
+
+      const config = await storage.getSiteConfig();
+      if (config && config.galleryImages && Array.isArray(config.galleryImages)) {
+        const newUrls: string[] = [];
+        for (const imageUrl of config.galleryImages) {
+          if (imageUrl.startsWith("/uploads/gallery/")) {
+            const localPath = path.join(process.cwd(), imageUrl);
+            if (fs.existsSync(localPath)) {
+              try {
+                const fileBuffer = fs.readFileSync(localPath);
+                const fileName = `gallery/${path.basename(localPath)}`;
+                const bucket = firebaseStorage.bucket();
+                const file = bucket.file(fileName);
+                const ext = path.extname(localPath).toLowerCase();
+                const mimeMap: Record<string, string> = {
+                  ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                  ".png": "image/png", ".gif": "image/gif",
+                  ".webp": "image/webp", ".svg": "image/svg+xml",
+                };
+                await file.save(fileBuffer, {
+                  metadata: { contentType: mimeMap[ext] || "image/jpeg" },
+                });
+                await file.makePublic();
+                const firebaseUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                newUrls.push(firebaseUrl);
+                results.images++;
+              } catch (e: any) {
+                (results.errors as string[]).push(`Failed to migrate ${imageUrl}: ${e.message}`);
+                newUrls.push(imageUrl);
+              }
+            } else {
+              newUrls.push(imageUrl);
+            }
+          } else {
+            newUrls.push(imageUrl);
+          }
+        }
+
+        if (results.images > 0) {
+          await storage.updateSiteConfig({ galleryImages: newUrls } as any);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Migration complete. ${results.images} images migrated to Firebase Storage.`,
+        details: results,
+      });
+    } catch (error: any) {
+      console.error("Migration error:", error);
       res.status(500).json({ message: error.message });
     }
   });

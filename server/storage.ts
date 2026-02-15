@@ -1,17 +1,4 @@
 import {
-  users,
-  packages,
-  applications,
-  applicationSteps,
-  documents,
-  messages,
-  queueEntries,
-  payments,
-  commissions,
-  notifications,
-  activityLogs,
-  siteConfig,
-  userNotes,
   type User,
   type InsertUser,
   type Package,
@@ -39,11 +26,10 @@ import {
   type UserNote,
   type InsertUserNote,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, desc, asc, gte, lte, like, or } from "drizzle-orm";
+import { firestore } from "./firebase-admin";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined>;
@@ -53,7 +39,6 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getUsersByLevel(level: number): Promise<User[]>;
 
-  // Packages
   getPackage(id: string): Promise<Package | undefined>;
   getAllPackages(): Promise<Package[]>;
   getActivePackages(): Promise<Package[]>;
@@ -61,7 +46,6 @@ export interface IStorage {
   updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package | undefined>;
   deletePackage(id: string): Promise<boolean>;
 
-  // Applications
   getApplication(id: string): Promise<Application | undefined>;
   getApplicationsByUser(userId: string): Promise<Application[]>;
   getApplicationsByStatus(status: string): Promise<Application[]>;
@@ -69,12 +53,10 @@ export interface IStorage {
   createApplication(app: InsertApplication): Promise<Application>;
   updateApplication(id: string, data: Partial<InsertApplication>): Promise<Application | undefined>;
 
-  // Application Steps
   getApplicationSteps(applicationId: string): Promise<ApplicationStep[]>;
   createApplicationStep(step: InsertApplicationStep): Promise<ApplicationStep>;
   updateApplicationStep(id: string, data: Partial<InsertApplicationStep>): Promise<ApplicationStep | undefined>;
 
-  // Documents
   getDocument(id: string): Promise<Document | undefined>;
   getDocumentsByApplication(applicationId: string): Promise<Document[]>;
   getDocumentsByUser(userId: string): Promise<Document[]>;
@@ -82,7 +64,6 @@ export interface IStorage {
   updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined>;
   deleteDocument(id: string): Promise<boolean>;
 
-  // Messages
   getMessage(id: string): Promise<Message | undefined>;
   getMessagesBetweenUsers(user1Id: string, user2Id: string): Promise<Message[]>;
   getMessagesForUser(userId: string): Promise<Message[]>;
@@ -90,7 +71,6 @@ export interface IStorage {
   createMessage(msg: InsertMessage): Promise<Message>;
   markMessageAsRead(id: string): Promise<Message | undefined>;
 
-  // Queue Entries
   getQueueEntry(id: string): Promise<QueueEntry | undefined>;
   getWaitingQueueEntries(): Promise<QueueEntry[]>;
   getInCallQueueEntries(): Promise<QueueEntry[]>;
@@ -99,7 +79,6 @@ export interface IStorage {
   createQueueEntry(entry: InsertQueueEntry): Promise<QueueEntry>;
   updateQueueEntry(id: string, data: Partial<InsertQueueEntry>): Promise<QueueEntry | undefined>;
 
-  // Payments
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByUser(userId: string): Promise<Payment[]>;
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
@@ -107,399 +86,668 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, data: Partial<InsertPayment>): Promise<Payment | undefined>;
 
-  // Commissions
   getCommission(id: string): Promise<Commission | undefined>;
   getCommissionsByAgent(agentId: string): Promise<Commission[]>;
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommission(id: string, data: Partial<InsertCommission>): Promise<Commission | undefined>;
 
-  // Notifications
   getNotificationsByUser(userId: string): Promise<Notification[]>;
   getUnreadNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
 
-  // Activity Logs
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getActivityLogs(limit?: number): Promise<ActivityLog[]>;
 
-  // Site Config
   getSiteConfig(): Promise<SiteConfig | undefined>;
   updateSiteConfig(data: Partial<InsertSiteConfig>): Promise<SiteConfig>;
 
-  // User Notes
   getUserNotes(userId: string): Promise<(UserNote & { author?: { firstName: string; lastName: string } })[]>;
   createUserNote(note: InsertUserNote): Promise<UserNote>;
 }
 
-export class DatabaseStorage implements IStorage {
-  // Users
+function toDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  if (val.toDate && typeof val.toDate === "function") return val.toDate();
+  if (typeof val === "string" || typeof val === "number") return new Date(val);
+  return null;
+}
+
+function serializeForFirestore(data: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (value instanceof Date) {
+      result[key] = value;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function docToRecord(doc: FirebaseFirestore.DocumentSnapshot): Record<string, any> | undefined {
+  if (!doc.exists) return undefined;
+  const data = doc.data()!;
+  const result: Record<string, any> = { id: doc.id };
+  for (const [key, value] of Object.entries(data)) {
+    if (value && typeof value === "object" && typeof value.toDate === "function") {
+      result[key] = value.toDate();
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function docsToRecords(snapshot: FirebaseFirestore.QuerySnapshot): Record<string, any>[] {
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    const result: Record<string, any> = { id: doc.id };
+    for (const [key, value] of Object.entries(data)) {
+      if (value && typeof value === "object" && typeof value.toDate === "function") {
+        result[key] = value.toDate();
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  });
+}
+
+export class FirestoreStorage implements IStorage {
+  private col(name: string) {
+    return firestore.collection(name);
+  }
+
+  // =========================================================================
+  // USERS
+  // =========================================================================
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+    const doc = await this.col("users").doc(id).get();
+    return docToRecord(doc) as User | undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
-    return user || undefined;
+    const snap = await this.col("users").where("email", "==", email.toLowerCase()).limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0] as User;
   }
 
   async getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.firebaseUid, firebaseUid));
-    return user || undefined;
+    const snap = await this.col("users").where("firebaseUid", "==", firebaseUid).limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0] as User;
   }
 
   async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.referralCode, referralCode));
-    return user || undefined;
+    const snap = await this.col("users").where("referralCode", "==", referralCode).limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0] as User;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values({
+    const id = randomUUID();
+    const now = new Date();
+    const userData = serializeForFirestore({
       ...insertUser,
       email: insertUser.email.toLowerCase(),
-    }).returning();
-    return user;
+      createdAt: now,
+      updatedAt: now,
+      isActive: insertUser.isActive ?? true,
+      userLevel: insertUser.userLevel ?? 1,
+    });
+    await this.col("users").doc(id).set(userData);
+    return { id, ...userData } as User;
   }
 
   async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
-    const [user] = await db.update(users).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(users.id, id)).returning();
-    return user || undefined;
+    const ref = this.col("users").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as User;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return db.select().from(users).orderBy(desc(users.createdAt));
+    const snap = await this.col("users").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap) as User[];
   }
 
   async getUsersByLevel(level: number): Promise<User[]> {
-    return db.select().from(users).where(eq(users.userLevel, level)).orderBy(desc(users.createdAt));
+    const snap = await this.col("users").where("userLevel", "==", level).get();
+    const results = docsToRecords(snap) as User[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  // Packages
+  // =========================================================================
+  // PACKAGES
+  // =========================================================================
   async getPackage(id: string): Promise<Package | undefined> {
-    const [pkg] = await db.select().from(packages).where(eq(packages.id, id));
-    return pkg || undefined;
+    const doc = await this.col("packages").doc(id).get();
+    return docToRecord(doc) as Package | undefined;
   }
 
   async getAllPackages(): Promise<Package[]> {
-    return db.select().from(packages).orderBy(asc(packages.sortOrder));
+    const snap = await this.col("packages").orderBy("sortOrder", "asc").get();
+    return docsToRecords(snap) as Package[];
   }
 
   async getActivePackages(): Promise<Package[]> {
-    return db.select().from(packages).where(eq(packages.isActive, true)).orderBy(asc(packages.sortOrder));
+    const snap = await this.col("packages").where("isActive", "==", true).get();
+    const results = docsToRecords(snap) as Package[];
+    return results.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }
 
   async createPackage(insertPkg: InsertPackage): Promise<Package> {
-    const [pkg] = await db.insert(packages).values(insertPkg).returning();
-    return pkg;
+    const id = randomUUID();
+    const now = new Date();
+    const pkgData = serializeForFirestore({
+      ...insertPkg,
+      createdAt: now,
+      updatedAt: now,
+      isActive: insertPkg.isActive ?? true,
+      sortOrder: insertPkg.sortOrder ?? 0,
+      requiredDocuments: insertPkg.requiredDocuments ?? [],
+      formFields: insertPkg.formFields ?? [],
+      workflowSteps: insertPkg.workflowSteps ?? ["Registration", "Payment", "Document Upload", "Review", "Approval", "Completed"],
+    });
+    await this.col("packages").doc(id).set(pkgData);
+    return { id, ...pkgData } as Package;
   }
 
   async updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package | undefined> {
-    const [pkg] = await db.update(packages).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(packages.id, id)).returning();
-    return pkg || undefined;
+    const ref = this.col("packages").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as Package;
   }
 
   async deletePackage(id: string): Promise<boolean> {
-    const result = await db.delete(packages).where(eq(packages.id, id)).returning();
-    return result.length > 0;
+    const ref = this.col("packages").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return false;
+    await ref.delete();
+    return true;
   }
 
-  // Applications
+  // =========================================================================
+  // APPLICATIONS
+  // =========================================================================
   async getApplication(id: string): Promise<Application | undefined> {
-    const [app] = await db.select().from(applications).where(eq(applications.id, id));
-    return app || undefined;
+    const doc = await this.col("applications").doc(id).get();
+    return docToRecord(doc) as Application | undefined;
   }
 
   async getApplicationsByUser(userId: string): Promise<Application[]> {
-    return db.select().from(applications).where(eq(applications.userId, userId)).orderBy(desc(applications.createdAt));
+    const snap = await this.col("applications").where("userId", "==", userId).get();
+    const results = docsToRecords(snap) as Application[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getApplicationsByStatus(status: string): Promise<Application[]> {
-    return db.select().from(applications).where(eq(applications.status, status)).orderBy(desc(applications.createdAt));
+    const snap = await this.col("applications").where("status", "==", status).get();
+    const results = docsToRecords(snap) as Application[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getAllApplications(): Promise<Application[]> {
-    return db.select().from(applications).orderBy(desc(applications.createdAt));
+    const snap = await this.col("applications").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap) as Application[];
   }
 
   async createApplication(insertApp: InsertApplication): Promise<Application> {
-    const [app] = await db.insert(applications).values(insertApp).returning();
-    return app;
+    const id = randomUUID();
+    const now = new Date();
+    const appData = serializeForFirestore({
+      ...insertApp,
+      createdAt: now,
+      updatedAt: now,
+      status: insertApp.status ?? "pending",
+      currentStep: insertApp.currentStep ?? 1,
+      totalSteps: insertApp.totalSteps ?? 6,
+      currentLevel: insertApp.currentLevel ?? 1,
+      formData: insertApp.formData ?? {},
+      paymentStatus: insertApp.paymentStatus ?? "unpaid",
+    });
+    await this.col("applications").doc(id).set(appData);
+    return { id, ...appData } as Application;
   }
 
   async updateApplication(id: string, data: Partial<InsertApplication>): Promise<Application | undefined> {
-    const [app] = await db.update(applications).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(applications.id, id)).returning();
-    return app || undefined;
+    const ref = this.col("applications").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as Application;
   }
 
-  // Application Steps
+  // =========================================================================
+  // APPLICATION STEPS
+  // =========================================================================
   async getApplicationSteps(applicationId: string): Promise<ApplicationStep[]> {
-    return db.select().from(applicationSteps).where(eq(applicationSteps.applicationId, applicationId)).orderBy(asc(applicationSteps.stepNumber));
+    const snap = await this.col("applicationSteps").where("applicationId", "==", applicationId).get();
+    const results = docsToRecords(snap) as ApplicationStep[];
+    return results.sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
   }
 
   async createApplicationStep(step: InsertApplicationStep): Promise<ApplicationStep> {
-    const [result] = await db.insert(applicationSteps).values(step).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const stepData = serializeForFirestore({
+      ...step,
+      createdAt: now,
+      updatedAt: now,
+      status: step.status ?? "pending",
+      stepData: step.stepData ?? {},
+    });
+    await this.col("applicationSteps").doc(id).set(stepData);
+    return { id, ...stepData } as ApplicationStep;
   }
 
   async updateApplicationStep(id: string, data: Partial<InsertApplicationStep>): Promise<ApplicationStep | undefined> {
-    const [result] = await db.update(applicationSteps).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(applicationSteps.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("applicationSteps").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as ApplicationStep;
   }
 
-  // Documents
+  // =========================================================================
+  // DOCUMENTS
+  // =========================================================================
   async getDocument(id: string): Promise<Document | undefined> {
-    const [doc] = await db.select().from(documents).where(eq(documents.id, id));
-    return doc || undefined;
+    const doc = await this.col("documents").doc(id).get();
+    return docToRecord(doc) as Document | undefined;
   }
 
   async getDocumentsByApplication(applicationId: string): Promise<Document[]> {
-    return db.select().from(documents).where(eq(documents.applicationId, applicationId)).orderBy(desc(documents.createdAt));
+    const snap = await this.col("documents").where("applicationId", "==", applicationId).get();
+    const results = docsToRecords(snap) as Document[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getDocumentsByUser(userId: string): Promise<Document[]> {
-    return db.select().from(documents).where(eq(documents.userId, userId)).orderBy(desc(documents.createdAt));
+    const snap = await this.col("documents").where("userId", "==", userId).get();
+    const results = docsToRecords(snap) as Document[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async createDocument(doc: InsertDocument): Promise<Document> {
-    const [result] = await db.insert(documents).values(doc).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const docData = serializeForFirestore({
+      ...doc,
+      createdAt: now,
+      updatedAt: now,
+      status: doc.status ?? "pending",
+    });
+    await this.col("documents").doc(id).set(docData);
+    return { id, ...docData } as Document;
   }
 
   async updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined> {
-    const [result] = await db.update(documents).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(documents.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("documents").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as Document;
   }
 
   async deleteDocument(id: string): Promise<boolean> {
-    const result = await db.delete(documents).where(eq(documents.id, id)).returning();
-    return result.length > 0;
+    const ref = this.col("documents").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return false;
+    await ref.delete();
+    return true;
   }
 
-  // Messages
+  // =========================================================================
+  // MESSAGES
+  // =========================================================================
   async getMessage(id: string): Promise<Message | undefined> {
-    const [msg] = await db.select().from(messages).where(eq(messages.id, id));
-    return msg || undefined;
+    const doc = await this.col("messages").doc(id).get();
+    return docToRecord(doc) as Message | undefined;
   }
 
   async getMessagesBetweenUsers(user1Id: string, user2Id: string): Promise<Message[]> {
-    return db.select().from(messages).where(
-      or(
-        and(eq(messages.senderId, user1Id), eq(messages.receiverId, user2Id)),
-        and(eq(messages.senderId, user2Id), eq(messages.receiverId, user1Id))
-      )
-    ).orderBy(asc(messages.createdAt));
+    const snap1 = await this.col("messages")
+      .where("senderId", "==", user1Id)
+      .where("receiverId", "==", user2Id)
+      .get();
+    const snap2 = await this.col("messages")
+      .where("senderId", "==", user2Id)
+      .where("receiverId", "==", user1Id)
+      .get();
+    const all = [...docsToRecords(snap1), ...docsToRecords(snap2)] as Message[];
+    return all.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   async getMessagesForUser(userId: string): Promise<Message[]> {
-    return db.select().from(messages).where(
-      or(eq(messages.senderId, userId), eq(messages.receiverId, userId))
-    ).orderBy(desc(messages.createdAt));
+    const snap1 = await this.col("messages").where("senderId", "==", userId).get();
+    const snap2 = await this.col("messages").where("receiverId", "==", userId).get();
+    const seen = new Set<string>();
+    const all: Message[] = [];
+    for (const msg of [...docsToRecords(snap1), ...docsToRecords(snap2)]) {
+      if (!seen.has(msg.id)) {
+        seen.add(msg.id);
+        all.push(msg as Message);
+      }
+    }
+    return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getUnreadMessageCount(userId: string): Promise<number> {
-    const unread = await db.select().from(messages).where(
-      and(eq(messages.receiverId, userId), eq(messages.isRead, false))
-    );
-    return unread.length;
+    const snap = await this.col("messages")
+      .where("receiverId", "==", userId)
+      .where("isRead", "==", false)
+      .get();
+    return snap.size;
   }
 
   async createMessage(msg: InsertMessage): Promise<Message> {
-    const [result] = await db.insert(messages).values(msg).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const msgData = serializeForFirestore({
+      ...msg,
+      createdAt: now,
+      isRead: msg.isRead ?? false,
+    });
+    await this.col("messages").doc(id).set(msgData);
+    return { id, ...msgData } as Message;
   }
 
   async markMessageAsRead(id: string): Promise<Message | undefined> {
-    const [result] = await db.update(messages).set({
-      isRead: true,
-      readAt: new Date(),
-    }).where(eq(messages.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("messages").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update({ isRead: true, readAt: new Date() });
+    const updated = await ref.get();
+    return docToRecord(updated) as Message;
   }
 
-  // Queue Entries
+  // =========================================================================
+  // QUEUE ENTRIES
+  // =========================================================================
   async getQueueEntry(id: string): Promise<QueueEntry | undefined> {
-    const [entry] = await db.select().from(queueEntries).where(eq(queueEntries.id, id));
-    return entry || undefined;
+    const doc = await this.col("queueEntries").doc(id).get();
+    return docToRecord(doc) as QueueEntry | undefined;
   }
 
   async getWaitingQueueEntries(): Promise<QueueEntry[]> {
-    return db.select().from(queueEntries).where(eq(queueEntries.status, "waiting")).orderBy(desc(queueEntries.priority), asc(queueEntries.createdAt));
+    const snap = await this.col("queueEntries").where("status", "==", "waiting").get();
+    const results = docsToRecords(snap) as QueueEntry[];
+    return results.sort((a, b) => {
+      const pDiff = (b.priority ?? 0) - (a.priority ?? 0);
+      if (pDiff !== 0) return pDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
   }
 
   async getInCallQueueEntries(): Promise<QueueEntry[]> {
-    return db.select().from(queueEntries).where(
-      or(eq(queueEntries.status, "in_call"), eq(queueEntries.status, "claimed"))
-    ).orderBy(desc(queueEntries.createdAt));
+    const snap1 = await this.col("queueEntries").where("status", "==", "in_call").get();
+    const snap2 = await this.col("queueEntries").where("status", "==", "claimed").get();
+    const all = [...docsToRecords(snap1), ...docsToRecords(snap2)] as QueueEntry[];
+    return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getCompletedQueueEntriesToday(): Promise<QueueEntry[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return db.select().from(queueEntries).where(
-      and(
-        eq(queueEntries.status, "completed"),
-        gte(queueEntries.completedAt, today)
-      )
-    ).orderBy(desc(queueEntries.completedAt));
+    const snap = await this.col("queueEntries")
+      .where("status", "==", "completed")
+      .where("completedAt", ">=", today)
+      .get();
+    const results = docsToRecords(snap) as QueueEntry[];
+    return results.sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
   }
 
   async getQueueEntriesByReviewer(reviewerId: string): Promise<QueueEntry[]> {
-    return db.select().from(queueEntries).where(eq(queueEntries.reviewerId, reviewerId)).orderBy(desc(queueEntries.createdAt));
+    const snap = await this.col("queueEntries").where("reviewerId", "==", reviewerId).get();
+    const results = docsToRecords(snap) as QueueEntry[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async createQueueEntry(entry: InsertQueueEntry): Promise<QueueEntry> {
-    const [result] = await db.insert(queueEntries).values(entry).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const entryData = serializeForFirestore({
+      ...entry,
+      createdAt: now,
+      updatedAt: now,
+      status: entry.status ?? "waiting",
+      queueType: entry.queueType ?? "consultation",
+      priority: entry.priority ?? 0,
+    });
+    await this.col("queueEntries").doc(id).set(entryData);
+    return { id, ...entryData } as QueueEntry;
   }
 
   async updateQueueEntry(id: string, data: Partial<InsertQueueEntry>): Promise<QueueEntry | undefined> {
-    const [result] = await db.update(queueEntries).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(queueEntries.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("queueEntries").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as QueueEntry;
   }
 
-  // Payments
+  // =========================================================================
+  // PAYMENTS
+  // =========================================================================
   async getPayment(id: string): Promise<Payment | undefined> {
-    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
-    return payment || undefined;
+    const doc = await this.col("payments").doc(id).get();
+    return docToRecord(doc) as Payment | undefined;
   }
 
   async getPaymentsByUser(userId: string): Promise<Payment[]> {
-    return db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.createdAt));
+    const snap = await this.col("payments").where("userId", "==", userId).get();
+    const results = docsToRecords(snap) as Payment[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getPaymentsByApplication(applicationId: string): Promise<Payment[]> {
-    return db.select().from(payments).where(eq(payments.applicationId, applicationId)).orderBy(desc(payments.createdAt));
+    const snap = await this.col("payments").where("applicationId", "==", applicationId).get();
+    const results = docsToRecords(snap) as Payment[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getAllPayments(): Promise<Payment[]> {
-    return db.select().from(payments).orderBy(desc(payments.createdAt));
+    const snap = await this.col("payments").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap) as Payment[];
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [result] = await db.insert(payments).values(payment).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const paymentData = serializeForFirestore({
+      ...payment,
+      createdAt: now,
+      updatedAt: now,
+      status: payment.status ?? "pending",
+      metadata: payment.metadata ?? {},
+    });
+    await this.col("payments").doc(id).set(paymentData);
+    return { id, ...paymentData } as Payment;
   }
 
   async updatePayment(id: string, data: Partial<InsertPayment>): Promise<Payment | undefined> {
-    const [result] = await db.update(payments).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(payments.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("payments").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as Payment;
   }
 
-  // Commissions
+  // =========================================================================
+  // COMMISSIONS
+  // =========================================================================
   async getCommission(id: string): Promise<Commission | undefined> {
-    const [commission] = await db.select().from(commissions).where(eq(commissions.id, id));
-    return commission || undefined;
+    const doc = await this.col("commissions").doc(id).get();
+    return docToRecord(doc) as Commission | undefined;
   }
 
   async getCommissionsByAgent(agentId: string): Promise<Commission[]> {
-    return db.select().from(commissions).where(eq(commissions.agentId, agentId)).orderBy(desc(commissions.createdAt));
+    const snap = await this.col("commissions").where("agentId", "==", agentId).get();
+    const results = docsToRecords(snap) as Commission[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getAllCommissions(): Promise<Commission[]> {
-    return db.select().from(commissions).orderBy(desc(commissions.createdAt));
+    const snap = await this.col("commissions").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap) as Commission[];
   }
 
   async createCommission(commission: InsertCommission): Promise<Commission> {
-    const [result] = await db.insert(commissions).values(commission).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const commData = serializeForFirestore({
+      ...commission,
+      createdAt: now,
+      updatedAt: now,
+      status: commission.status ?? "pending",
+    });
+    await this.col("commissions").doc(id).set(commData);
+    return { id, ...commData } as Commission;
   }
 
   async updateCommission(id: string, data: Partial<InsertCommission>): Promise<Commission | undefined> {
-    const [result] = await db.update(commissions).set({
-      ...data,
-      updatedAt: new Date(),
-    }).where(eq(commissions.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("commissions").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+    await ref.update(updateData);
+    const updated = await ref.get();
+    return docToRecord(updated) as Commission;
   }
 
-  // Notifications
+  // =========================================================================
+  // NOTIFICATIONS
+  // =========================================================================
   async getNotificationsByUser(userId: string): Promise<Notification[]> {
-    return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+    const snap = await this.col("notifications").where("userId", "==", userId).get();
+    const results = docsToRecords(snap) as Notification[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getUnreadNotifications(userId: string): Promise<Notification[]> {
-    return db.select().from(notifications).where(
-      and(eq(notifications.userId, userId), eq(notifications.isRead, false))
-    ).orderBy(desc(notifications.createdAt));
+    const snap = await this.col("notifications")
+      .where("userId", "==", userId)
+      .where("isRead", "==", false)
+      .get();
+    const results = docsToRecords(snap) as Notification[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [result] = await db.insert(notifications).values(notification).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const notifData = serializeForFirestore({
+      ...notification,
+      createdAt: now,
+      isRead: notification.isRead ?? false,
+      type: notification.type ?? "info",
+      metadata: notification.metadata ?? {},
+    });
+    await this.col("notifications").doc(id).set(notifData);
+    return { id, ...notifData } as Notification;
   }
 
   async markNotificationAsRead(id: string): Promise<Notification | undefined> {
-    const [result] = await db.update(notifications).set({
-      isRead: true,
-      readAt: new Date(),
-    }).where(eq(notifications.id, id)).returning();
-    return result || undefined;
+    const ref = this.col("notifications").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update({ isRead: true, readAt: new Date() });
+    const updated = await ref.get();
+    return docToRecord(updated) as Notification;
   }
 
   async markAllNotificationsAsRead(userId: string): Promise<void> {
-    await db.update(notifications).set({
-      isRead: true,
-      readAt: new Date(),
-    }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    const snap = await this.col("notifications")
+      .where("userId", "==", userId)
+      .where("isRead", "==", false)
+      .get();
+    const batch = firestore.batch();
+    snap.docs.forEach(doc => {
+      batch.update(doc.ref, { isRead: true, readAt: new Date() });
+    });
+    await batch.commit();
   }
 
-  // Activity Logs
+  // =========================================================================
+  // ACTIVITY LOGS
+  // =========================================================================
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
-    const [result] = await db.insert(activityLogs).values(log).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const logData = serializeForFirestore({
+      ...log,
+      createdAt: now,
+      details: log.details ?? {},
+    });
+    await this.col("activityLogs").doc(id).set(logData);
+    return { id, ...logData } as ActivityLog;
   }
 
   async getActivityLogs(limit: number = 100): Promise<ActivityLog[]> {
-    return db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(limit);
+    const snap = await this.col("activityLogs").orderBy("createdAt", "desc").limit(limit).get();
+    return docsToRecords(snap) as ActivityLog[];
   }
 
-  // Site Config
+  // =========================================================================
+  // SITE CONFIG
+  // =========================================================================
   async getSiteConfig(): Promise<SiteConfig | undefined> {
-    const configs = await db.select().from(siteConfig).limit(1);
-    return configs[0] || undefined;
+    const snap = await this.col("siteConfig").limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0] as SiteConfig;
   }
 
   async updateSiteConfig(data: Partial<InsertSiteConfig>): Promise<SiteConfig> {
     const existing = await this.getSiteConfig();
     if (existing) {
-      const [result] = await db.update(siteConfig).set({
-        ...data,
-        updatedAt: new Date(),
-      }).where(eq(siteConfig.id, existing.id)).returning();
-      return result;
+      const ref = this.col("siteConfig").doc(existing.id);
+      const updateData = serializeForFirestore({ ...data, updatedAt: new Date() });
+      await ref.update(updateData);
+      const updated = await ref.get();
+      return docToRecord(updated) as SiteConfig;
     } else {
-      const [result] = await db.insert(siteConfig).values(data).returning();
-      return result;
+      const id = randomUUID();
+      const now = new Date();
+      const configData = serializeForFirestore({
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await this.col("siteConfig").doc(id).set(configData);
+      return { id, ...configData } as SiteConfig;
     }
   }
 
-  // User Notes
+  // =========================================================================
+  // USER NOTES
+  // =========================================================================
   async getUserNotes(userId: string): Promise<(UserNote & { author?: { firstName: string; lastName: string } })[]> {
-    const notes = await db.select().from(userNotes).where(eq(userNotes.userId, userId)).orderBy(desc(userNotes.createdAt));
+    const snap = await this.col("userNotes").where("userId", "==", userId).get();
+    const notes = docsToRecords(snap) as UserNote[];
+    notes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     const notesWithAuthors = await Promise.all(notes.map(async (note) => {
       const author = await this.getUser(note.authorId);
       return {
@@ -511,9 +759,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUserNote(note: InsertUserNote): Promise<UserNote> {
-    const [result] = await db.insert(userNotes).values(note).returning();
-    return result;
+    const id = randomUUID();
+    const now = new Date();
+    const noteData = serializeForFirestore({
+      ...note,
+      createdAt: now,
+    });
+    await this.col("userNotes").doc(id).set(noteData);
+    return { id, ...noteData } as UserNote;
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new FirestoreStorage();
