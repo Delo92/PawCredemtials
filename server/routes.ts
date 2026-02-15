@@ -359,7 +359,7 @@ export async function registerRoutes(
           action: "user_registered",
           entityType: "user",
           entityId: user.id,
-          details: { method: "google" },
+          details: { method: "google" } as any,
         });
       }
 
@@ -376,7 +376,7 @@ export async function registerRoutes(
         action: "user_login",
         entityType: "user",
         entityId: user.id,
-        details: { method: "google" },
+        details: { method: "google" } as any,
       });
 
       res.json({
@@ -531,7 +531,7 @@ export async function registerRoutes(
 
   app.get("/api/applications/:id", requireAuth, async (req, res) => {
     try {
-      const application = await storage.getApplication(req.params.id);
+      const application = await storage.getApplication(req.params.id as string);
       if (!application) {
         res.status(404).json({ message: "Application not found" });
         return;
@@ -698,7 +698,7 @@ export async function registerRoutes(
   // Level 2+: Claim a caller from the queue
   app.post("/api/queue/:id/claim", requireAuth, requireLevel(2), async (req, res) => {
     try {
-      const entry = await storage.getQueueEntry(req.params.id);
+      const entry = await storage.getQueueEntry(req.params.id as string);
       if (!entry) {
         res.status(404).json({ message: "Queue entry not found" });
         return;
@@ -707,7 +707,7 @@ export async function registerRoutes(
         res.status(400).json({ message: "This caller has already been claimed" });
         return;
       }
-      const updated = await storage.updateQueueEntry(req.params.id, {
+      const updated = await storage.updateQueueEntry(req.params.id as string, {
         reviewerId: req.user!.id,
         status: "claimed",
         claimedAt: new Date(),
@@ -721,7 +721,7 @@ export async function registerRoutes(
   // Level 2+: Start call with claimed caller
   app.post("/api/queue/:id/start-call", requireAuth, requireLevel(2), async (req, res) => {
     try {
-      const entry = await storage.getQueueEntry(req.params.id);
+      const entry = await storage.getQueueEntry(req.params.id as string);
       if (!entry) {
         res.status(404).json({ message: "Queue entry not found" });
         return;
@@ -733,7 +733,7 @@ export async function registerRoutes(
       
       // Here is where Twilio/GHL integration would generate a call
       // For now, just update status
-      const updated = await storage.updateQueueEntry(req.params.id, {
+      const updated = await storage.updateQueueEntry(req.params.id as string, {
         status: "in_call",
         callStartedAt: new Date(),
         // roomId would be set here when Twilio/GHL is integrated
@@ -748,7 +748,7 @@ export async function registerRoutes(
   app.post("/api/queue/:id/complete", requireAuth, requireLevel(2), async (req, res) => {
     try {
       const { notes, outcome } = req.body; // outcome: "approved" or "denied"
-      const entry = await storage.getQueueEntry(req.params.id);
+      const entry = await storage.getQueueEntry(req.params.id as string);
       if (!entry) {
         res.status(404).json({ message: "Queue entry not found" });
         return;
@@ -757,7 +757,7 @@ export async function registerRoutes(
         res.status(403).json({ message: "This caller is not assigned to you" });
         return;
       }
-      const updated = await storage.updateQueueEntry(req.params.id, {
+      const updated = await storage.updateQueueEntry(req.params.id as string, {
         status: "completed",
         callEndedAt: new Date(),
         completedAt: new Date(),
@@ -796,7 +796,7 @@ export async function registerRoutes(
   // Level 2+: Release a claimed caller back to queue
   app.post("/api/queue/:id/release", requireAuth, requireLevel(2), async (req, res) => {
     try {
-      const entry = await storage.getQueueEntry(req.params.id);
+      const entry = await storage.getQueueEntry(req.params.id as string);
       if (!entry) {
         res.status(404).json({ message: "Queue entry not found" });
         return;
@@ -805,7 +805,7 @@ export async function registerRoutes(
         res.status(403).json({ message: "This caller is not assigned to you" });
         return;
       }
-      const updated = await storage.updateQueueEntry(req.params.id, {
+      const updated = await storage.updateQueueEntry(req.params.id as string, {
         reviewerId: null,
         status: "waiting",
         claimedAt: null,
@@ -883,7 +883,7 @@ export async function registerRoutes(
   // Level 3: Claim an application
   app.post("/api/agent/work-queue/:id/claim", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const app = await storage.getApplication(req.params.id);
+      const app = await storage.getApplication(req.params.id as string);
       if (!app) {
         res.status(404).json({ message: "Application not found" });
         return;
@@ -896,7 +896,7 @@ export async function registerRoutes(
         res.status(400).json({ message: "Application already claimed by another agent" });
         return;
       }
-      const updated = await storage.updateApplication(req.params.id, {
+      const updated = await storage.updateApplication(req.params.id as string, {
         assignedAgentId: req.user!.id,
       });
       res.json(updated);
@@ -909,7 +909,7 @@ export async function registerRoutes(
   app.post("/api/agent/work-queue/:id/complete", requireAuth, requireLevel(3), async (req, res) => {
     try {
       const { notes } = req.body;
-      const app = await storage.getApplication(req.params.id);
+      const app = await storage.getApplication(req.params.id as string);
       if (!app) {
         res.status(404).json({ message: "Application not found" });
         return;
@@ -918,7 +918,7 @@ export async function registerRoutes(
         res.status(403).json({ message: "This application is not assigned to you" });
         return;
       }
-      const updated = await storage.updateApplication(req.params.id, {
+      const updated = await storage.updateApplication(req.params.id as string, {
         status: "level4_verification",
         currentLevel: 4,
         level3Notes: notes,
@@ -970,7 +970,7 @@ export async function registerRoutes(
   app.post("/api/admin/verification-queue/:id/verify", requireAuth, requireLevel(4), async (req, res) => {
     try {
       const { notes, approved } = req.body;
-      const app = await storage.getApplication(req.params.id);
+      const app = await storage.getApplication(req.params.id as string);
       if (!app) {
         res.status(404).json({ message: "Application not found" });
         return;
@@ -981,7 +981,7 @@ export async function registerRoutes(
       }
       
       if (approved) {
-        const updated = await storage.updateApplication(req.params.id, {
+        const updated = await storage.updateApplication(req.params.id as string, {
           status: "completed",
           currentLevel: 5,
           level4Notes: notes,
@@ -994,7 +994,7 @@ export async function registerRoutes(
         res.json(updated);
       } else {
         // Send back to Level 3 for rework
-        const updated = await storage.updateApplication(req.params.id, {
+        const updated = await storage.updateApplication(req.params.id as string, {
           status: "level3_work",
           currentLevel: 3,
           level4Notes: notes,
@@ -1137,7 +1137,7 @@ export async function registerRoutes(
 
   app.put("/api/admin/packages/:id", requireAuth, requireLevel(4), async (req, res) => {
     try {
-      const pkg = await storage.updatePackage(req.params.id, req.body);
+      const pkg = await storage.updatePackage(req.params.id as string, req.body);
       if (!pkg) {
         res.status(404).json({ message: "Package not found" });
         return;
@@ -1150,7 +1150,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/packages/:id", requireAuth, requireLevel(5), async (req, res) => {
     try {
-      const success = await storage.deletePackage(req.params.id);
+      const success = await storage.deletePackage(req.params.id as string);
       if (!success) {
         res.status(404).json({ message: "Package not found" });
         return;
@@ -1168,7 +1168,7 @@ export async function registerRoutes(
   // Get user applications (for profile modal)
   app.get("/api/users/:id/applications", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const apps = await storage.getApplicationsByUser(req.params.id);
+      const apps = await storage.getApplicationsByUser(req.params.id as string);
       const packages = await storage.getActivePackages();
       const packagesMap = new Map(packages.map(p => [p.id, p]));
       
@@ -1186,7 +1186,7 @@ export async function registerRoutes(
   // Get user basic info (for edit tracking display)
   app.get("/api/users/:id/info", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const user = await storage.getUser(req.params.id);
+      const user = await storage.getUser(req.params.id as string);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;
@@ -1224,7 +1224,7 @@ export async function registerRoutes(
       if (state !== undefined) updates.state = state;
       if (zipCode !== undefined) updates.zipCode = zipCode;
       
-      const user = await storage.updateUser(req.params.id, updates);
+      const user = await storage.updateUser(req.params.id as string, updates);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;
@@ -1238,7 +1238,7 @@ export async function registerRoutes(
   // Get user notes
   app.get("/api/users/:id/notes", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const notes = await storage.getUserNotes(req.params.id);
+      const notes = await storage.getUserNotes(req.params.id as string);
       res.json(notes);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1254,7 +1254,7 @@ export async function registerRoutes(
         return;
       }
       const note = await storage.createUserNote({
-        userId: req.params.id,
+        userId: req.params.id as string,
         authorId: req.user!.id,
         content: content.trim(),
       });
@@ -1281,7 +1281,7 @@ export async function registerRoutes(
       if (state !== undefined) updates.state = state;
       if (zipCode !== undefined) updates.zipCode = zipCode;
       
-      const user = await storage.updateUser(req.params.id, updates);
+      const user = await storage.updateUser(req.params.id as string, updates);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;
@@ -1295,7 +1295,7 @@ export async function registerRoutes(
   // Get a user's applications/purchases (for profile modal)
   app.get("/api/admin/users/:id/applications", requireAuth, requireLevel(4), async (req, res) => {
     try {
-      const apps = await storage.getApplicationsByUser(req.params.id);
+      const apps = await storage.getApplicationsByUser(req.params.id as string);
       const packages = await storage.getActivePackages();
       const packagesMap = new Map(packages.map(p => [p.id, p]));
       
