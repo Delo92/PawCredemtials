@@ -1328,22 +1328,67 @@ export async function registerRoutes(
       }
 
       const results: Record<string, any> = {
+        counters: false,
         siteConfig: false,
+        adminSettings: false,
+        commissionSettings: false,
         packages: 0,
         ownerUser: false,
+        collections_initialized: [] as string[],
         errors: [] as string[],
       };
 
+      // 1. Initialize _counters collection (ChronicDocs pattern)
+      try {
+        await storage.initializeCounters();
+        results.counters = true;
+      } catch (e: any) {
+        (results.errors as string[]).push(`Counters init failed: ${e.message}`);
+      }
+
+      // 2. Site config
       const existingConfig = await storage.getSiteConfig();
       if (!existingConfig) {
-        await storage.updateSiteConfig({
-          ...defaultConfig,
-        } as any);
+        await storage.updateSiteConfig({ ...defaultConfig } as any);
         results.siteConfig = true;
       } else {
         results.siteConfig = "already_exists";
       }
 
+      // 3. Admin settings (ChronicDocs pattern)
+      const existingAdmin = await storage.getAdminSettings();
+      if (!existingAdmin) {
+        await storage.updateAdminSettings({
+          availableStates: ["OK", "TX", "FL", "CA", "NY"],
+          maintenanceMode: false,
+          registrationOpen: true,
+          maxQueueSize: 50,
+          autoAssignAgents: true,
+          defaultWorkflowSteps: 6,
+        });
+        results.adminSettings = true;
+        results.collections_initialized.push("adminSettings");
+      } else {
+        results.adminSettings = "already_exists";
+      }
+
+      // 4. Commission settings (ChronicDocs pattern)
+      const existingCommSettings = await storage.getCommissionSettings();
+      if (!existingCommSettings) {
+        await storage.updateCommissionSettings({
+          defaultRate: 10,
+          agentCommissionPercent: 15,
+          autoApprove: false,
+          minPayoutAmount: 5000,
+          payoutSchedule: "monthly",
+        });
+        results.commissionSettings = true;
+        results.collections_initialized.push("commissionSettings");
+      } else {
+        results.commissionSettings = "already_exists";
+      }
+
+      // 5. Packages
       const existingPackages = await storage.getActivePackages();
       if (existingPackages.length === 0) {
         const seedPackages = [
@@ -1388,6 +1433,7 @@ export async function registerRoutes(
         results.packages = `${existingPackages.length}_already_exist`;
       }
 
+      // 6. Owner user
       const allUsers = await storage.getAllUsers();
       const hasOwner = allUsers.some((u: any) => u.userLevel === 5);
       if (!hasOwner) {
@@ -1415,9 +1461,49 @@ export async function registerRoutes(
         results.ownerUser = "already_exists";
       }
 
+      // 7. Initialize remaining collections with placeholder docs using proper storage methods
+      // ChronicDocs pattern: all collections exist in Firestore from the start
+      const initCollection = async (name: string, checkFn: () => Promise<any>, createFn: () => Promise<any>) => {
+        try {
+          const existing = await checkFn();
+          const isEmpty = Array.isArray(existing) ? existing.length === 0 : !existing;
+          if (isEmpty) {
+            await createFn();
+            results.collections_initialized.push(name);
+          }
+        } catch (e: any) {
+          (results.errors as string[]).push(`Failed to init ${name}: ${e.message}`);
+        }
+      };
+
+      await initCollection("formTemplates",
+        () => storage.getFormTemplates(),
+        () => storage.createFormTemplate({ name: "Default Template", description: "System template", isActive: true, fields: [] })
+      );
+      await initCollection("formTypes",
+        () => storage.getFormTypes(),
+        () => storage.createFormType({ name: "Medical Note", description: "Standard medical documentation form", isActive: true })
+      );
+      await initCollection("bulletin",
+        () => storage.getBulletins(),
+        () => storage.createBulletin({ title: "Welcome", message: "Platform is live and ready.", isActive: true, priority: "normal", targetLevels: [1, 2, 3, 4, 5] })
+      );
+      await initCollection("termsOfService",
+        () => storage.getTermsOfService(),
+        () => storage.updateTermsOfService({ version: "1.0", content: "Terms of Service placeholder. Update this with your actual terms.", isActive: true })
+      );
+      await initCollection("systemReferralCodes",
+        () => storage.getSystemReferralCodes(),
+        () => storage.createSystemReferralCode({ code: "WELCOME2025", discountPercent: 10, isActive: true, description: "Welcome discount" })
+      );
+      await initCollection("blogPosts",
+        () => storage.getBlogPosts(),
+        () => storage.createBlogPost({ title: "Welcome to Our Platform", content: "We are excited to launch our doctor's note service.", isPublished: true, authorId: "system" })
+      );
+
       res.json({
         success: true,
-        message: "Firebase seed complete",
+        message: "Firebase seed complete - all ChronicDocs collections initialized",
         details: results,
       });
     } catch (error: any) {

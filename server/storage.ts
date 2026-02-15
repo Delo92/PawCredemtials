@@ -106,6 +106,101 @@ export interface IStorage {
 
   getUserNotes(userId: string): Promise<(UserNote & { author?: { firstName: string; lastName: string } })[]>;
   createUserNote(note: InsertUserNote): Promise<UserNote>;
+
+  getCounter(collectionName: string): Promise<number>;
+  initializeCounters(): Promise<void>;
+
+  getAdminSettings(): Promise<Record<string, any> | undefined>;
+  updateAdminSettings(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getApproval(id: string): Promise<Record<string, any> | undefined>;
+  getApprovalsByUser(firebaseUid: string): Promise<Record<string, any>[]>;
+  createApproval(data: Record<string, any>): Promise<Record<string, any>>;
+  updateApproval(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  createErrorLog(data: Record<string, any>): Promise<Record<string, any>>;
+  getErrorLogs(limit?: number): Promise<Record<string, any>[]>;
+
+  getDocumentStates(firebaseUid: string): Promise<Record<string, any>[]>;
+  updateDocumentState(firebaseUid: string, documentType: string, state: Record<string, any>): Promise<Record<string, any>>;
+
+  getCommissionSettings(): Promise<Record<string, any> | undefined>;
+  updateCommissionSettings(data: Record<string, any>): Promise<Record<string, any>>;
+
+  createConsultationRecord(data: Record<string, any>): Promise<Record<string, any>>;
+  getConsultationHistory(firebaseUid: string): Promise<Record<string, any>[]>;
+
+  getFormAssignment(id: string): Promise<Record<string, any> | undefined>;
+  getFormAssignmentsByUser(firebaseUid: string): Promise<Record<string, any>[]>;
+  createFormAssignment(data: Record<string, any>): Promise<Record<string, any>>;
+  updateFormAssignment(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getFormTemplates(): Promise<Record<string, any>[]>;
+  createFormTemplate(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getFormTypes(): Promise<Record<string, any>[]>;
+  createFormType(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getWorkflowInstance(id: string): Promise<Record<string, any> | undefined>;
+  getWorkflowInstancesByUser(firebaseUid: string): Promise<Record<string, any>[]>;
+  createWorkflowInstance(data: Record<string, any>): Promise<Record<string, any>>;
+  updateWorkflowInstance(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getAgentQueue(): Promise<Record<string, any>[]>;
+  getAgentQueueByAgent(agentFirebaseUid: string): Promise<Record<string, any>[]>;
+  createAgentQueueEntry(data: Record<string, any>): Promise<Record<string, any>>;
+  updateAgentQueueEntry(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getAgentClockStatus(agentFirebaseUid: string): Promise<Record<string, any> | undefined>;
+  getAgentClockRecords(agentFirebaseUid: string): Promise<Record<string, any>[]>;
+  createAgentClockRecord(data: Record<string, any>): Promise<Record<string, any>>;
+  updateAgentClockRecord(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getBulletins(): Promise<Record<string, any>[]>;
+  createBulletin(data: Record<string, any>): Promise<Record<string, any>>;
+  updateBulletin(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+  deleteBulletin(id: string): Promise<boolean>;
+
+  getApplicationStatus(firebaseUid: string): Promise<Record<string, any> | undefined>;
+  createApplicationStatus(data: Record<string, any>): Promise<Record<string, any>>;
+  updateApplicationStatus(firebaseUid: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getStepData(firebaseUid: string): Promise<Record<string, any> | undefined>;
+  updateStepData(firebaseUid: string, data: Record<string, any>): Promise<Record<string, any>>;
+
+  getProfileNotes(firebaseUid: string): Promise<Record<string, any>[]>;
+  createProfileNote(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getPushSubscriptions(firebaseUid: string): Promise<Record<string, any>[]>;
+  createPushSubscription(data: Record<string, any>): Promise<Record<string, any>>;
+  deletePushSubscription(id: string): Promise<boolean>;
+
+  getBlogPosts(): Promise<Record<string, any>[]>;
+  createBlogPost(data: Record<string, any>): Promise<Record<string, any>>;
+  updateBlogPost(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+  deleteBlogPost(id: string): Promise<boolean>;
+
+  getChargebacks(): Promise<Record<string, any>[]>;
+  createChargeback(data: Record<string, any>): Promise<Record<string, any>>;
+  updateChargeback(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getReferralCodeHistory(agentFirebaseUid: string): Promise<Record<string, any>[]>;
+  createReferralCodeHistory(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getReferralRegistrations(agentFirebaseUid: string): Promise<Record<string, any>[]>;
+  createReferralRegistration(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getSystemReferralCodes(): Promise<Record<string, any>[]>;
+  createSystemReferralCode(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getTermsOfService(): Promise<Record<string, any> | undefined>;
+  updateTermsOfService(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getTermsAcceptances(firebaseUid: string): Promise<Record<string, any>[]>;
+  createTermsAcceptance(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getAgentDocuments(agentFirebaseUid: string): Promise<Record<string, any>[]>;
+  createAgentDocument(data: Record<string, any>): Promise<Record<string, any>>;
 }
 
 function docToRecord(doc: FirebaseFirestore.DocumentSnapshot): Record<string, any> | undefined {
@@ -151,6 +246,49 @@ export class FirestoreStorage implements IStorage {
     return getDb().collection(name);
   }
 
+  private async incrementCounter(collectionName: string, delta: number = 1): Promise<void> {
+    const counterRef = this.col("_counters").doc(collectionName);
+    const existing = await counterRef.get();
+    if (existing.exists) {
+      await counterRef.update({ count: FieldValue.increment(delta) });
+    } else {
+      await counterRef.set({ count: delta });
+    }
+  }
+
+  // =========================================================================
+  // COUNTERS
+  // =========================================================================
+  async getCounter(collectionName: string): Promise<number> {
+    const doc = await this.col("_counters").doc(collectionName).get();
+    if (!doc.exists) return 0;
+    return doc.data()?.count ?? 0;
+  }
+
+  async initializeCounters(): Promise<void> {
+    const collections = [
+      "users", "packages", "applications", "applicationSteps", "documents",
+      "messages", "queueEntries", "payments", "commissions", "notifications",
+      "activityLogs", "siteConfig", "userNotes", "adminSettings", "approvals",
+      "errorLogs", "documentStates", "commissionSettings", "consultationHistory",
+      "formAssignments", "formTemplates", "formTypes", "workflowInstances",
+      "agentQueue", "agentClockRecords", "bulletin", "applicationStatus",
+      "stepData", "profileNotes", "pushSubscriptions", "blogPosts", "chargebacks",
+      "referralCodeHistory", "referralRegistrations", "systemReferralCodes",
+      "termsOfService", "termsAcceptances", "agentDocuments"
+    ];
+    const db = getDb();
+    const batch = db.batch();
+    for (const col of collections) {
+      const ref = this.col("_counters").doc(col);
+      const existing = await ref.get();
+      if (!existing.exists) {
+        batch.set(ref, { count: 0 });
+      }
+    }
+    await batch.commit();
+  }
+
   // =========================================================================
   // USERS - Firebase UID as document ID
   // =========================================================================
@@ -194,6 +332,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("users").doc(id).set(userData);
     const created = await this.col("users").doc(id).get();
+    await this.incrementCounter("users");
     return docToRecord(created) as User;
   }
 
@@ -252,6 +391,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("packages").doc(id).set(pkgData);
     const created = await this.col("packages").doc(id).get();
+    await this.incrementCounter("packages");
     return docToRecord(created) as Package;
   }
 
@@ -270,6 +410,7 @@ export class FirestoreStorage implements IStorage {
     const existing = await ref.get();
     if (!existing.exists) return false;
     await ref.delete();
+    await this.incrementCounter("packages", -1);
     return true;
   }
 
@@ -313,6 +454,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("applications").doc(id).set(appData);
     const created = await this.col("applications").doc(id).get();
+    await this.incrementCounter("applications");
     return docToRecord(created) as Application;
   }
 
@@ -346,6 +488,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("applicationSteps").doc(id).set(stepData);
     const created = await this.col("applicationSteps").doc(id).get();
+    await this.incrementCounter("applicationSteps");
     return docToRecord(created) as ApplicationStep;
   }
 
@@ -389,6 +532,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("documents").doc(id).set(docData);
     const created = await this.col("documents").doc(id).get();
+    await this.incrementCounter("documents");
     return docToRecord(created) as Document;
   }
 
@@ -407,6 +551,7 @@ export class FirestoreStorage implements IStorage {
     const existing = await ref.get();
     if (!existing.exists) return false;
     await ref.delete();
+    await this.incrementCounter("documents", -1);
     return true;
   }
 
@@ -462,6 +607,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("messages").doc(id).set(msgData);
     const created = await this.col("messages").doc(id).get();
+    await this.incrementCounter("messages");
     return docToRecord(created) as Message;
   }
 
@@ -528,6 +674,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("queueEntries").doc(id).set(entryData);
     const created = await this.col("queueEntries").doc(id).get();
+    await this.incrementCounter("queueEntries");
     return docToRecord(created) as QueueEntry;
   }
 
@@ -577,6 +724,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("payments").doc(id).set(paymentData);
     const created = await this.col("payments").doc(id).get();
+    await this.incrementCounter("payments");
     return docToRecord(created) as Payment;
   }
 
@@ -619,6 +767,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("commissions").doc(id).set(commData);
     const created = await this.col("commissions").doc(id).get();
+    await this.incrementCounter("commissions");
     return docToRecord(created) as Commission;
   }
 
@@ -661,6 +810,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("notifications").doc(id).set(notifData);
     const created = await this.col("notifications").doc(id).get();
+    await this.incrementCounter("notifications");
     return docToRecord(created) as Notification;
   }
 
@@ -698,6 +848,7 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("activityLogs").doc(id).set(logData);
     const created = await this.col("activityLogs").doc(id).get();
+    await this.incrementCounter("activityLogs");
     return docToRecord(created) as ActivityLog;
   }
 
@@ -761,7 +912,600 @@ export class FirestoreStorage implements IStorage {
     });
     await this.col("userNotes").doc(id).set(noteData);
     const created = await this.col("userNotes").doc(id).get();
+    await this.incrementCounter("userNotes");
     return docToRecord(created) as UserNote;
+  }
+
+  // =========================================================================
+  // ADMIN SETTINGS
+  // =========================================================================
+  async getAdminSettings(): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("adminSettings").doc("default").get();
+    return docToRecord(doc);
+  }
+
+  async updateAdminSettings(data: Record<string, any>): Promise<Record<string, any>> {
+    const ref = this.col("adminSettings").doc("default");
+    const existing = await ref.get();
+    const updateData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    if (existing.exists) {
+      await ref.update(updateData);
+    } else {
+      await ref.set({ ...updateData, createdAt: FieldValue.serverTimestamp() });
+    }
+    const updated = await ref.get();
+    return docToRecord(updated)!;
+  }
+
+  // =========================================================================
+  // APPROVALS
+  // =========================================================================
+  async getApproval(id: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("approvals").doc(id).get();
+    return docToRecord(doc);
+  }
+
+  async getApprovalsByUser(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("approvals").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createApproval(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("approvals").doc(id).set(cleanData);
+    await this.incrementCounter("approvals");
+    const created = await this.col("approvals").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateApproval(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("approvals").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // ERROR LOGS
+  // =========================================================================
+  async createErrorLog(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("errorLogs").doc(id).set(cleanData);
+    await this.incrementCounter("errorLogs");
+    const created = await this.col("errorLogs").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async getErrorLogs(limit: number = 100): Promise<Record<string, any>[]> {
+    const snap = await this.col("errorLogs").orderBy("createdAt", "desc").limit(limit).get();
+    return docsToRecords(snap);
+  }
+
+  // =========================================================================
+  // DOCUMENT STATES
+  // =========================================================================
+  async getDocumentStates(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("documentStates").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async updateDocumentState(firebaseUid: string, documentType: string, state: Record<string, any>): Promise<Record<string, any>> {
+    const snap = await this.col("documentStates")
+      .where("firebaseUid", "==", firebaseUid)
+      .where("documentType", "==", documentType)
+      .limit(1).get();
+
+    if (!snap.empty) {
+      const ref = snap.docs[0].ref;
+      await ref.update(cleanForFirestore({ ...state, updatedAt: FieldValue.serverTimestamp() }));
+      const updated = await ref.get();
+      return docToRecord(updated)!;
+    } else {
+      const id = randomUUID();
+      const data = cleanForFirestore({ firebaseUid, documentType, ...state, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      await this.col("documentStates").doc(id).set(data);
+      await this.incrementCounter("documentStates");
+      const created = await this.col("documentStates").doc(id).get();
+      return docToRecord(created)!;
+    }
+  }
+
+  // =========================================================================
+  // COMMISSION SETTINGS
+  // =========================================================================
+  async getCommissionSettings(): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("commissionSettings").doc("default").get();
+    return docToRecord(doc);
+  }
+
+  async updateCommissionSettings(data: Record<string, any>): Promise<Record<string, any>> {
+    const ref = this.col("commissionSettings").doc("default");
+    const existing = await ref.get();
+    const updateData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    if (existing.exists) {
+      await ref.update(updateData);
+    } else {
+      await ref.set({ ...updateData, createdAt: FieldValue.serverTimestamp() });
+    }
+    const updated = await ref.get();
+    return docToRecord(updated)!;
+  }
+
+  // =========================================================================
+  // CONSULTATION HISTORY
+  // =========================================================================
+  async createConsultationRecord(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("consultationHistory").doc(id).set(cleanData);
+    await this.incrementCounter("consultationHistory");
+    const created = await this.col("consultationHistory").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async getConsultationHistory(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("consultationHistory").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  // =========================================================================
+  // FORM ASSIGNMENTS
+  // =========================================================================
+  async getFormAssignment(id: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("formAssignments").doc(id).get();
+    return docToRecord(doc);
+  }
+
+  async getFormAssignmentsByUser(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("formAssignments").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createFormAssignment(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, status: data.status ?? "pending", createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("formAssignments").doc(id).set(cleanData);
+    await this.incrementCounter("formAssignments");
+    const created = await this.col("formAssignments").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateFormAssignment(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("formAssignments").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // FORM TEMPLATES
+  // =========================================================================
+  async getFormTemplates(): Promise<Record<string, any>[]> {
+    const snap = await this.col("formTemplates").get();
+    return docsToRecords(snap);
+  }
+
+  async createFormTemplate(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("formTemplates").doc(id).set(cleanData);
+    await this.incrementCounter("formTemplates");
+    const created = await this.col("formTemplates").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // FORM TYPES
+  // =========================================================================
+  async getFormTypes(): Promise<Record<string, any>[]> {
+    const snap = await this.col("formTypes").get();
+    return docsToRecords(snap);
+  }
+
+  async createFormType(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("formTypes").doc(id).set(cleanData);
+    await this.incrementCounter("formTypes");
+    const created = await this.col("formTypes").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // WORKFLOW INSTANCES
+  // =========================================================================
+  async getWorkflowInstance(id: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("workflowInstances").doc(id).get();
+    return docToRecord(doc);
+  }
+
+  async getWorkflowInstancesByUser(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("workflowInstances").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createWorkflowInstance(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, status: data.status ?? "active", createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("workflowInstances").doc(id).set(cleanData);
+    await this.incrementCounter("workflowInstances");
+    const created = await this.col("workflowInstances").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateWorkflowInstance(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("workflowInstances").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // AGENT QUEUE
+  // =========================================================================
+  async getAgentQueue(): Promise<Record<string, any>[]> {
+    const snap = await this.col("agentQueue").where("status", "==", "pending").get();
+    return docsToRecords(snap);
+  }
+
+  async getAgentQueueByAgent(agentFirebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("agentQueue").where("agentFirebaseUid", "==", agentFirebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createAgentQueueEntry(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, status: data.status ?? "pending", createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("agentQueue").doc(id).set(cleanData);
+    await this.incrementCounter("agentQueue");
+    const created = await this.col("agentQueue").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateAgentQueueEntry(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("agentQueue").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // AGENT CLOCK RECORDS
+  // =========================================================================
+  async getAgentClockStatus(agentFirebaseUid: string): Promise<Record<string, any> | undefined> {
+    const snap = await this.col("agentClockRecords")
+      .where("agentFirebaseUid", "==", agentFirebaseUid)
+      .where("clockOutTime", "==", null)
+      .limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0];
+  }
+
+  async getAgentClockRecords(agentFirebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("agentClockRecords").where("agentFirebaseUid", "==", agentFirebaseUid).get();
+    const results = docsToRecords(snap);
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async createAgentClockRecord(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("agentClockRecords").doc(id).set(cleanData);
+    await this.incrementCounter("agentClockRecords");
+    const created = await this.col("agentClockRecords").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateAgentClockRecord(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("agentClockRecords").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // BULLETIN
+  // =========================================================================
+  async getBulletins(): Promise<Record<string, any>[]> {
+    const snap = await this.col("bulletin").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap);
+  }
+
+  async createBulletin(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, isActive: data.isActive ?? true, createdAt: FieldValue.serverTimestamp() });
+    await this.col("bulletin").doc(id).set(cleanData);
+    await this.incrementCounter("bulletin");
+    const created = await this.col("bulletin").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateBulletin(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("bulletin").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  async deleteBulletin(id: string): Promise<boolean> {
+    const ref = this.col("bulletin").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return false;
+    await ref.delete();
+    await this.incrementCounter("bulletin", -1);
+    return true;
+  }
+
+  // =========================================================================
+  // APPLICATION STATUS
+  // =========================================================================
+  async getApplicationStatus(firebaseUid: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("applicationStatus").doc(firebaseUid).get();
+    return docToRecord(doc);
+  }
+
+  async createApplicationStatus(data: Record<string, any>): Promise<Record<string, any>> {
+    const uid = data.firebaseUid;
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("applicationStatus").doc(uid).set(cleanData);
+    await this.incrementCounter("applicationStatus");
+    const created = await this.col("applicationStatus").doc(uid).get();
+    return docToRecord(created)!;
+  }
+
+  async updateApplicationStatus(firebaseUid: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("applicationStatus").doc(firebaseUid);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // STEP DATA
+  // =========================================================================
+  async getStepData(firebaseUid: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("stepData").doc(firebaseUid).get();
+    return docToRecord(doc);
+  }
+
+  async updateStepData(firebaseUid: string, data: Record<string, any>): Promise<Record<string, any>> {
+    const ref = this.col("stepData").doc(firebaseUid);
+    const existing = await ref.get();
+    const updateData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    if (existing.exists) {
+      await ref.update(updateData);
+    } else {
+      await ref.set({ ...updateData, firebaseUid, createdAt: FieldValue.serverTimestamp() });
+      await this.incrementCounter("stepData");
+    }
+    const updated = await ref.get();
+    return docToRecord(updated)!;
+  }
+
+  // =========================================================================
+  // PROFILE NOTES
+  // =========================================================================
+  async getProfileNotes(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("profileNotes").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createProfileNote(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("profileNotes").doc(id).set(cleanData);
+    await this.incrementCounter("profileNotes");
+    const created = await this.col("profileNotes").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // PUSH SUBSCRIPTIONS
+  // =========================================================================
+  async getPushSubscriptions(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("pushSubscriptions").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createPushSubscription(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("pushSubscriptions").doc(id).set(cleanData);
+    await this.incrementCounter("pushSubscriptions");
+    const created = await this.col("pushSubscriptions").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async deletePushSubscription(id: string): Promise<boolean> {
+    const ref = this.col("pushSubscriptions").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return false;
+    await ref.delete();
+    await this.incrementCounter("pushSubscriptions", -1);
+    return true;
+  }
+
+  // =========================================================================
+  // BLOG POSTS
+  // =========================================================================
+  async getBlogPosts(): Promise<Record<string, any>[]> {
+    const snap = await this.col("blogPosts").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap);
+  }
+
+  async createBlogPost(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, isPublished: data.isPublished ?? false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    await this.col("blogPosts").doc(id).set(cleanData);
+    await this.incrementCounter("blogPosts");
+    const created = await this.col("blogPosts").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateBlogPost(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("blogPosts").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  async deleteBlogPost(id: string): Promise<boolean> {
+    const ref = this.col("blogPosts").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return false;
+    await ref.delete();
+    await this.incrementCounter("blogPosts", -1);
+    return true;
+  }
+
+  // =========================================================================
+  // CHARGEBACKS
+  // =========================================================================
+  async getChargebacks(): Promise<Record<string, any>[]> {
+    const snap = await this.col("chargebacks").orderBy("createdAt", "desc").get();
+    return docsToRecords(snap);
+  }
+
+  async createChargeback(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, status: data.status ?? "pending", createdAt: FieldValue.serverTimestamp() });
+    await this.col("chargebacks").doc(id).set(cleanData);
+    await this.incrementCounter("chargebacks");
+    const created = await this.col("chargebacks").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateChargeback(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("chargebacks").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    await ref.update(cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() }));
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  // =========================================================================
+  // REFERRAL CODE HISTORY
+  // =========================================================================
+  async getReferralCodeHistory(agentFirebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("referralCodeHistory").where("agentFirebaseUid", "==", agentFirebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createReferralCodeHistory(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("referralCodeHistory").doc(id).set(cleanData);
+    await this.incrementCounter("referralCodeHistory");
+    const created = await this.col("referralCodeHistory").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // REFERRAL REGISTRATIONS
+  // =========================================================================
+  async getReferralRegistrations(agentFirebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("referralRegistrations").where("agentFirebaseUid", "==", agentFirebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createReferralRegistration(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("referralRegistrations").doc(id).set(cleanData);
+    await this.incrementCounter("referralRegistrations");
+    const created = await this.col("referralRegistrations").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // SYSTEM REFERRAL CODES
+  // =========================================================================
+  async getSystemReferralCodes(): Promise<Record<string, any>[]> {
+    const snap = await this.col("systemReferralCodes").get();
+    return docsToRecords(snap);
+  }
+
+  async createSystemReferralCode(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, isActive: data.isActive ?? true, createdAt: FieldValue.serverTimestamp() });
+    await this.col("systemReferralCodes").doc(id).set(cleanData);
+    await this.incrementCounter("systemReferralCodes");
+    const created = await this.col("systemReferralCodes").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // TERMS OF SERVICE
+  // =========================================================================
+  async getTermsOfService(): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("termsOfService").doc("current").get();
+    return docToRecord(doc);
+  }
+
+  async updateTermsOfService(data: Record<string, any>): Promise<Record<string, any>> {
+    const ref = this.col("termsOfService").doc("current");
+    const existing = await ref.get();
+    const updateData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    if (existing.exists) {
+      await ref.update(updateData);
+    } else {
+      await ref.set({ ...updateData, createdAt: FieldValue.serverTimestamp() });
+    }
+    const updated = await ref.get();
+    return docToRecord(updated)!;
+  }
+
+  // =========================================================================
+  // TERMS ACCEPTANCES
+  // =========================================================================
+  async getTermsAcceptances(firebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("termsAcceptances").where("firebaseUid", "==", firebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createTermsAcceptance(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("termsAcceptances").doc(id).set(cleanData);
+    await this.incrementCounter("termsAcceptances");
+    const created = await this.col("termsAcceptances").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  // =========================================================================
+  // AGENT DOCUMENTS
+  // =========================================================================
+  async getAgentDocuments(agentFirebaseUid: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("agentDocuments").where("agentFirebaseUid", "==", agentFirebaseUid).get();
+    return docsToRecords(snap);
+  }
+
+  async createAgentDocument(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("agentDocuments").doc(id).set(cleanData);
+    await this.incrementCounter("agentDocuments");
+    const created = await this.col("agentDocuments").doc(id).get();
+    return docToRecord(created)!;
   }
 }
 
