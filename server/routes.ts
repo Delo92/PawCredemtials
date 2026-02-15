@@ -1435,7 +1435,7 @@ export async function registerRoutes(
       }
 
       // 6. Test accounts for all 5 levels (ChronicDocs pattern)
-      const testPassword = "ChronicBrands";
+      const testPassword = "TestPass123";
       const hashedTestPassword = await bcrypt.hash(testPassword, 10);
       const testAccounts = [
         { email: "level1@test.com", firstName: "Test", lastName: "Applicant", userLevel: 1, referralCode: "TEST_L1" },
@@ -1449,10 +1449,10 @@ export async function registerRoutes(
       for (const acct of testAccounts) {
         try {
           const existing = await storage.getUserByEmail(acct.email);
-          if (existing && !existing.passwordHash) {
+          if (existing) {
             await storage.updateUser(existing.id, { passwordHash: hashedTestPassword } as any);
-            (results.testAccounts as string[]).push(`${acct.email} (Level ${acct.userLevel}) - fixed passwordHash`);
-          } else if (!existing) {
+            (results.testAccounts as string[]).push(`${acct.email} (Level ${acct.userLevel}) - updated`);
+          } else {
             await storage.createUser({
               ...acct,
               passwordHash: hashedTestPassword,
