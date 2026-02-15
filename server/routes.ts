@@ -1311,6 +1311,122 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
+  // FIREBASE INITIALIZATION / SEED ENDPOINT
+  // ===========================================================================
+
+  app.post("/api/admin/seed-firebase", async (req, res) => {
+    try {
+      const existingUsers = await storage.getAllUsers();
+      if (existingUsers.length > 0) {
+        const authHeader = req.headers.authorization;
+        const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+        const bootstrapToken = process.env.BOOTSTRAP_TOKEN;
+        if (!bootstrapToken || token !== bootstrapToken) {
+          res.status(403).json({ message: "System already initialized. Re-seeding requires a valid BOOTSTRAP_TOKEN." });
+          return;
+        }
+      }
+
+      const results: Record<string, any> = {
+        siteConfig: false,
+        packages: 0,
+        ownerUser: false,
+        errors: [] as string[],
+      };
+
+      const existingConfig = await storage.getSiteConfig();
+      if (!existingConfig) {
+        await storage.updateSiteConfig({
+          ...defaultConfig,
+        } as any);
+        results.siteConfig = true;
+      } else {
+        results.siteConfig = "already_exists";
+      }
+
+      const existingPackages = await storage.getActivePackages();
+      if (existingPackages.length === 0) {
+        const seedPackages = [
+          {
+            name: "Basic Doctor's Note",
+            description: "Standard doctor's note for work or school absence. Includes date of visit and return-to-work date.",
+            price: 4999,
+            isActive: true,
+            requiresLevel2: false,
+            features: ["Same-day delivery", "Digital copy", "Verification number"],
+            category: "standard",
+          },
+          {
+            name: "Urgent Care Note",
+            description: "Urgent care visit documentation with detailed medical excuse. Suitable for extended absences.",
+            price: 7999,
+            isActive: true,
+            requiresLevel2: true,
+            features: ["Priority processing", "Medical consultation", "Detailed documentation", "Print-ready PDF"],
+            category: "urgent",
+          },
+          {
+            name: "Specialist Referral Note",
+            description: "Specialist referral documentation with medical justification. Includes follow-up recommendations.",
+            price: 12999,
+            isActive: true,
+            requiresLevel2: true,
+            features: ["Specialist consultation", "Comprehensive documentation", "Follow-up plan", "Priority support"],
+            category: "specialist",
+          },
+        ];
+
+        for (const pkg of seedPackages) {
+          try {
+            await storage.createPackage(pkg as any);
+            results.packages++;
+          } catch (e: any) {
+            (results.errors as string[]).push(`Failed to create package ${pkg.name}: ${e.message}`);
+          }
+        }
+      } else {
+        results.packages = `${existingPackages.length}_already_exist`;
+      }
+
+      const allUsers = await storage.getAllUsers();
+      const hasOwner = allUsers.some((u: any) => u.userLevel === 5);
+      if (!hasOwner) {
+        try {
+          const ownerEmail = req.body?.email || "owner@doctorsnote.com";
+          const generatedPassword = randomBytes(16).toString("hex");
+          const ownerPassword = req.body?.password || generatedPassword;
+          const hashedPassword = await bcrypt.hash(ownerPassword, 10);
+          await storage.createUser({
+            email: ownerEmail,
+            password: hashedPassword,
+            firstName: "Platform",
+            lastName: "Owner",
+            userLevel: 5,
+            isActive: true,
+            referralCode: "OWNER001",
+          } as any);
+          results.ownerUser = true;
+          results.ownerEmail = ownerEmail;
+          results.ownerPassword = ownerPassword;
+        } catch (e: any) {
+          (results.errors as string[]).push(`Failed to create owner: ${e.message}`);
+        }
+      } else {
+        results.ownerUser = "already_exists";
+      }
+
+      res.json({
+        success: true,
+        message: "Firebase seed complete",
+        details: results,
+      });
+    } catch (error: any) {
+      console.error("Seed error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
   // DATA MIGRATION ENDPOINT (PostgreSQL + Local Files -> Firebase)
   // ===========================================================================
 
