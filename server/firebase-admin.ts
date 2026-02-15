@@ -8,31 +8,77 @@ let _db: Firestore | null = null;
 let _storage: Storage | null = null;
 let _auth: Auth | null = null;
 
-function getCredentials(): { projectId: string; clientEmail: string; privateKey: string } {
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountKey) {
+function tryParseServiceAccountKey(raw: string): { projectId: string; clientEmail: string; privateKey: string } | null {
+  const attempts = [
+    () => JSON.parse(raw),
+    () => JSON.parse(raw.trim()),
+    () => JSON.parse(raw.replace(/\n/g, '\\n')),
+    () => JSON.parse(Buffer.from(raw, 'base64').toString('utf-8')),
+    () => JSON.parse(Buffer.from(raw.trim(), 'base64').toString('utf-8')),
+  ];
+
+  for (const attempt of attempts) {
     try {
-      const cleaned = serviceAccountKey
-        .replace(/\\n/g, '\n')
-        .replace(/\\\\/g, '\\');
-      const parsed = JSON.parse(cleaned);
-      return {
-        projectId: parsed.project_id,
-        clientEmail: parsed.client_email,
-        privateKey: parsed.private_key,
-      };
-    } catch (e) {
-      try {
-        const base64Decoded = Buffer.from(serviceAccountKey, 'base64').toString('utf-8');
-        const parsed = JSON.parse(base64Decoded);
+      const parsed = attempt();
+      if (parsed && parsed.project_id && parsed.client_email && parsed.private_key) {
+        let pk = parsed.private_key;
+        if (typeof pk === 'string' && pk.includes('\\n') && !pk.includes('\n')) {
+          pk = pk.replace(/\\n/g, '\n');
+        }
+        console.log(`Firebase credentials parsed successfully for project: ${parsed.project_id}`);
         return {
           projectId: parsed.project_id,
           clientEmail: parsed.client_email,
-          privateKey: parsed.private_key,
+          privateKey: pk,
         };
-      } catch {
-        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY as JSON or base64");
       }
+    } catch {
+    }
+  }
+  return null;
+}
+
+function getCredentials(): { projectId: string; clientEmail: string; privateKey: string } {
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountKey) {
+    const result = tryParseServiceAccountKey(serviceAccountKey);
+    if (result) return result;
+
+    if (serviceAccountKey.includes('-----BEGIN') || serviceAccountKey.includes('PRIVATE KEY')) {
+      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+      if (projectId && clientEmail) {
+        let pk = serviceAccountKey.trim();
+        if (pk.startsWith('"')) pk = pk.slice(1);
+        if (pk.endsWith('"')) pk = pk.slice(0, -1);
+        pk = pk.replace(/\\n/g, '\n');
+        console.log(`Firebase credentials assembled from private key + env vars for project: ${projectId}`);
+        return { projectId, clientEmail, privateKey: pk };
+      }
+
+      if (projectId) {
+        let pk = serviceAccountKey.trim();
+        if (pk.startsWith('"')) pk = pk.slice(1);
+        if (pk.endsWith('"')) pk = pk.slice(0, -1);
+        pk = pk.replace(/\\n/g, '\n');
+        const inferredEmail = `firebase-adminsdk@${projectId}.iam.gserviceaccount.com`;
+        console.log(`Firebase credentials assembled with inferred client_email for project: ${projectId}`);
+        console.log(`Using inferred client_email: ${inferredEmail}`);
+        console.log(`If auth fails, set FIREBASE_CLIENT_EMAIL to the correct service account email from your Firebase console.`);
+        return { projectId, clientEmail: inferredEmail, privateKey: pk };
+      }
+
+      console.error(
+        "FIREBASE_SERVICE_ACCOUNT_KEY contains a private key but no project ID found. " +
+        "Set VITE_FIREBASE_PROJECT_ID or FIREBASE_PROJECT_ID."
+      );
+    } else {
+      console.error(
+        "FIREBASE_SERVICE_ACCOUNT_KEY is set but could not be parsed as JSON. " +
+        `Key starts with: "${serviceAccountKey.substring(0, 30)}..." (length: ${serviceAccountKey.length}). ` +
+        "It should be the full JSON from Firebase console > Project Settings > Service Accounts > Generate New Private Key."
+      );
     }
   }
 
@@ -41,15 +87,16 @@ function getCredentials(): { projectId: string; clientEmail: string; privateKey:
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
 
   if (clientEmail && privateKey && projectId) {
-    return {
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-    };
+    let pk = privateKey;
+    if (pk.includes('\\n') && !pk.includes('\n')) {
+      pk = pk.replace(/\\n/g, '\n');
+    }
+    console.log(`Firebase credentials loaded from individual env vars for project: ${projectId}`);
+    return { projectId, clientEmail, privateKey: pk };
   }
 
   throw new Error(
-    "Firebase credentials not found. Set either FIREBASE_SERVICE_ACCOUNT_KEY (JSON) " +
+    "Firebase credentials not found. Set FIREBASE_SERVICE_ACCOUNT_KEY (full JSON from Firebase console) " +
     "or individual FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY + FIREBASE_PROJECT_ID env vars."
   );
 }
