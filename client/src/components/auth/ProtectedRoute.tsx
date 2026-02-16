@@ -57,15 +57,12 @@ function redirectToDashboard(
       setLocation("/dashboard/applicant");
       break;
     case 2:
-      setLocation("/dashboard/reviewer");
+      setLocation("/dashboard/doctor");
       break;
     case 3:
-      setLocation("/dashboard/agent");
-      break;
-    case 4:
       setLocation("/dashboard/admin");
       break;
-    case 5:
+    case 4:
       setLocation("/dashboard/owner");
       break;
     default:

@@ -1,10 +1,10 @@
-# Application Portal - White-Label Multi-Role Platform
+# ChronicDocs - Asynchronous Doctor's Note Service Platform
 
 ## Overview
 
-This is a white-label application processing platform with a 5-tier user hierarchy system. The platform handles applications, document management, payments, messaging, and workflow automation. It's built as a full-stack TypeScript application with React frontend and Express backend, designed to be customizable for different business verticals (telemedicine, licensing, certification, etc.).
+This is a white-label asynchronous doctor's note purchasing service with a 4-tier user hierarchy. The platform handles patient applications, doctor review/approval, automated document generation, payments, messaging, and workflow automation. Built as a full-stack TypeScript application with React frontend, Express backend, and Firebase Firestore for data storage.
 
-The core workflow follows: Registration → Package Selection → Payment → Document Upload → Review → Approval → Completion.
+The core workflow follows: Registration → Package Selection → Payment → Form Auto-Fill → Doctor Review/Approval → Auto-Document Generation → Completion.
 
 ## User Preferences
 
@@ -40,12 +40,11 @@ Path aliases are configured: `@/` for client/src, `@shared/` for shared code, `@
 - **Migrations**: Drizzle Kit with `db:push` command for schema sync
 - **Validation**: Zod schemas generated from Drizzle schemas via drizzle-zod
 
-### User Hierarchy (5 Levels)
-1. **Level 1 - Applicant**: End users who submit applications
-2. **Level 2 - Reviewer**: Review submitted applications
-3. **Level 3 - Agent**: Process documents and handle operations
-4. **Level 4 - Admin**: Manage users, packages, and system settings
-5. **Level 5 - Owner**: Full platform control, white-label configuration
+### User Hierarchy (4 Levels)
+1. **Level 1 - Patient**: End users who purchase doctor's notes and submit applications
+2. **Level 2 - Doctor**: Reviews applications, approves/denies, handles work queue (merged from old Reviewer+Agent)
+3. **Level 3 - Admin**: Manage users, packages, verification queue, and system settings
+4. **Level 4 - Owner**: Full platform control, white-label configuration
 
 Role names are configurable per deployment via the `siteConfig` table.
 
@@ -61,6 +60,8 @@ Role names are configurable per deployment via the `siteConfig` table.
 - `notifications` - User notifications
 - `activityLogs` - Audit trail
 - `siteConfig` - White-label customization
+- `doctorProfiles` - Doctor credentials (license, NPI, DEA, phone, fax, address, specialty)
+- `autoMessageTriggers` - Automated messages triggered on application status changes
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
@@ -70,8 +71,8 @@ Role names are configurable per deployment via the `siteConfig` table.
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary database via `DATABASE_URL` environment variable
-- **Connection**: pg Pool with Drizzle ORM wrapper
+- **Firebase Firestore**: Primary data store via Firebase Admin SDK
+- **Connection**: Firebase service account key via `FIREBASE_SERVICE_ACCOUNT_KEY` secret
 
 ### Frontend Libraries
 - **UI Framework**: shadcn/ui (Radix UI + Tailwind)

@@ -35,7 +35,6 @@ export interface WhiteLabelConfig {
     level2: string;
     level3: string;
     level4: string;
-    level5: string;
   };
   workflowSteps: string[];
   features: {
@@ -72,11 +71,10 @@ export const defaultConfig: WhiteLabelConfig = {
     { label: "Disclaimer", url: "/disclaimer" }
   ],
   levelNames: {
-    level1: "Customer",
-    level2: "Medical Staff",
-    level3: "Agent",
-    level4: "Admin",
-    level5: "Owner",
+    level1: "Patient",
+    level2: "Doctor",
+    level3: "Admin",
+    level4: "Owner",
   },
   workflowSteps: [
     "Create Account",
@@ -98,11 +96,10 @@ export const defaultConfig: WhiteLabelConfig = {
 
 // User level constants
 export const USER_LEVELS = {
-  APPLICANT: 1,
-  REVIEWER: 2,
-  AGENT: 3,
-  ADMIN: 4,
-  OWNER: 5,
+  PATIENT: 1,
+  DOCTOR: 2,
+  ADMIN: 3,
+  OWNER: 4,
 } as const;
 
 export type UserLevel = typeof USER_LEVELS[keyof typeof USER_LEVELS];

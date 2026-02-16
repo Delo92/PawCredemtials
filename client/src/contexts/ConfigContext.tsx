@@ -28,8 +28,6 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         return config.levelNames.level3;
       case 4:
         return config.levelNames.level4;
-      case 5:
-        return config.levelNames.level5;
       default:
         return "Unknown";
     }

@@ -28,7 +28,6 @@ import {
   BarChart3,
   FolderOpen,
   ClipboardList,
-  Phone,
   UserCheck,
   Building2,
   DollarSign,
@@ -60,35 +59,26 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const baseItems: NavItem[] = [];
 
     switch (user.userLevel) {
-      case 1: // Customer
+      case 1: // Patient
         return [
           { title: "Dashboard", href: "/dashboard/applicant", icon: Home },
           { title: "My Profile", href: "/dashboard/applicant/registration", icon: FileText },
-          { title: "Call Queue", href: "/dashboard/applicant/call-queue", icon: Phone },
           { title: "My Notes", href: "/dashboard/applicant/documents", icon: FolderOpen },
           { title: "Payments", href: "/dashboard/applicant/payments", icon: CreditCard },
           { title: "Messages", href: "/dashboard/applicant/messages", icon: MessageSquare },
           { title: "Settings", href: "/dashboard/applicant/settings", icon: Settings },
         ];
-      case 2: // Medical Staff
+      case 2: // Doctor
         return [
-          { title: "Dashboard", href: "/dashboard/reviewer", icon: Home },
-          { title: "Call Queue", href: "/dashboard/reviewer/call-queue", icon: Phone },
-          { title: "Pending Notes", href: "/dashboard/reviewer/queue", icon: ClipboardList },
-          { title: "Completed Notes", href: "/dashboard/reviewer/completed", icon: UserCheck },
-          { title: "Messages", href: "/dashboard/reviewer/messages", icon: MessageSquare },
-          { title: "Settings", href: "/dashboard/reviewer/settings", icon: Settings },
+          { title: "Dashboard", href: "/dashboard/doctor", icon: Home },
+          { title: "Review Queue", href: "/dashboard/doctor/queue", icon: ClipboardList },
+          { title: "Completed", href: "/dashboard/doctor/completed", icon: UserCheck },
+          { title: "Referrals", href: "/dashboard/doctor/referrals", icon: Users },
+          { title: "Commissions", href: "/dashboard/doctor/commissions", icon: DollarSign },
+          { title: "Messages", href: "/dashboard/doctor/messages", icon: MessageSquare },
+          { title: "Settings", href: "/dashboard/doctor/settings", icon: Settings },
         ];
-      case 3: // Agent
-        return [
-          { title: "Dashboard", href: "/dashboard/agent", icon: Home },
-          { title: "Work Queue", href: "/dashboard/agent/queue", icon: ClipboardList },
-          { title: "My Referrals", href: "/dashboard/agent/referrals", icon: Users },
-          { title: "Commissions", href: "/dashboard/agent/commissions", icon: DollarSign },
-          { title: "Messages", href: "/dashboard/agent/messages", icon: MessageSquare },
-          { title: "Settings", href: "/dashboard/agent/settings", icon: Settings },
-        ];
-      case 4: // Admin
+      case 3: // Admin
         return [
           { title: "Dashboard", href: "/dashboard/admin", icon: Home },
           { title: "Verification Queue", href: "/dashboard/admin/queue", icon: ClipboardList },
@@ -99,7 +89,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
           { title: "Settings", href: "/dashboard/admin/settings", icon: Settings },
         ];
-      case 5: // Owner
+      case 4: // Owner
         return [
           { title: "Dashboard", href: "/dashboard/owner", icon: Home },
           { title: "Users", href: "/dashboard/owner/users", icon: Users },

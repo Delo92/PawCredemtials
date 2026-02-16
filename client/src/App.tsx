@@ -22,8 +22,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 // Dashboard pages
 const ApplicantDashboard = lazy(() => import("@/pages/dashboard/ApplicantDashboard"));
 const NewApplication = lazy(() => import("@/pages/dashboard/applicant/NewApplication"));
-const ReviewerDashboard = lazy(() => import("@/pages/dashboard/ReviewerDashboard"));
-const AgentDashboard = lazy(() => import("@/pages/dashboard/AgentDashboard"));
+const DoctorDashboard = lazy(() => import("@/pages/dashboard/DoctorDashboard"));
 const AdminDashboard = lazy(() => import("@/pages/dashboard/AdminDashboard"));
 const UsersManagement = lazy(() => import("@/pages/dashboard/admin/UsersManagement"));
 const PackagesManagement = lazy(() => import("@/pages/dashboard/admin/PackagesManagement"));
@@ -34,10 +33,6 @@ const SiteSettings = lazy(() => import("@/pages/dashboard/owner/SiteSettings"));
 const RegistrationPage = lazy(() => import("@/pages/dashboard/applicant/RegistrationPage"));
 const DocumentsPage = lazy(() => import("@/pages/dashboard/applicant/DocumentsPage"));
 const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage"));
-const ApplicantCallQueuePage = lazy(() => import("@/pages/dashboard/applicant/CallQueuePage"));
-
-// Reviewer sub-pages
-const ReviewerCallQueuePage = lazy(() => import("@/pages/dashboard/reviewer/CallQueuePage"));
 
 // Shared pages (used across multiple levels)
 const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsPage"));
@@ -122,176 +117,144 @@ function App() {
                       <SharedSettingsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/applicant/call-queue">
-                    <ProtectedRoute minLevel={1}>
-                      <ApplicantCallQueuePage />
-                    </ProtectedRoute>
-                  </Route>
                   <Route path="/dashboard/applicant">
                     <ProtectedRoute minLevel={1}>
                       <ApplicantDashboard />
                     </ProtectedRoute>
                   </Route>
 
-                  {/* Reviewer Routes (Level 2+) */}
-                  <Route path="/dashboard/reviewer/call-queue">
-                    <ProtectedRoute minLevel={2}>
-                      <ReviewerCallQueuePage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/reviewer/queue">
+                  {/* Doctor Routes (Level 2+) */}
+                  <Route path="/dashboard/doctor/queue">
                     <ProtectedRoute minLevel={2}>
                       <SharedQueuePage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/reviewer/completed">
+                  <Route path="/dashboard/doctor/completed">
                     <ProtectedRoute minLevel={2}>
                       <SharedCompletedPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/reviewer/messages">
+                  <Route path="/dashboard/doctor/referrals">
                     <ProtectedRoute minLevel={2}>
-                      <SharedMessagesPage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/reviewer/settings">
-                    <ProtectedRoute minLevel={2}>
-                      <SharedSettingsPage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/reviewer">
-                    <ProtectedRoute minLevel={2}>
-                      <ReviewerDashboard />
-                    </ProtectedRoute>
-                  </Route>
-
-                  {/* Agent Routes (Level 3+) */}
-                  <Route path="/dashboard/agent/queue">
-                    <ProtectedRoute minLevel={3}>
-                      <SharedQueuePage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/agent/referrals">
-                    <ProtectedRoute minLevel={3}>
                       <SharedReferralsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/agent/commissions">
-                    <ProtectedRoute minLevel={3}>
+                  <Route path="/dashboard/doctor/commissions">
+                    <ProtectedRoute minLevel={2}>
                       <SharedCommissionsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/agent/messages">
-                    <ProtectedRoute minLevel={3}>
+                  <Route path="/dashboard/doctor/messages">
+                    <ProtectedRoute minLevel={2}>
                       <SharedMessagesPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/agent/settings">
-                    <ProtectedRoute minLevel={3}>
+                  <Route path="/dashboard/doctor/settings">
+                    <ProtectedRoute minLevel={2}>
                       <SharedSettingsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/agent">
-                    <ProtectedRoute minLevel={3}>
-                      <AgentDashboard />
+                  <Route path="/dashboard/doctor">
+                    <ProtectedRoute minLevel={2}>
+                      <DoctorDashboard />
                     </ProtectedRoute>
                   </Route>
 
-                  {/* Admin Routes (Level 4+) */}
+                  {/* Admin Routes (Level 3+) */}
                   <Route path="/dashboard/admin/users">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <UsersManagement />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/packages">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <PackagesManagement />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/applications">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedApplicationsListPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/payments">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedPaymentsManagementPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/analytics">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/queue">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedQueuePage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/reports">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <PlaceholderPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/messages">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedMessagesPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin/settings">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <SharedSettingsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/admin">
-                    <ProtectedRoute minLevel={4}>
+                    <ProtectedRoute minLevel={3}>
                       <AdminDashboard />
                     </ProtectedRoute>
                   </Route>
 
-                  {/* Owner Routes (Level 5) */}
+                  {/* Owner Routes (Level 4) */}
                   <Route path="/dashboard/owner/users">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <UsersManagement />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/packages">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <PackagesManagement />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/applications">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SharedApplicationsListPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/site-settings">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SiteSettings />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/settings">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SharedSettingsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/payments">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SharedPaymentsManagementPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/commissions">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SharedCommissionsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/analytics">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner">
-                    <ProtectedRoute minLevel={5}>
+                    <ProtectedRoute minLevel={4}>
                       <OwnerDashboard />
                     </ProtectedRoute>
                   </Route>

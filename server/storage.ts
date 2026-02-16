@@ -202,6 +202,17 @@ export interface IStorage {
 
   getAgentDocuments(agentFirebaseUid: string): Promise<Record<string, any>[]>;
   createAgentDocument(data: Record<string, any>): Promise<Record<string, any>>;
+
+  getDoctorProfile(doctorId: string): Promise<Record<string, any> | undefined>;
+  getDoctorProfileByUserId(userId: string): Promise<Record<string, any> | undefined>;
+  getAllDoctorProfiles(): Promise<Record<string, any>[]>;
+  createDoctorProfile(data: Record<string, any>): Promise<Record<string, any>>;
+  updateDoctorProfile(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+
+  getAutoMessageTriggers(packageId: string): Promise<Record<string, any>[]>;
+  createAutoMessageTrigger(data: Record<string, any>): Promise<Record<string, any>>;
+  updateAutoMessageTrigger(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+  deleteAutoMessageTrigger(id: string): Promise<boolean>;
 }
 
 function docToRecord(doc: FirebaseFirestore.DocumentSnapshot): Record<string, any> | undefined {
@@ -1518,6 +1529,68 @@ export class FirestoreStorage implements IStorage {
     await this.incrementCounter("agentDocuments");
     const created = await this.col("agentDocuments").doc(id).get();
     return docToRecord(created)!;
+  }
+
+  async getDoctorProfile(doctorId: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("doctorProfiles").doc(doctorId).get();
+    return docToRecord(doc);
+  }
+
+  async getDoctorProfileByUserId(userId: string): Promise<Record<string, any> | undefined> {
+    const snap = await this.col("doctorProfiles").where("userId", "==", userId).limit(1).get();
+    if (snap.empty) return undefined;
+    return docToRecord(snap.docs[0]);
+  }
+
+  async getAllDoctorProfiles(): Promise<Record<string, any>[]> {
+    const snap = await this.col("doctorProfiles").get();
+    return docsToRecords(snap);
+  }
+
+  async createDoctorProfile(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = data.userId || randomUUID();
+    const cleanData = cleanForFirestore({
+      ...data,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await this.col("doctorProfiles").doc(id).set(cleanData);
+    await this.incrementCounter("doctorProfiles");
+    const created = await this.col("doctorProfiles").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateDoctorProfile(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const cleanData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    await this.col("doctorProfiles").doc(id).update(cleanData);
+    const updated = await this.col("doctorProfiles").doc(id).get();
+    return docToRecord(updated);
+  }
+
+  async getAutoMessageTriggers(packageId: string): Promise<Record<string, any>[]> {
+    const snap = await this.col("autoMessageTriggers").where("packageId", "==", packageId).get();
+    return docsToRecords(snap);
+  }
+
+  async createAutoMessageTrigger(data: Record<string, any>): Promise<Record<string, any>> {
+    const id = randomUUID();
+    const cleanData = cleanForFirestore({ ...data, createdAt: FieldValue.serverTimestamp() });
+    await this.col("autoMessageTriggers").doc(id).set(cleanData);
+    await this.incrementCounter("autoMessageTriggers");
+    const created = await this.col("autoMessageTriggers").doc(id).get();
+    return docToRecord(created)!;
+  }
+
+  async updateAutoMessageTrigger(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const cleanData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    await this.col("autoMessageTriggers").doc(id).update(cleanData);
+    const updated = await this.col("autoMessageTriggers").doc(id).get();
+    return docToRecord(updated);
+  }
+
+  async deleteAutoMessageTrigger(id: string): Promise<boolean> {
+    await this.col("autoMessageTriggers").doc(id).delete();
+    return true;
   }
 }
 

@@ -60,7 +60,6 @@ const configSchema = z.object({
   level2Name: z.string().min(1, "Level 2 name is required"),
   level3Name: z.string().min(1, "Level 3 name is required"),
   level4Name: z.string().min(1, "Level 4 name is required"),
-  level5Name: z.string().min(1, "Level 5 name is required"),
 });
 
 type ConfigFormData = z.infer<typeof configSchema>;
@@ -110,7 +109,6 @@ export default function SiteSettings() {
       level2Name: "Reviewer",
       level3Name: "Agent",
       level4Name: "Admin",
-      level5Name: "Owner",
     },
   });
 
@@ -167,7 +165,6 @@ export default function SiteSettings() {
         level2Name: config.levelNames?.level2 || "Reviewer",
         level3Name: config.levelNames?.level3 || "Agent",
         level4Name: config.levelNames?.level4 || "Admin",
-        level5Name: config.levelNames?.level5 || "Owner",
       });
     }
   }, [config, form]);
@@ -924,22 +921,6 @@ export default function SiteSettings() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="level5Name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Level 5 (Owners)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Owner" data-testid="input-level5" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Examples: Owner, Super Admin, Director, Principal
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -62,7 +62,7 @@ export default function OwnerDashboard() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
-              {getLevelName(5)} Dashboard
+              {getLevelName(4)} Dashboard
             </h1>
             <p className="text-muted-foreground">
               Complete system overview and configuration.
@@ -210,7 +210,7 @@ export default function OwnerDashboard() {
           <CardContent>
             {usersLoading ? (
               <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
+                {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="flex items-center gap-4">
                     <Skeleton className="h-4 w-20" />
                     <Skeleton className="h-2 flex-1" />
@@ -220,7 +220,7 @@ export default function OwnerDashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((level) => {
+                {[1, 2, 3, 4].map((level) => {
                   const count = usersByLevel[level] || 0;
                   const percentage = totalUsers > 0 ? (count / totalUsers) * 100 : 0;
                   return (

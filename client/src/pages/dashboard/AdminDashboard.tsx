@@ -54,7 +54,7 @@ export default function AdminDashboard() {
         {/* Welcome Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
-            {getLevelName(4)} Dashboard
+            {getLevelName(3)} Dashboard
           </h1>
           <p className="text-muted-foreground">
             Overview of platform activity and management tools.
