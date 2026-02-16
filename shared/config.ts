@@ -47,21 +47,21 @@ export interface WhiteLabelConfig {
 }
 
 export const defaultConfig: WhiteLabelConfig = {
-  siteName: "Doctor's Note",
-  tagline: "Fast, discreet medical documentation when you need it",
-  description: "Get legitimate doctor's notes for work, school, or personal needs. Quick approval, secure delivery, and complete privacy.",
+  siteName: "Support Animal Registry",
+  tagline: "Fast, trusted support animal registration and certification",
+  description: "Get your registered support animal certification quickly and easily. Verified by licensed professionals, legally recognized, and delivered digitally.",
   primaryColor: "#3b82f6",
   secondaryColor: "#6366f1",
   accentColor: "#0ea5e9",
-  heroTitle: "Get Your Doctor's Note Today",
-  heroSubtitle: "Need documentation for work or school? We provide fast, legitimate medical notes with quick turnaround times. Discreet, secure, and hassle-free.",
-  heroButtonText: "Get Your Note",
+  heroTitle: "Register Your Support Animal Today",
+  heroSubtitle: "Need an official support animal registration? We provide fast, legitimate ESA letters and certifications with quick turnaround times. Trusted, secure, and hassle-free.",
+  heroButtonText: "Get Started",
   heroButtonLink: "/register",
-  heroSecondaryButtonText: "View Pricing",
+  heroSecondaryButtonText: "View Packages",
   heroSecondaryButtonLink: "/packages",
   footerQuickLinks: [
     { label: "Home", url: "/" },
-    { label: "Pricing", url: "/packages" },
+    { label: "Packages", url: "/packages" },
     { label: "How It Works", url: "/#how-it-works" },
     { label: "Contact", url: "/contact" }
   ],
@@ -71,18 +71,18 @@ export const defaultConfig: WhiteLabelConfig = {
     { label: "Disclaimer", url: "/disclaimer" }
   ],
   levelNames: {
-    level1: "Patient",
-    level2: "Doctor",
+    level1: "Applicant",
+    level2: "Reviewer",
     level3: "Admin",
     level4: "Owner",
   },
   workflowSteps: [
     "Create Account",
-    "Select Note Type",
+    "Select Registration Type",
     "Payment",
     "Provide Details",
-    "Medical Review",
-    "Note Issued",
+    "Professional Review",
+    "Certificate Issued",
     "Delivered"
   ],
   features: {
@@ -96,8 +96,8 @@ export const defaultConfig: WhiteLabelConfig = {
 
 // User level constants
 export const USER_LEVELS = {
-  PATIENT: 1,
-  DOCTOR: 2,
+  APPLICANT: 1,
+  REVIEWER: 2,
   ADMIN: 3,
   OWNER: 4,
 } as const;

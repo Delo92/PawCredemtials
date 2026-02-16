@@ -16,10 +16,10 @@ export function Footer() {
   ];
 
   const serviceLinks = [
-    { label: "Work Absence Notes", url: "/packages" },
-    { label: "School Excuse Notes", url: "/packages" },
-    { label: "Medical Clearance", url: "/packages" },
-    { label: "Custom Documentation", url: "/packages" },
+    { label: "ESA Letters", url: "/packages" },
+    { label: "Housing Certification", url: "/packages" },
+    { label: "Travel Certificates", url: "/packages" },
+    { label: "PSD Letters", url: "/packages" },
   ];
 
   return (
@@ -95,11 +95,11 @@ export function Footer() {
               Get Started
             </h4>
             <p className="text-sm text-muted-foreground">
-              Need a doctor's note quickly? Create your account and get started in minutes.
+              Need to register your support animal? Create your account and get started in minutes.
             </p>
             <Button asChild data-testid="button-footer-register">
               <Link href="/register">
-                Get Your Note
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -111,7 +111,7 @@ export function Footer() {
             {config.footerText || `\u00A9 ${currentYear} ${config.siteName}. All rights reserved.`}
           </p>
           <p className="text-xs text-muted-foreground" data-testid="text-footer-tagline">
-            Fast, discreet medical documentation
+            Trusted support animal registration and certification
           </p>
         </div>
       </div>

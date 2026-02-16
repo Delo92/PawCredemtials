@@ -191,7 +191,7 @@ export function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
                   <Link href="/login">Log in</Link>
                 </Button>
                 <Button asChild data-testid="button-register">
-                  <Link href="/register">Get Your Note</Link>
+                  <Link href="/register">Get Started</Link>
                 </Button>
               </div>
             )}

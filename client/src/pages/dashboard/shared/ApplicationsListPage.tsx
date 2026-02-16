@@ -33,7 +33,7 @@ export default function ApplicationsListPage() {
               All Orders
             </h1>
             <p className="text-muted-foreground">
-              View and manage all doctor's note orders in the system
+              View and manage all support animal registration orders
             </p>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function ApplicationsListPage() {
         <Card>
           <CardHeader>
             <CardTitle>Orders</CardTitle>
-            <CardDescription>All doctor's note orders in the system</CardDescription>
+            <CardDescription>All support animal registration orders</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">

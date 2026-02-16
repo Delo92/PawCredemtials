@@ -26,10 +26,10 @@ export default function Packages() {
         <div className="container relative z-10">
           <div className="text-center text-primary-foreground">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 !text-white" data-testid="text-packages-title">
-              Doctor's Note Services
+              Support Animal Registration Packages
             </h1>
             <p className="text-primary-foreground/80 max-w-2xl mx-auto text-lg">
-              Choose the type of doctor's note you need. All notes are reviewed by licensed medical professionals and delivered digitally.
+              Choose the registration package you need. All certifications are reviewed by licensed professionals and delivered digitally.
             </p>
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function Packages() {
                     <ul className="space-y-3">
                       <li className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                        <span>Medical professional review</span>
+                        <span>Licensed professional review</span>
                       </li>
                       <li className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
@@ -93,14 +93,14 @@ export default function Packages() {
                       </li>
                       <li className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-chart-2 shrink-0" />
-                        <span>100% confidential</span>
+                        <span>Legally recognized</span>
                       </li>
                     </ul>
                   </CardContent>
                   <CardFooter>
                     <Button className="w-full" asChild data-testid={`button-select-${pkg.id}`}>
                       <Link href={isAuthenticated ? `/dashboard/applicant/applications/new?package=${pkg.id}` : `/register?package=${pkg.id}`}>
-                        Get This Note
+                        Select Package
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
@@ -121,8 +121,8 @@ export default function Packages() {
         <AnimateOnScroll animation="fade-up">
           <div className="mt-20 grid md:grid-cols-3 gap-8">
             {[
-              { icon: Stethoscope, title: "Licensed Professionals", desc: "Every note is reviewed and approved by licensed medical providers." },
-              { icon: Clock, title: "Same-Day Processing", desc: "Most requests are processed and delivered within hours." },
+              { icon: Stethoscope, title: "Licensed Professionals", desc: "Every certification is reviewed and signed by licensed professionals." },
+              { icon: Clock, title: "Same-Day Processing", desc: "Most applications are processed and delivered within hours." },
               { icon: Shield, title: "Complete Privacy", desc: "Your information is encrypted and never shared with third parties." },
             ].map((item, i) => (
               <div key={i} className="text-center" data-testid={`packages-feature-${i}`}>
@@ -140,7 +140,7 @@ export default function Packages() {
           <div className="mt-16 text-center">
             <h2 className="text-2xl font-bold mb-4" data-testid="text-faq-heading">Have Questions?</h2>
             <p className="text-muted-foreground mb-6">
-              Our support team is available 24/7 to help you get the right documentation.
+              Our support team is available 24/7 to help you find the right registration package.
             </p>
             <Button variant="outline" asChild data-testid="button-view-faq">
               <Link href="/#faq">View FAQ</Link>

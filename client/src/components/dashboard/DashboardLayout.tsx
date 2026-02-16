@@ -59,16 +59,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const baseItems: NavItem[] = [];
 
     switch (user.userLevel) {
-      case 1: // Patient
+      case 1: // Applicant
         return [
           { title: "Dashboard", href: "/dashboard/applicant", icon: Home },
           { title: "My Profile", href: "/dashboard/applicant/registration", icon: FileText },
-          { title: "My Notes", href: "/dashboard/applicant/documents", icon: FolderOpen },
+          { title: "My Certificates", href: "/dashboard/applicant/documents", icon: FolderOpen },
           { title: "Payments", href: "/dashboard/applicant/payments", icon: CreditCard },
           { title: "Messages", href: "/dashboard/applicant/messages", icon: MessageSquare },
           { title: "Settings", href: "/dashboard/applicant/settings", icon: Settings },
         ];
-      case 2: // Doctor
+      case 2: // Reviewer
         return [
           { title: "Dashboard", href: "/dashboard/doctor", icon: Home },
           { title: "Review Queue", href: "/dashboard/doctor/queue", icon: ClipboardList },
@@ -83,7 +83,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Dashboard", href: "/dashboard/admin", icon: Home },
           { title: "Verification Queue", href: "/dashboard/admin/queue", icon: ClipboardList },
           { title: "Users", href: "/dashboard/admin/users", icon: Users },
-          { title: "Note Types", href: "/dashboard/admin/packages", icon: Building2 },
+          { title: "Registration Types", href: "/dashboard/admin/packages", icon: Building2 },
           { title: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
           { title: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
           { title: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
@@ -94,7 +94,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Dashboard", href: "/dashboard/owner", icon: Home },
           { title: "Users", href: "/dashboard/owner/users", icon: Users },
           { title: "Orders", href: "/dashboard/owner/applications", icon: FileText },
-          { title: "Note Types", href: "/dashboard/owner/packages", icon: Building2 },
+          { title: "Registration Types", href: "/dashboard/owner/packages", icon: Building2 },
           { title: "Payments", href: "/dashboard/owner/payments", icon: CreditCard },
           { title: "Commissions", href: "/dashboard/owner/commissions", icon: DollarSign },
           { title: "Analytics", href: "/dashboard/owner/analytics", icon: BarChart3 },

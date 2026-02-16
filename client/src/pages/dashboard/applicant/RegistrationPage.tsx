@@ -119,7 +119,7 @@ export default function RegistrationPage() {
           <Link href="/packages">
             <Button data-testid="button-buy-package">
               <ShoppingCart className="mr-2 h-4 w-4" />
-              Order Doctor's Note
+              Register Support Animal
             </Button>
           </Link>
         </div>
@@ -154,7 +154,7 @@ export default function RegistrationPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
-                <CardDescription>This information will be used on your doctor's notes</CardDescription>
+                <CardDescription>This information will be used on your certifications</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -235,7 +235,7 @@ export default function RegistrationPage() {
               <CardHeader>
                 <CardTitle>Address Information</CardTitle>
                 <CardDescription>
-                  Please verify your address does not have a P.O. Box. This information will be used on your doctor's notes.
+                  Please verify your address does not have a P.O. Box. This information will be used on your certifications.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -308,7 +308,7 @@ export default function RegistrationPage() {
             {/* Medical Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Medical Information (Optional)</CardTitle>
+                <CardTitle>Animal Information (Optional)</CardTitle>
                 <CardDescription>
                   This is optional. You can provide this information now or update it later in your profile.
                 </CardDescription>
@@ -319,10 +319,10 @@ export default function RegistrationPage() {
                   name="medicalCondition"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Medical Condition or Reason for Visit</FormLabel>
+                      <FormLabel>Animal Type and Details</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="E.g., Chronic pain, anxiety, insomnia... (optional)"
+                          placeholder="E.g., Dog - Golden Retriever, Cat - Domestic Shorthair... (optional)"
                           data-testid="input-medical-condition"
                           {...field}
                         />
@@ -479,7 +479,7 @@ export default function RegistrationPage() {
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>Patient Authorization</FormLabel>
+                        <FormLabel>Applicant Authorization</FormLabel>
                         <FormDescription>
                           I authorize the platform and its staff to access my information to assist with processing my order.
                         </FormDescription>

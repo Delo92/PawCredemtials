@@ -58,10 +58,10 @@ export default function DocumentsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-documents-title">
-              My Notes
+              My Certificates
             </h1>
             <p className="text-muted-foreground">
-              View and download your doctor's notes
+              View and download your support animal certifications
             </p>
           </div>
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
@@ -72,9 +72,9 @@ export default function DocumentsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Your Doctor's Notes</CardTitle>
+            <CardTitle>Your Certificates</CardTitle>
             <CardDescription>
-              Download your completed doctor's notes here
+              Download your completed certifications here
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -83,9 +83,9 @@ export default function DocumentsPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
                 <FolderOpen className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">No notes yet</h3>
+              <h3 className="text-lg font-semibold mb-2">No certificates yet</h3>
               <p className="text-muted-foreground mb-4 max-w-sm">
-                Your completed doctor's notes will appear here for download once your order is processed.
+                Your completed certifications will appear here for download once your registration is processed.
               </p>
               <Button onClick={() => setIsUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />

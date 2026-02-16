@@ -121,7 +121,7 @@ export default function Register() {
       <div className="py-8 border-b bg-[hsl(var(--section-bg))]">
         <div className="container">
           <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="text-sm text-muted-foreground mt-1">Get started with your doctor's note</p>
+          <p className="text-sm text-muted-foreground mt-1">Get started with your support animal registration</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ export default function Register() {
               </div>
               <CardTitle className="text-2xl" data-testid="text-register-title">Create an account</CardTitle>
               <CardDescription>
-                Get your doctor's note quickly and securely
+                Register your support animal quickly and securely
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -28,7 +28,7 @@ import type { Package } from "@shared/schema";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 
 const applicationSchema = z.object({
-  packageId: z.string().min(1, "Please select a note type"),
+  packageId: z.string().min(1, "Please select a registration type"),
   fullName: z.string().min(1, "Full name is required"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   address: z.string().min(1, "Address is required"),
@@ -85,7 +85,7 @@ export default function NewApplication() {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       toast({
         title: "Order Submitted!",
-        description: "Your doctor's note request has been submitted successfully.",
+        description: "Your support animal registration has been submitted successfully.",
       });
       setLocation(`/dashboard/applicant/applications/${application.id}`);
     },
@@ -102,7 +102,7 @@ export default function NewApplication() {
 
   const nextStep = () => {
     if (step === 1 && !form.getValues("packageId")) {
-      form.setError("packageId", { message: "Please select a note type" });
+      form.setError("packageId", { message: "Please select a registration type" });
       return;
     }
     if (step < totalSteps) {
@@ -131,7 +131,7 @@ export default function NewApplication() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-new-app-title">
-              Order Doctor's Note
+              Register Support Animal
             </h1>
             <p className="text-muted-foreground">
               Step {step} of {totalSteps}
@@ -147,9 +147,9 @@ export default function NewApplication() {
             {step === 1 && (
               <Card data-testid="step-package-selection">
                 <CardHeader>
-                  <CardTitle>Select Note Type</CardTitle>
+                  <CardTitle>Select Registration Type</CardTitle>
                   <CardDescription>
-                    Choose the type of doctor's note you need
+                    Choose the type of registration you need
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -212,7 +212,7 @@ export default function NewApplication() {
                 <CardHeader>
                   <CardTitle>Your Information</CardTitle>
                   <CardDescription>
-                    Please provide your details for the doctor's note
+                    Please provide your details for the registration
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -323,9 +323,9 @@ export default function NewApplication() {
             {step === 3 && (
               <Card data-testid="step-application-details">
                 <CardHeader>
-                  <CardTitle>Note Details</CardTitle>
+                  <CardTitle>Registration Details</CardTitle>
                   <CardDescription>
-                    Provide the details needed for your doctor's note
+                    Provide the details needed for your registration
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -334,10 +334,10 @@ export default function NewApplication() {
                     name="reason"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Purpose of Note</FormLabel>
+                        <FormLabel>Purpose of Registration</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="What do you need this doctor's note for? (e.g., work absence, school excuse, etc.)"
+                            placeholder="What do you need this registration for? (e.g., housing ESA, travel, emotional support, etc.)"
                             className="min-h-[120px]"
                             data-testid="input-reason"
                             {...field}
@@ -369,7 +369,7 @@ export default function NewApplication() {
 
                   {selectedPackage && (
                     <div className="p-4 rounded-lg border bg-muted/30">
-                      <p className="text-sm font-medium mb-1">Selected Note Type</p>
+                      <p className="text-sm font-medium mb-1">Selected Registration Type</p>
                       <p className="text-lg font-bold">{selectedPackage.name}</p>
                       <p className="text-2xl font-bold text-primary mt-2">
                         ${Number(selectedPackage.price).toFixed(2)}

@@ -92,8 +92,8 @@ export default function PackagesManagement() {
       setIsDialogOpen(false);
       form.reset();
       toast({
-        title: "Note Type Created",
-        description: "The note type has been created successfully.",
+        title: "Registration Type Created",
+        description: "The registration type has been created successfully.",
       });
     },
     onError: (error: any) => {
@@ -120,8 +120,8 @@ export default function PackagesManagement() {
       setEditingPackage(null);
       form.reset();
       toast({
-        title: "Note Type Updated",
-        description: "The note type has been updated successfully.",
+        title: "Registration Type Updated",
+        description: "The registration type has been updated successfully.",
       });
     },
     onError: (error: any) => {
@@ -141,8 +141,8 @@ export default function PackagesManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setDeleteConfirmId(null);
       toast({
-        title: "Note Type Deleted",
-        description: "The note type has been deleted successfully.",
+        title: "Registration Type Deleted",
+        description: "The registration type has been deleted successfully.",
       });
     },
     onError: (error: any) => {
@@ -198,23 +198,23 @@ export default function PackagesManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-packages-title">
-              Note Types Management
+              Registration Types Management
             </h1>
             <p className="text-muted-foreground">
-              Create and manage doctor's note types
+              Create and manage support animal registration types
             </p>
           </div>
           <Button onClick={openCreateDialog} data-testid="button-create-package">
             <Plus className="mr-2 h-4 w-4" />
-            Add Note Type
+            Add Registration Type
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Note Types</CardTitle>
+            <CardTitle>All Registration Types</CardTitle>
             <CardDescription>
-              {packages?.length || 0} total note types
+              {packages?.length || 0} total registration types
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -277,7 +277,7 @@ export default function PackagesManagement() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No note types found. Create your first note type to get started.
+                          No registration types found. Create your first registration type to get started.
                         </TableCell>
                       </TableRow>
                     )}
@@ -293,12 +293,12 @@ export default function PackagesManagement() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingPackage ? "Edit Note Type" : "Create Note Type"}
+                {editingPackage ? "Edit Registration Type" : "Create Registration Type"}
               </DialogTitle>
               <DialogDescription>
                 {editingPackage
-                  ? "Update the note type details below."
-                  : "Fill in the details to create a new doctor's note type."}
+                  ? "Update the registration type details below."
+                  : "Fill in the details to create a new support animal registration type."}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -308,9 +308,9 @@ export default function PackagesManagement() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Note Type Name</FormLabel>
+                      <FormLabel>Registration Type Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Work Excuse Note" data-testid="input-package-name" {...field} />
+                        <Input placeholder="e.g., ESA Letter" data-testid="input-package-name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -325,7 +325,7 @@ export default function PackagesManagement() {
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Brief description of the note type..."
+                          placeholder="Brief description of the registration type..."
                           data-testid="input-package-description"
                           {...field}
                         />

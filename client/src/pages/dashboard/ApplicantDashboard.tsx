@@ -65,7 +65,7 @@ export default function ApplicantDashboard() {
               Welcome back, {user?.firstName}!
             </h1>
             <p className="text-muted-foreground">
-              Track your orders and download your doctor's notes.
+              Track your registrations and download your certifications.
             </p>
           </div>
           <Button asChild data-testid="button-fill-registration">
@@ -108,7 +108,7 @@ export default function ApplicantDashboard() {
 
           <Card data-testid="card-stat-documents">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Notes Received</CardTitle>
+              <CardTitle className="text-sm font-medium">Certificates Received</CardTitle>
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -167,9 +167,9 @@ export default function ApplicantDashboard() {
         {/* Available Services */}
         <Card data-testid="card-available-services">
           <CardHeader>
-            <CardTitle>Order a Doctor's Note</CardTitle>
+            <CardTitle>Register a Support Animal</CardTitle>
             <CardDescription>
-              Choose the type of note you need
+              Choose the registration type you need
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -210,7 +210,7 @@ export default function ApplicantDashboard() {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                No note types available at this time.
+                No registration types available at this time.
               </div>
             )}
           </CardContent>

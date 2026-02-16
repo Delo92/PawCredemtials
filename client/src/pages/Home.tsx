@@ -56,44 +56,44 @@ export default function Home() {
   };
 
   const services = [
-    { icon: Heart, title: "Work Absence Notes", description: "Professional documentation for excused absences from work, reviewed by licensed providers." },
-    { icon: Pill, title: "School Excuse Notes", description: "Verified medical excuses for school or university absences, delivered same day." },
-    { icon: Stethoscope, title: "Medical Clearance", description: "Clearance documentation for return to work, sports, or other activities." },
-    { icon: Dna, title: "Custom Medical Notes", description: "Tailored medical documentation for specific needs with professional review." },
-    { icon: Accessibility, title: "Accommodation Letters", description: "Documentation supporting workplace or educational accommodations." },
-    { icon: NotebookPen, title: "Urgent Requests", description: "Priority processing for time-sensitive documentation needs." },
+    { icon: Heart, title: "Emotional Support Animal (ESA) Letter", description: "Official ESA letters reviewed and signed by licensed mental health professionals for housing and travel." },
+    { icon: Pill, title: "Housing ESA Certification", description: "Verified ESA documentation for landlords and housing providers, compliant with the Fair Housing Act." },
+    { icon: Stethoscope, title: "Travel ESA Certificate", description: "Certification for traveling with your support animal, accepted by major airlines and carriers." },
+    { icon: Dna, title: "Psychiatric Service Dog (PSD) Letter", description: "Professional PSD letters for individuals who qualify, reviewed by licensed providers." },
+    { icon: Accessibility, title: "Landlord Verification Letter", description: "Documentation verifying your support animal registration for landlords and property managers." },
+    { icon: NotebookPen, title: "Priority Processing", description: "Expedited processing for time-sensitive support animal registration needs." },
   ];
 
   const stats = [
-    { icon: Users, value: "10,000+", label: "Customers Served" },
+    { icon: Users, value: "10,000+", label: "Animals Registered" },
     { icon: Building2, value: "24hr", label: "Processing Time" },
-    { icon: FlaskConical, value: "100%", label: "Confidential" },
+    { icon: FlaskConical, value: "100%", label: "Legally Recognized" },
     { icon: Award, value: "4.9/5", label: "Customer Rating" },
   ];
 
   const departments = [
-    { name: "General Notes", img: "/images/medilab/departments-1.jpg", desc: "Standard doctor's notes for work absences, school excuses, and general medical documentation. Our most popular service with same-day delivery." },
-    { name: "Specialist Notes", img: "/images/medilab/departments-2.jpg", desc: "Specialized documentation from specific medical fields including cardiology, neurology, and orthopedics for targeted medical needs." },
-    { name: "Clearance Letters", img: "/images/medilab/departments-3.jpg", desc: "Medical clearance documentation for return to work, sports participation, travel, and other activities requiring physician approval." },
-    { name: "Accommodation Docs", img: "/images/medilab/departments-4.jpg", desc: "Comprehensive accommodation documentation for workplace or educational settings, including ADA compliance letters." },
-    { name: "Urgent Care", img: "/images/medilab/departments-5.jpg", desc: "Priority rush processing for time-sensitive documentation needs. Get your verified medical note within hours." },
+    { name: "ESA Letters", img: "/images/medilab/departments-1.jpg", desc: "Emotional Support Animal letters for housing and travel, reviewed by licensed mental health professionals. Our most popular service with same-day delivery." },
+    { name: "PSD Letters", img: "/images/medilab/departments-2.jpg", desc: "Psychiatric Service Dog letters for individuals who qualify, providing legal documentation for public access and housing rights." },
+    { name: "Travel Certificates", img: "/images/medilab/departments-3.jpg", desc: "Support animal travel certification accepted by major airlines and transportation providers for hassle-free travel with your companion." },
+    { name: "Housing Verification", img: "/images/medilab/departments-4.jpg", desc: "Comprehensive landlord verification letters ensuring your rights under the Fair Housing Act are protected for you and your support animal." },
+    { name: "Priority Registration", img: "/images/medilab/departments-5.jpg", desc: "Expedited processing for time-sensitive registration needs. Get your verified support animal certification within hours." },
   ];
 
   const faqs = [
-    { q: "How quickly will I receive my doctor's note?", a: "Most notes are processed and delivered within a few hours. Our priority service can deliver notes even faster for urgent needs." },
-    { q: "Are the doctor's notes legitimate?", a: "Yes, all documentation is reviewed and approved by licensed medical professionals. Our notes meet standard requirements for employers and educational institutions." },
+    { q: "How quickly will I receive my support animal registration?", a: "Most registrations are processed and delivered within a few hours. Our priority service can deliver certifications even faster for urgent needs." },
+    { q: "Are the ESA letters legally recognized?", a: "Yes, all documentation is reviewed and signed by licensed mental health professionals. Our letters meet requirements under the Fair Housing Act and other applicable laws." },
     { q: "Is my personal information kept confidential?", a: "Absolutely. We use industry-standard encryption and never share your personal information with third parties. Your privacy is our top priority." },
-    { q: "What types of doctor's notes do you offer?", a: "We offer work absence notes, school excuse notes, medical clearance letters, accommodation documentation, and custom medical notes for various needs." },
-    { q: "Can I get a refund if I'm not satisfied?", a: "Yes, we offer a satisfaction guarantee. If your note doesn't meet your needs, contact our support team for assistance." },
-    { q: "Do I need to provide medical records?", a: "No medical records are required. Simply provide the basic information about your situation, and our medical team will handle the rest." },
+    { q: "What types of support animal certifications do you offer?", a: "We offer ESA letters for housing, travel certificates, Psychiatric Service Dog letters, landlord verification letters, and priority registration services." },
+    { q: "Can I get a refund if I'm not satisfied?", a: "Yes, we offer a satisfaction guarantee. If your certification doesn't meet your needs, contact our support team for assistance." },
+    { q: "What do I need to get started?", a: "Simply create an account and provide basic information about yourself and your animal. Our licensed professionals will review your application and handle the rest." },
   ];
 
   const testimonials = [
-    { name: "Sarah M.", role: "Working Professional", text: "Got my work absence note within 2 hours. The process was incredibly smooth and professional. Highly recommend!", rating: 5, img: "/images/medilab/testimonials/testimonials-1.jpg" },
-    { name: "James K.", role: "College Student", text: "Needed a school excuse note last minute and they delivered. The note was professional and accepted without any issues.", rating: 5, img: "/images/medilab/testimonials/testimonials-2.jpg" },
-    { name: "Emily R.", role: "Freelancer", text: "The medical clearance letter was exactly what I needed. Professional, quick, and completely confidential.", rating: 5, img: "/images/medilab/testimonials/testimonials-3.jpg" },
-    { name: "Michael D.", role: "Business Owner", text: "Outstanding service. I needed urgent documentation and they delivered within the hour. Will definitely use again.", rating: 5, img: "/images/medilab/testimonials/testimonials-4.jpg" },
-    { name: "Lisa T.", role: "Graduate Student", text: "Simple process, legitimate documentation. Exactly what I needed for my university. The customer service was excellent too.", rating: 5, img: "/images/medilab/testimonials/testimonials-5.jpg" },
+    { name: "Sarah M.", role: "Pet Owner", text: "Got my ESA letter within 2 hours. The process was incredibly smooth and professional. My landlord accepted it right away!", rating: 5, img: "/images/medilab/testimonials/testimonials-1.jpg" },
+    { name: "James K.", role: "Apartment Renter", text: "Needed an ESA letter for my new apartment and they delivered. The letter was professional and accepted without any issues.", rating: 5, img: "/images/medilab/testimonials/testimonials-2.jpg" },
+    { name: "Emily R.", role: "Frequent Traveler", text: "The travel certificate was exactly what I needed for my support dog. Professional, quick, and completely confidential.", rating: 5, img: "/images/medilab/testimonials/testimonials-3.jpg" },
+    { name: "Michael D.", role: "Dog Owner", text: "Outstanding service. I needed a PSD letter urgently and they delivered within the hour. Will definitely use again.", rating: 5, img: "/images/medilab/testimonials/testimonials-4.jpg" },
+    { name: "Lisa T.", role: "Cat Owner", text: "Simple process, legitimate documentation. My housing provider accepted the ESA letter immediately. The customer service was excellent too.", rating: 5, img: "/images/medilab/testimonials/testimonials-5.jpg" },
   ];
 
   const defaultGalleryImages = [
@@ -135,7 +135,7 @@ export default function Home() {
                 {config.heroTitle || `WELCOME TO ${config.siteName.toUpperCase()}`}
               </h2>
               <p className="text-primary-foreground/90 text-lg mb-6 leading-relaxed">
-                {config.heroSubtitle || "Professional medical documentation delivered quickly and discreetly. Trusted by thousands."}
+                {config.heroSubtitle || "Trusted support animal registration and certification delivered quickly. Join thousands of satisfied pet owners."}
               </p>
               {isAuthenticated ? (
                 <Button size="lg" variant="secondary" asChild data-testid="button-hero-dashboard">
@@ -157,9 +157,9 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-5 mt-10">
             {[
-              { icon: ClipboardCheck, title: "Licensed Professionals", desc: "All documentation reviewed and approved by verified medical providers." },
+              { icon: ClipboardCheck, title: "Licensed Professionals", desc: "All certifications reviewed and signed by licensed mental health professionals." },
               { icon: ShieldCheck, title: "100% Confidential", desc: "Your information is encrypted and never shared with third parties." },
-              { icon: Clock, title: "Same-Day Delivery", desc: "Receive your verified documentation within hours of submitting your request." },
+              { icon: Clock, title: "Same-Day Delivery", desc: "Receive your verified certification within hours of submitting your application." },
             ].map((item, i) => (
               <AnimateOnScroll key={i} animation="fade-up" delay={i * 100}>
                 <Card className="bg-background/95 backdrop-blur-sm shadow-lg border-0" data-testid={`hero-icon-box-${i}`}>
@@ -201,13 +201,13 @@ export default function Home() {
                 </h3>
                 <div className="w-16 h-1 bg-primary rounded-full mb-6" />
                 <p className="text-muted-foreground mb-8 leading-relaxed text-base">
-                  We provide fast, professional medical documentation for individuals who need legitimate doctor's notes for work, school, or personal needs. Our licensed medical professionals ensure every document meets the highest standards.
+                  We provide fast, professional support animal registration for individuals who need legitimate ESA letters and certifications. Our licensed mental health professionals ensure every document meets the highest legal standards.
                 </p>
                 <div className="space-y-6">
                   {[
-                    { icon: ShieldCheck, title: "Verified Medical Professionals", desc: "Every note is reviewed and signed by a licensed healthcare provider." },
-                    { icon: Clock, title: "Fast Turnaround Time", desc: "Most requests are processed within hours, with priority options available." },
-                    { icon: Shield, title: "Complete Privacy Protection", desc: "Your personal health information is encrypted and never shared with anyone." },
+                    { icon: ShieldCheck, title: "Licensed Mental Health Professionals", desc: "Every certification is reviewed and signed by a licensed professional." },
+                    { icon: Clock, title: "Fast Turnaround Time", desc: "Most applications are processed within hours, with priority options available." },
+                    { icon: Shield, title: "Complete Privacy Protection", desc: "Your personal information is encrypted and never shared with anyone." },
                   ].map((item, i) => (
                     <div key={i} className="flex gap-4 items-start" data-testid={`about-item-${i}`}>
                       <div className="shrink-0 w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center">
@@ -258,7 +258,7 @@ export default function Home() {
                 Services
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mt-4 text-base">
-                Professional medical documentation for every situation, delivered with speed and discretion.
+                Professional support animal registration and certification for every situation, delivered with speed and care.
               </p>
             </div>
           </AnimateOnScroll>
@@ -293,15 +293,15 @@ export default function Home() {
           <AnimateOnScroll animation="fade-up">
             <div className="text-center max-w-2xl mx-auto text-primary-foreground">
               <h2 className="text-3xl md:text-4xl font-bold mb-4 !text-white" data-testid="text-cta-title">
-                Need a Doctor's Note Now?
+                Register Your Support Animal Now
               </h2>
               <p className="text-primary-foreground/80 text-lg mb-8 leading-relaxed">
-                Join thousands of satisfied customers. Get your verified documentation in just a few simple steps.
+                Join thousands of satisfied pet owners. Get your verified certification in just a few simple steps.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" variant="secondary" asChild data-testid="button-cta-start">
                   <Link href="/register">
-                    Get Your Note Today
+                    Get Started Today
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -323,7 +323,7 @@ export default function Home() {
                 Departments
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mt-4 text-base">
-                Explore our specialized documentation services tailored to your specific needs.
+                Explore our specialized registration services tailored to your specific needs.
               </p>
             </div>
           </AnimateOnScroll>
@@ -385,7 +385,7 @@ export default function Home() {
                 Frequently Asked Questions
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mt-4 text-base">
-                Find answers to common questions about our doctor's note service.
+                Find answers to common questions about our support animal registration service.
               </p>
             </div>
           </AnimateOnScroll>
@@ -427,7 +427,7 @@ export default function Home() {
                 </h3>
                 <div className="w-16 h-1 bg-primary rounded-full mb-6" />
                 <p className="text-muted-foreground leading-relaxed text-base">
-                  Hear from our satisfied customers who trust us for their medical documentation needs. We're proud to maintain a 4.9/5 rating across thousands of orders.
+                  Hear from our satisfied customers who trust us for their support animal registration needs. We're proud to maintain a 4.9/5 rating across thousands of registrations.
                 </p>
               </div>
             </AnimateOnScroll>
