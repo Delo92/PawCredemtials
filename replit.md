@@ -1,10 +1,10 @@
-# ChronicDocs - Asynchronous Doctor's Note Service Platform
+# Support Animal Registry - Registered Support Animal Certification Platform
 
 ## Overview
 
-This is a white-label asynchronous doctor's note purchasing service with a 4-tier user hierarchy. The platform handles patient applications, doctor review/approval, automated document generation, payments, messaging, and workflow automation. Built as a full-stack TypeScript application with React frontend, Express backend, and Firebase Firestore for data storage.
+This is a white-label support animal registration and certification service with a 4-tier user hierarchy. The platform handles applicant registrations, professional review/approval, automated certificate generation, payments, messaging, and workflow automation. Built as a full-stack TypeScript application with React frontend, Express backend, and Firebase Firestore for data storage.
 
-The core workflow follows: Registration → Package Selection → Payment → Form Auto-Fill → Doctor Review/Approval → Auto-Document Generation → Completion.
+The core workflow follows: Registration → Package Selection → Payment → Form Auto-Fill → Professional Review/Approval → Auto-Certificate Generation → Completion.
 
 ## User Preferences
 
@@ -41,9 +41,9 @@ Path aliases are configured: `@/` for client/src, `@shared/` for shared code, `@
 - **Validation**: Zod schemas generated from Drizzle schemas via drizzle-zod
 
 ### User Hierarchy (4 Levels)
-1. **Level 1 - Patient**: End users who purchase doctor's notes and submit applications
-2. **Level 2 - Doctor**: Reviews applications, approves/denies, handles work queue (merged from old Reviewer+Agent)
-3. **Level 3 - Admin**: Manage users, packages, verification queue, and system settings
+1. **Level 1 - Applicant**: End users who register support animals and submit applications
+2. **Level 2 - Reviewer**: Reviews applications, approves/denies, handles work queue
+3. **Level 3 - Admin**: Manage users, registration types, verification queue, and system settings
 4. **Level 4 - Owner**: Full platform control, white-label configuration
 
 Role names are configurable per deployment via the `siteConfig` table.

@@ -225,6 +225,35 @@ export async function registerRoutes(
   );
 
   // ===========================================================================
+  // ONE-TIME CONFIG MIGRATION - Update branding to Support Animal Registry
+  // ===========================================================================
+  try {
+    const existingConfig = await storage.getSiteConfig();
+    if (existingConfig && existingConfig.siteName && existingConfig.siteName !== defaultConfig.siteName) {
+      await storage.updateSiteConfig({
+        siteName: defaultConfig.siteName,
+        tagline: defaultConfig.tagline,
+        description: defaultConfig.description,
+        heroTitle: defaultConfig.heroTitle,
+        heroSubtitle: defaultConfig.heroSubtitle,
+        heroButtonText: defaultConfig.heroButtonText,
+        heroButtonLink: defaultConfig.heroButtonLink,
+        heroSecondaryButtonText: defaultConfig.heroSecondaryButtonText,
+        heroSecondaryButtonLink: defaultConfig.heroSecondaryButtonLink,
+        footerQuickLinks: defaultConfig.footerQuickLinks,
+        footerLegalLinks: defaultConfig.footerLegalLinks,
+        level1Name: defaultConfig.levelNames.level1,
+        level2Name: defaultConfig.levelNames.level2,
+        level3Name: defaultConfig.levelNames.level3,
+        level4Name: defaultConfig.levelNames.level4,
+      } as any);
+      console.log("[config] Migrated site config to new branding");
+    }
+  } catch (e: any) {
+    console.log("[config] Config migration skipped:", e.message);
+  }
+
+  // ===========================================================================
   // FILE UPLOAD ROUTES (Firebase Storage)
   // ===========================================================================
 
@@ -1584,13 +1613,28 @@ export async function registerRoutes(
         (results.errors as string[]).push(`Counters init failed: ${e.message}`);
       }
 
-      // 2. Site config
+      // 2. Site config - always update with latest defaults to ensure branding is current
       const existingConfig = await storage.getSiteConfig();
       if (!existingConfig) {
         await storage.updateSiteConfig({ ...defaultConfig } as any);
         results.siteConfig = true;
       } else {
-        results.siteConfig = "already_exists";
+        await storage.updateSiteConfig({
+          siteName: defaultConfig.siteName,
+          tagline: defaultConfig.tagline,
+          description: defaultConfig.description,
+          heroTitle: defaultConfig.heroTitle,
+          heroSubtitle: defaultConfig.heroSubtitle,
+          heroButtonText: defaultConfig.heroButtonText,
+          heroButtonLink: defaultConfig.heroButtonLink,
+          heroSecondaryButtonText: defaultConfig.heroSecondaryButtonText,
+          heroSecondaryButtonLink: defaultConfig.heroSecondaryButtonLink,
+          levelNames: defaultConfig.levelNames,
+          workflowSteps: defaultConfig.workflowSteps,
+          footerQuickLinks: defaultConfig.footerQuickLinks,
+          footerLegalLinks: defaultConfig.footerLegalLinks,
+        } as any);
+        results.siteConfig = "updated";
       }
 
       // 3. Admin settings (ChronicDocs pattern)
