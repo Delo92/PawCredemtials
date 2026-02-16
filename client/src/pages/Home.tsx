@@ -481,7 +481,7 @@ export default function Home() {
                 Gallery
               </h2>
               <p className="text-muted-foreground max-w-2xl mx-auto mt-4 text-base">
-                A glimpse into our professional medical facilities and team.
+                A glimpse into our professional team and satisfied clients.
               </p>
             </div>
           </AnimateOnScroll>
@@ -519,7 +519,7 @@ export default function Home() {
                 Ready to Get Started?
               </h2>
               <p className="text-primary-foreground/80 text-lg mb-8 leading-relaxed">
-                Create your account today and receive your doctor's note in minutes. Our team is available 24/7 to assist you.
+                Create your account today and receive your support animal certification in minutes. Our team is available 24/7 to assist you.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" variant="secondary" asChild data-testid="button-contact-register">

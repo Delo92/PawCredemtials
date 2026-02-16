@@ -1631,8 +1631,8 @@ export async function registerRoutes(
       if (existingPackages.length === 0) {
         const seedPackages = [
           {
-            name: "Basic Doctor's Note",
-            description: "Standard doctor's note for work or school absence. Includes date of visit and return-to-work date.",
+            name: "ESA Letter",
+            description: "Emotional Support Animal letter for housing and travel. Reviewed and signed by a licensed professional.",
             price: 4999,
             isActive: true,
             requiresLevel2: false,
@@ -1640,21 +1640,21 @@ export async function registerRoutes(
             category: "standard",
           },
           {
-            name: "Urgent Care Note",
-            description: "Urgent care visit documentation with detailed medical excuse. Suitable for extended absences.",
+            name: "Housing ESA Certification",
+            description: "Comprehensive ESA certification for landlords and housing providers. Compliant with the Fair Housing Act.",
             price: 7999,
             isActive: true,
             requiresLevel2: true,
-            features: ["Priority processing", "Medical consultation", "Detailed documentation", "Print-ready PDF"],
+            features: ["Priority processing", "Professional consultation", "Detailed documentation", "Print-ready PDF"],
             category: "urgent",
           },
           {
-            name: "Specialist Referral Note",
-            description: "Specialist referral documentation with medical justification. Includes follow-up recommendations.",
+            name: "PSD Letter",
+            description: "Psychiatric Service Dog letter with professional evaluation. Includes follow-up recommendations.",
             price: 12999,
             isActive: true,
             requiresLevel2: true,
-            features: ["Specialist consultation", "Comprehensive documentation", "Follow-up plan", "Priority support"],
+            features: ["Professional evaluation", "Comprehensive documentation", "Follow-up plan", "Priority support"],
             category: "specialist",
           },
         ];
@@ -1701,12 +1701,12 @@ export async function registerRoutes(
         }
       }
 
-      // Also ensure owner@doctorsnote.com exists as Level 4
+      // Also ensure owner account exists as Level 4
       const allUsers = await storage.getAllUsers();
-      const hasOwner = allUsers.some((u: any) => u.userLevel === 4 && u.email === "owner@doctorsnote.com");
+      const hasOwner = allUsers.some((u: any) => u.userLevel === 4 && u.email === "owner@supportanimalregistry.com");
       if (!hasOwner) {
         try {
-          const ownerEmail = req.body?.email || "owner@doctorsnote.com";
+          const ownerEmail = req.body?.email || "owner@supportanimalregistry.com";
           const ownerPassword = req.body?.password || testPassword;
           const hashedOwnerPw = await bcrypt.hash(ownerPassword, 10);
           await storage.createUser({
@@ -1747,7 +1747,7 @@ export async function registerRoutes(
       );
       await initCollection("formTypes",
         () => storage.getFormTypes(),
-        () => storage.createFormType({ name: "Medical Note", description: "Standard medical documentation form", isActive: true })
+        () => storage.createFormType({ name: "Registration Form", description: "Standard support animal registration form", isActive: true })
       );
       await initCollection("bulletin",
         () => storage.getBulletins(),
@@ -1763,7 +1763,7 @@ export async function registerRoutes(
       );
       await initCollection("blogPosts",
         () => storage.getBlogPosts(),
-        () => storage.createBlogPost({ title: "Welcome to Our Platform", content: "We are excited to launch our doctor's note service.", isPublished: true, authorId: "system" })
+        () => storage.createBlogPost({ title: "Welcome to Our Platform", content: "We are excited to launch our support animal registration service.", isPublished: true, authorId: "system" })
       );
 
       // 8. Initialize ALL remaining collections with placeholder docs so they appear in Firestore
