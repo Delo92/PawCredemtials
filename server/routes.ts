@@ -105,6 +105,22 @@ const memoryUpload = multer({
   },
 });
 
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+      "video/mp4", "video/webm", "video/ogg",
+    ];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files (JPEG, PNG, GIF, WebP, SVG) and video files (MP4, WebM, OGG) are allowed"));
+    }
+  },
+});
+
 declare module "express-session" {
   interface SessionData {
     userId: string;
@@ -294,6 +310,51 @@ export async function registerRoutes(
       } catch (error: any) {
         console.error("Firebase Storage upload error:", error);
         res.status(500).json({ message: "Failed to upload image" });
+      }
+    });
+  });
+
+  app.post("/api/upload/media", requireAuth, requireLevel(4), (req, res, next) => {
+    mediaUpload.single("file")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ message: "File size must be under 50MB" });
+          return;
+        }
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+
+      try {
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
+        const allowedFolders = ["media", "hero", "about", "cta", "contact", "departments", "testimonials", "gallery"];
+        const rawFolder = (req.body.folder || "media").replace(/[^a-zA-Z0-9_-]/g, "");
+        const folder = allowedFolders.includes(rawFolder) ? rawFolder : "media";
+        const fileName = `${folder}/${folder}-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype,
+          },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        res.json({ url });
+      } catch (error: any) {
+        console.error("Firebase Storage upload error:", error);
+        res.status(500).json({ message: "Failed to upload file" });
       }
     });
   });

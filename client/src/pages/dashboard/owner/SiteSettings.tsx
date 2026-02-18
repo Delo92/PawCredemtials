@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +23,88 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
 import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload, Film, Video } from "lucide-react";
 import { MediaPreview } from "@/components/MediaRenderer";
+
+function MediaUploadInput({
+  value,
+  onChange,
+  placeholder = "Image URL, video URL, or Vimeo link",
+  folder = "media",
+  accept = "image/*,video/mp4,video/webm",
+  testId,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  folder?: string;
+  accept?: string;
+  testId?: string;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", folder);
+      const res = await fetch("/api/upload/media", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      const data = await res.json();
+      onChange(data.url);
+      toast({ title: "Uploaded", description: "File uploaded successfully." });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }, [folder, onChange, toast]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1"
+          data-testid={testId ? `input-${testId}` : undefined}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="default"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          data-testid={testId ? `button-upload-${testId}` : undefined}
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+          {uploading ? "Uploading..." : "Upload"}
+        </Button>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        data-testid={testId ? `input-file-${testId}` : undefined}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+        }}
+      />
+    </div>
+  );
+}
 
 const footerLinkSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -510,7 +592,13 @@ export default function SiteSettings() {
                             <div className="grid md:grid-cols-2 gap-4">
                               <div>
                                 <FormControl>
-                                  <Input placeholder="https://example.com/hero.mp4 or https://vimeo.com/123456789" data-testid="input-hero-media" {...field} />
+                                  <MediaUploadInput
+                                    value={field.value || ""}
+                                    onChange={field.onChange}
+                                    placeholder="https://example.com/hero.mp4 or https://vimeo.com/123456789"
+                                    folder="hero"
+                                    testId="hero-media"
+                                  />
                                 </FormControl>
                                 <FormDescription>
                                   Add an image, video (.mp4, .webm), GIF, or Vimeo link for the hero section. Videos autoplay on loop.
@@ -767,7 +855,12 @@ export default function SiteSettings() {
                               <div className="grid md:grid-cols-2 gap-4">
                                 <div>
                                   <FormControl>
-                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-about-media" {...field} />
+                                    <MediaUploadInput
+                                      value={field.value || ""}
+                                      onChange={field.onChange}
+                                      folder="about"
+                                      testId="about-media"
+                                    />
                                   </FormControl>
                                   <FormDescription>
                                     Shown in the "About Us" section. Default: /images/medilab/about.jpg
@@ -792,7 +885,12 @@ export default function SiteSettings() {
                               <div className="grid md:grid-cols-2 gap-4">
                                 <div>
                                   <FormControl>
-                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-cta-media" {...field} />
+                                    <MediaUploadInput
+                                      value={field.value || ""}
+                                      onChange={field.onChange}
+                                      folder="cta"
+                                      testId="cta-media"
+                                    />
                                   </FormControl>
                                   <FormDescription>
                                     Background for the "Register Now" call-to-action section. Default: /images/medilab/hero-bg.jpg
@@ -817,7 +915,12 @@ export default function SiteSettings() {
                               <div className="grid md:grid-cols-2 gap-4">
                                 <div>
                                   <FormControl>
-                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-contact-media" {...field} />
+                                    <MediaUploadInput
+                                      value={field.value || ""}
+                                      onChange={field.onChange}
+                                      folder="contact"
+                                      testId="contact-media"
+                                    />
                                   </FormControl>
                                   <FormDescription>
                                     Background for the bottom "Ready to Get Started?" section. Default: /images/medilab/departments-3.jpg
@@ -854,7 +957,12 @@ export default function SiteSettings() {
                                 render={({ field: urlField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <Input placeholder="Image URL, video URL, or Vimeo link" data-testid={`input-dept-media-${index}`} {...urlField} />
+                                      <MediaUploadInput
+                                        value={urlField.value || ""}
+                                        onChange={urlField.onChange}
+                                        folder="departments"
+                                        testId={`dept-media-${index}`}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -908,7 +1016,13 @@ export default function SiteSettings() {
                                 render={({ field: urlField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <Input placeholder="Profile image or short video URL" className="text-sm" data-testid={`input-testimonial-media-${index}`} {...urlField} />
+                                      <MediaUploadInput
+                                        value={urlField.value || ""}
+                                        onChange={urlField.onChange}
+                                        placeholder="Profile image or short video URL"
+                                        folder="testimonials"
+                                        testId={`testimonial-media-${index}`}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
