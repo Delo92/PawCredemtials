@@ -6,6 +6,12 @@ export interface FooterLink {
   url: string;
 }
 
+export interface SiteMediaItem {
+  url: string;
+  type: "image" | "video" | "vimeo";
+  label?: string;
+}
+
 export interface WhiteLabelConfig {
   siteName: string;
   tagline: string;
@@ -30,6 +36,12 @@ export interface WhiteLabelConfig {
   contactPhone?: string;
   address?: string;
   galleryImages?: string[];
+  aboutMediaUrl?: string;
+  ctaMediaUrl?: string;
+  contactMediaUrl?: string;
+  departmentMediaUrls?: string[];
+  testimonialMediaUrls?: string[];
+  siteMedia?: SiteMediaItem[];
   levelNames: {
     level1: string;
     level2: string;
