@@ -1829,6 +1829,8 @@ export async function registerRoutes(
         { name: "referralRegistrations", doc: { type: "system_init", status: "placeholder" } },
         { name: "termsAcceptances", doc: { type: "system_init", status: "placeholder" } },
         { name: "agentDocuments", doc: { type: "system_init", status: "placeholder" } },
+        { name: "doctorProfiles", doc: { type: "system_init", status: "placeholder", specialty: "General" } },
+        { name: "autoMessageTriggers", doc: { type: "system_init", status: "placeholder", triggerStatus: "none" } },
       ];
 
       for (const col of remainingCollections) {
@@ -1844,7 +1846,7 @@ export async function registerRoutes(
 
       res.json({
         success: true,
-        message: "Firebase seed complete - all ChronicDocs collections initialized",
+        message: "Firebase seed complete - all Support Animal Registry collections initialized",
         details: results,
       });
     } catch (error: any) {

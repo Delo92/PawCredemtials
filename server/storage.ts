@@ -287,7 +287,8 @@ export class FirestoreStorage implements IStorage {
       "agentQueue", "agentClockRecords", "bulletin", "applicationStatus",
       "stepData", "profileNotes", "pushSubscriptions", "blogPosts", "chargebacks",
       "referralCodeHistory", "referralRegistrations", "systemReferralCodes",
-      "termsOfService", "termsAcceptances", "agentDocuments"
+      "termsOfService", "termsAcceptances", "agentDocuments",
+      "doctorProfiles", "autoMessageTriggers"
     ];
     const db = getDb();
     const batch = db.batch();
