@@ -21,7 +21,8 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload, Film, Video } from "lucide-react";
+import { MediaPreview } from "@/components/MediaRenderer";
 
 const footerLinkSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -30,6 +31,10 @@ const footerLinkSchema = z.object({
 
 const galleryImageSchema = z.object({
   url: z.string().min(1, "Image URL is required"),
+});
+
+const mediaItemSchema = z.object({
+  url: z.string().optional().or(z.literal("")),
 });
 
 const configSchema = z.object({
@@ -44,7 +49,7 @@ const configSchema = z.object({
   heroTitle: z.string().optional(),
   heroSubtitle: z.string().optional(),
   heroBackgroundUrl: z.string().url().optional().or(z.literal("")),
-  heroMediaUrl: z.string().url().optional().or(z.literal("")),
+  heroMediaUrl: z.string().optional().or(z.literal("")),
   heroButtonText: z.string().optional(),
   heroButtonLink: z.string().optional(),
   heroSecondaryButtonText: z.string().optional(),
@@ -56,6 +61,11 @@ const configSchema = z.object({
   contactPhone: z.string().optional(),
   address: z.string().optional(),
   galleryImages: z.array(galleryImageSchema).optional(),
+  aboutMediaUrl: z.string().optional().or(z.literal("")),
+  ctaMediaUrl: z.string().optional().or(z.literal("")),
+  contactMediaUrl: z.string().optional().or(z.literal("")),
+  departmentMedia: z.array(mediaItemSchema).optional(),
+  testimonialMedia: z.array(mediaItemSchema).optional(),
   level1Name: z.string().min(1, "Level 1 name is required"),
   level2Name: z.string().min(1, "Level 2 name is required"),
   level3Name: z.string().min(1, "Level 3 name is required"),
@@ -105,6 +115,15 @@ export default function SiteSettings() {
       contactPhone: "",
       address: "",
       galleryImages: [],
+      aboutMediaUrl: "",
+      ctaMediaUrl: "",
+      contactMediaUrl: "",
+      departmentMedia: [
+        { url: "" }, { url: "" }, { url: "" }, { url: "" }, { url: "" },
+      ],
+      testimonialMedia: [
+        { url: "" }, { url: "" }, { url: "" }, { url: "" }, { url: "" },
+      ],
       level1Name: "Applicant",
       level2Name: "Reviewer",
       level3Name: "Agent",
@@ -125,6 +144,16 @@ export default function SiteSettings() {
   const { fields: galleryFields, append: appendGallery, remove: removeGallery } = useFieldArray({
     control: form.control,
     name: "galleryImages",
+  });
+
+  const { fields: deptMediaFields, append: appendDeptMedia, remove: removeDeptMedia } = useFieldArray({
+    control: form.control,
+    name: "departmentMedia",
+  });
+
+  const { fields: testimonialMediaFields, append: appendTestimonialMedia, remove: removeTestimonialMedia } = useFieldArray({
+    control: form.control,
+    name: "testimonialMedia",
   });
 
   useEffect(() => {
@@ -161,6 +190,15 @@ export default function SiteSettings() {
         contactPhone: config.contactPhone || "",
         address: config.address || "",
         galleryImages: (config.galleryImages || []).map((url: string) => ({ url })),
+        aboutMediaUrl: config.aboutMediaUrl || "",
+        ctaMediaUrl: config.ctaMediaUrl || "",
+        contactMediaUrl: config.contactMediaUrl || "",
+        departmentMedia: (config.departmentMediaUrls || []).length > 0
+          ? (config.departmentMediaUrls || []).map((url: string) => ({ url }))
+          : [{ url: "" }, { url: "" }, { url: "" }, { url: "" }, { url: "" }],
+        testimonialMedia: (config.testimonialMediaUrls || []).length > 0
+          ? (config.testimonialMediaUrls || []).map((url: string) => ({ url }))
+          : [{ url: "" }, { url: "" }, { url: "" }, { url: "" }, { url: "" }],
         level1Name: config.levelNames?.level1 || "Applicant",
         level2Name: config.levelNames?.level2 || "Reviewer",
         level3Name: config.levelNames?.level3 || "Agent",
@@ -191,10 +229,12 @@ export default function SiteSettings() {
   });
 
   const onSubmit = (data: ConfigFormData) => {
-    const { galleryImages, ...rest } = data;
+    const { galleryImages, departmentMedia, testimonialMedia, ...rest } = data;
     const payload: Record<string, unknown> = {
       ...rest,
       galleryImages: (galleryImages || []).map((item) => item.url).filter(Boolean),
+      departmentMediaUrls: (departmentMedia || []).map((item) => item.url || ""),
+      testimonialMediaUrls: (testimonialMedia || []).map((item) => item.url || ""),
     };
     updateConfig.mutate(payload);
   };
@@ -236,6 +276,10 @@ export default function SiteSettings() {
                 <TabsTrigger value="gallery" data-testid="tab-gallery">
                   <Image className="mr-2 h-4 w-4" />
                   Gallery
+                </TabsTrigger>
+                <TabsTrigger value="media" data-testid="tab-media">
+                  <Film className="mr-2 h-4 w-4" />
+                  Site Media
                 </TabsTrigger>
                 <TabsTrigger value="footer" data-testid="tab-footer">
                   <LinkIcon className="mr-2 h-4 w-4" />
@@ -460,12 +504,12 @@ export default function SiteSettings() {
                       name="heroMediaUrl"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Hero Media URL (Image, Video, or GIF)</FormLabel>
+                          <FormLabel>Hero Media URL (Image, Video, GIF, or Vimeo)</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://example.com/hero.mp4" data-testid="input-hero-media" {...field} />
+                            <Input placeholder="https://example.com/hero.mp4 or https://vimeo.com/123456789" data-testid="input-hero-media" {...field} />
                           </FormControl>
                           <FormDescription>
-                            Add an image (.jpg, .png), video (.mp4, .webm), or GIF to display in the hero section. Videos and GIFs will autoplay on loop.
+                            Add an image, video (.mp4, .webm), GIF, or Vimeo link for the hero section. Videos autoplay on loop.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -536,9 +580,9 @@ export default function SiteSettings() {
               <TabsContent value="gallery">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Gallery Images</CardTitle>
+                    <CardTitle>Gallery Media</CardTitle>
                     <CardDescription>
-                      Manage the images displayed in the gallery section on your landing page. Upload images or paste URLs to showcase your facilities and team.
+                      Manage the images, videos, or Vimeo embeds displayed in the gallery section. Paste an image URL, video URL (.mp4, .webm), or Vimeo link.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -692,6 +736,201 @@ export default function SiteSettings() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="media">
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Section Backgrounds</CardTitle>
+                      <CardDescription>
+                        Set images, videos, or Vimeo embeds for each section of your landing page. Paste an image URL, video URL (.mp4, .webm), or a Vimeo link.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="aboutMediaUrl"
+                        render={({ field }) => {
+                          const val = form.watch("aboutMediaUrl");
+                          return (
+                            <FormItem>
+                              <FormLabel>About Section Image/Video</FormLabel>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <FormControl>
+                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-about-media" {...field} />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Shown in the "About Us" section. Default: /images/medilab/about.jpg
+                                  </FormDescription>
+                                  <FormMessage />
+                                </div>
+                                <MediaPreview url={val || ""} data-testid="preview-about-media" />
+                              </div>
+                            </FormItem>
+                          );
+                        }}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="ctaMediaUrl"
+                        render={({ field }) => {
+                          const val = form.watch("ctaMediaUrl");
+                          return (
+                            <FormItem>
+                              <FormLabel>CTA Section Background</FormLabel>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <FormControl>
+                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-cta-media" {...field} />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Background for the "Register Now" call-to-action section. Default: /images/medilab/hero-bg.jpg
+                                  </FormDescription>
+                                  <FormMessage />
+                                </div>
+                                <MediaPreview url={val || ""} data-testid="preview-cta-media" />
+                              </div>
+                            </FormItem>
+                          );
+                        }}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="contactMediaUrl"
+                        render={({ field }) => {
+                          const val = form.watch("contactMediaUrl");
+                          return (
+                            <FormItem>
+                              <FormLabel>Contact Section Background</FormLabel>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <FormControl>
+                                    <Input placeholder="Image URL, video URL, or Vimeo link" data-testid="input-contact-media" {...field} />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Background for the bottom "Ready to Get Started?" section. Default: /images/medilab/departments-3.jpg
+                                  </FormDescription>
+                                  <FormMessage />
+                                </div>
+                                <MediaPreview url={val || ""} data-testid="preview-contact-media" />
+                              </div>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Department Images</CardTitle>
+                      <CardDescription>
+                        Set images or videos for each department/service category shown on the landing page. Supports image URLs, video URLs, or Vimeo links.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {deptMediaFields.map((field, index) => {
+                        const deptNames = ["ESA Letters", "PSD Letters", "Travel Certificates", "Housing Verification", "Priority Registration"];
+                        const val = form.watch(`departmentMedia.${index}.url`);
+                        return (
+                          <div key={field.id} className="grid md:grid-cols-3 gap-4 items-start border rounded-md p-4" data-testid={`dept-media-${index}`}>
+                            <div className="md:col-span-2 space-y-2">
+                              <p className="text-sm font-medium">{deptNames[index] || `Department ${index + 1}`}</p>
+                              <FormField
+                                control={form.control}
+                                name={`departmentMedia.${index}.url`}
+                                render={({ field: urlField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input placeholder="Image URL, video URL, or Vimeo link" data-testid={`input-dept-media-${index}`} {...urlField} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => form.setValue(`departmentMedia.${index}.url`, "")}
+                                data-testid={`button-clear-dept-media-${index}`}
+                              >
+                                <Trash2 className="mr-1 h-3 w-3" /> Clear
+                              </Button>
+                            </div>
+                            <MediaPreview url={val || ""} className="aspect-[4/3]" data-testid={`preview-dept-media-${index}`} />
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendDeptMedia({ url: "" })}
+                        data-testid="button-add-dept-media"
+                      >
+                        <Plus className="mr-2 h-4 w-4" /> Add Department Slot
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Testimonial Images</CardTitle>
+                      <CardDescription>
+                        Set profile photos or short video clips for each testimonial. Supports image URLs, video URLs, or Vimeo links.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {testimonialMediaFields.map((field, index) => {
+                        const testimonialNames = ["Sarah M.", "James K.", "Emily R.", "Michael D.", "Lisa T."];
+                        const val = form.watch(`testimonialMedia.${index}.url`);
+                        return (
+                          <div key={field.id} className="flex gap-4 items-center border rounded-md p-3" data-testid={`testimonial-media-${index}`}>
+                            <MediaPreview url={val || ""} className="w-16 h-16 shrink-0 rounded-full overflow-hidden" data-testid={`preview-testimonial-media-${index}`} />
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium">{testimonialNames[index] || `Testimonial ${index + 1}`}</p>
+                              <FormField
+                                control={form.control}
+                                name={`testimonialMedia.${index}.url`}
+                                render={({ field: urlField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input placeholder="Profile image or short video URL" className="text-sm" data-testid={`input-testimonial-media-${index}`} {...urlField} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => form.setValue(`testimonialMedia.${index}.url`, "")}
+                              data-testid={`button-clear-testimonial-media-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendTestimonialMedia({ url: "" })}
+                        data-testid="button-add-testimonial-media"
+                      >
+                        <Plus className="mr-2 h-4 w-4" /> Add Testimonial Slot
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="footer">

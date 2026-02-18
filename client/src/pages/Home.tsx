@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimateOnScroll } from "@/hooks/use-scroll-animation";
+import { MediaRenderer } from "@/components/MediaRenderer";
 import {
   ArrowRight,
   Users,
@@ -27,13 +28,6 @@ import {
   Quote,
 } from "lucide-react";
 
-function getMediaType(url: string): 'image' | 'video' | 'gif' {
-  const extension = url.split('?')[0].split('.').pop()?.toLowerCase();
-  if (['mp4', 'webm', 'ogg', 'mov'].includes(extension || '')) return 'video';
-  if (extension === 'gif') return 'gif';
-  return 'image';
-}
-
 export default function Home() {
   const { config } = useConfig();
   const { isAuthenticated, user } = useAuth();
@@ -41,7 +35,6 @@ export default function Home() {
   const [activeDept, setActiveDept] = useState(0);
 
   const heroMediaUrl = config.heroMediaUrl || config.heroBackgroundUrl;
-  const mediaType = heroMediaUrl ? getMediaType(heroMediaUrl) : null;
 
   const getDashboardPath = () => {
     if (!user) return "/register";
@@ -71,12 +64,21 @@ export default function Home() {
     { icon: Award, value: "4.9/5", label: "Customer Rating" },
   ];
 
+  const defaultDeptImages = [
+    "/images/medilab/departments-1.jpg",
+    "/images/medilab/departments-2.jpg",
+    "/images/medilab/departments-3.jpg",
+    "/images/medilab/departments-4.jpg",
+    "/images/medilab/departments-5.jpg",
+  ];
+  const deptMedia = config.departmentMediaUrls || [];
+
   const departments = [
-    { name: "ESA Letters", img: "/images/medilab/departments-1.jpg", desc: "Emotional Support Animal letters for housing and travel, reviewed by licensed mental health professionals. Our most popular service with same-day delivery." },
-    { name: "PSD Letters", img: "/images/medilab/departments-2.jpg", desc: "Psychiatric Service Dog letters for individuals who qualify, providing legal documentation for public access and housing rights." },
-    { name: "Travel Certificates", img: "/images/medilab/departments-3.jpg", desc: "Support animal travel certification accepted by major airlines and transportation providers for hassle-free travel with your companion." },
-    { name: "Housing Verification", img: "/images/medilab/departments-4.jpg", desc: "Comprehensive landlord verification letters ensuring your rights under the Fair Housing Act are protected for you and your support animal." },
-    { name: "Priority Registration", img: "/images/medilab/departments-5.jpg", desc: "Expedited processing for time-sensitive registration needs. Get your verified support animal certification within hours." },
+    { name: "ESA Letters", img: deptMedia[0] || defaultDeptImages[0], desc: "Emotional Support Animal letters for housing and travel, reviewed by licensed mental health professionals. Our most popular service with same-day delivery." },
+    { name: "PSD Letters", img: deptMedia[1] || defaultDeptImages[1], desc: "Psychiatric Service Dog letters for individuals who qualify, providing legal documentation for public access and housing rights." },
+    { name: "Travel Certificates", img: deptMedia[2] || defaultDeptImages[2], desc: "Support animal travel certification accepted by major airlines and transportation providers for hassle-free travel with your companion." },
+    { name: "Housing Verification", img: deptMedia[3] || defaultDeptImages[3], desc: "Comprehensive landlord verification letters ensuring your rights under the Fair Housing Act are protected for you and your support animal." },
+    { name: "Priority Registration", img: deptMedia[4] || defaultDeptImages[4], desc: "Expedited processing for time-sensitive registration needs. Get your verified support animal certification within hours." },
   ];
 
   const faqs = [
@@ -88,12 +90,21 @@ export default function Home() {
     { q: "What do I need to get started?", a: "Simply create an account and provide basic information about yourself and your animal. Our licensed professionals will review your application and handle the rest." },
   ];
 
+  const defaultTestimonialImages = [
+    "/images/medilab/testimonials/testimonials-1.jpg",
+    "/images/medilab/testimonials/testimonials-2.jpg",
+    "/images/medilab/testimonials/testimonials-3.jpg",
+    "/images/medilab/testimonials/testimonials-4.jpg",
+    "/images/medilab/testimonials/testimonials-5.jpg",
+  ];
+  const testimonialMedia = config.testimonialMediaUrls || [];
+
   const testimonials = [
-    { name: "Sarah M.", role: "Pet Owner", text: "Got my ESA letter within 2 hours. The process was incredibly smooth and professional. My landlord accepted it right away!", rating: 5, img: "/images/medilab/testimonials/testimonials-1.jpg" },
-    { name: "James K.", role: "Apartment Renter", text: "Needed an ESA letter for my new apartment and they delivered. The letter was professional and accepted without any issues.", rating: 5, img: "/images/medilab/testimonials/testimonials-2.jpg" },
-    { name: "Emily R.", role: "Frequent Traveler", text: "The travel certificate was exactly what I needed for my support dog. Professional, quick, and completely confidential.", rating: 5, img: "/images/medilab/testimonials/testimonials-3.jpg" },
-    { name: "Michael D.", role: "Dog Owner", text: "Outstanding service. I needed a PSD letter urgently and they delivered within the hour. Will definitely use again.", rating: 5, img: "/images/medilab/testimonials/testimonials-4.jpg" },
-    { name: "Lisa T.", role: "Cat Owner", text: "Simple process, legitimate documentation. My housing provider accepted the ESA letter immediately. The customer service was excellent too.", rating: 5, img: "/images/medilab/testimonials/testimonials-5.jpg" },
+    { name: "Sarah M.", role: "Pet Owner", text: "Got my ESA letter within 2 hours. The process was incredibly smooth and professional. My landlord accepted it right away!", rating: 5, img: testimonialMedia[0] || defaultTestimonialImages[0] },
+    { name: "James K.", role: "Apartment Renter", text: "Needed an ESA letter for my new apartment and they delivered. The letter was professional and accepted without any issues.", rating: 5, img: testimonialMedia[1] || defaultTestimonialImages[1] },
+    { name: "Emily R.", role: "Frequent Traveler", text: "The travel certificate was exactly what I needed for my support dog. Professional, quick, and completely confidential.", rating: 5, img: testimonialMedia[2] || defaultTestimonialImages[2] },
+    { name: "Michael D.", role: "Dog Owner", text: "Outstanding service. I needed a PSD letter urgently and they delivered within the hour. Will definitely use again.", rating: 5, img: testimonialMedia[3] || defaultTestimonialImages[3] },
+    { name: "Lisa T.", role: "Cat Owner", text: "Simple process, legitimate documentation. My housing provider accepted the ESA letter immediately. The customer service was excellent too.", rating: 5, img: testimonialMedia[4] || defaultTestimonialImages[4] },
   ];
 
   const defaultGalleryImages = [
@@ -114,18 +125,13 @@ export default function Home() {
     <div className="flex flex-col">
       {/* Hero Section */}
       <section className="relative min-h-[85vh] flex items-center">
-        {heroMediaUrl && mediaType === 'image' && (
-          <img src={heroMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" data-testid="img-hero-background" />
-        )}
-        {heroMediaUrl && mediaType === 'video' && (
-          <video className="absolute inset-0 w-full h-full object-cover" src={heroMediaUrl} autoPlay loop muted playsInline data-testid="video-hero-background" />
-        )}
-        {heroMediaUrl && mediaType === 'gif' && (
-          <img className="absolute inset-0 w-full h-full object-cover" src={heroMediaUrl} alt="Hero background" data-testid="img-hero-gif-background" />
-        )}
-        {!heroMediaUrl && (
-          <img src="/images/medilab/hero-bg.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" data-testid="img-hero-default" />
-        )}
+        <MediaRenderer
+          url={heroMediaUrl || ""}
+          fallbackUrl="/images/medilab/hero-bg.jpg"
+          alt=""
+          overlay
+          data-testid="media-hero-background"
+        />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
 
         <div className="container relative z-10 py-20">
@@ -185,10 +191,10 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 items-start">
             <AnimateOnScroll animation="fade-right">
               <div className="relative">
-                <img
-                  src="/images/medilab/about.jpg"
+                <MediaRenderer
+                  url={config.aboutMediaUrl || "/images/medilab/about.jpg"}
                   alt="About our service"
-                  className="rounded-md w-full object-cover shadow-lg"
+                  className="rounded-md w-full shadow-lg"
                   data-testid="img-about"
                 />
                 <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-primary rounded-md opacity-20 -z-10" />
@@ -287,7 +293,12 @@ export default function Home() {
 
       {/* CTA / Order Section */}
       <section className="relative py-20 md:py-24 overflow-hidden">
-        <img src="/images/medilab/hero-bg.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <MediaRenderer
+          url={config.ctaMediaUrl || "/images/medilab/hero-bg.jpg"}
+          alt=""
+          overlay
+          data-testid="media-cta-bg"
+        />
         <div className="absolute inset-0 bg-primary/90" />
         <div className="container relative z-10">
           <AnimateOnScroll animation="fade-up">
@@ -361,11 +372,11 @@ export default function Home() {
                       </Link>
                     </Button>
                   </div>
-                  <div>
-                    <img
-                      src={departments[activeDept].img}
+                  <div className="relative aspect-[4/3] rounded-md overflow-hidden shadow-lg">
+                    <MediaRenderer
+                      url={departments[activeDept].img}
                       alt={departments[activeDept].name}
-                      className="rounded-md w-full object-cover shadow-lg aspect-[4/3]"
+                      className="w-full h-full"
                       data-testid={`img-dept-${activeDept}`}
                     />
                   </div>
@@ -438,12 +449,14 @@ export default function Home() {
                     <Card className="shadow-md border-0 bg-background" data-testid={`testimonial-${i}`}>
                       <CardContent className="p-6">
                         <div className="flex items-start gap-4">
-                          <img
-                            src={t.img}
-                            alt={t.name}
-                            className="h-16 w-16 rounded-full object-cover shrink-0 ring-2 ring-primary/20"
-                            data-testid={`img-testimonial-${i}`}
-                          />
+                          <div className="h-16 w-16 rounded-full overflow-hidden shrink-0 ring-2 ring-primary/20">
+                            <MediaRenderer
+                              url={t.img}
+                              alt={t.name}
+                              className="h-full w-full"
+                              data-testid={`img-testimonial-${i}`}
+                            />
+                          </div>
                           <div className="flex-1">
                             <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
                               <div>
@@ -489,10 +502,10 @@ export default function Home() {
             {galleryImages.map((img, i) => (
               <AnimateOnScroll key={i} animation="zoom-in" delay={i * 60}>
                 <div className="group relative overflow-hidden rounded-md cursor-pointer aspect-square" data-testid={`gallery-img-${i}`}>
-                  <img
-                    src={img}
+                  <MediaRenderer
+                    url={img}
                     alt={`Gallery ${i + 1}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="w-full h-full transition-transform duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/40 transition-colors duration-300 flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -510,7 +523,12 @@ export default function Home() {
 
       {/* Contact / Final CTA Section */}
       <section id="contact" className="relative py-20 md:py-24 overflow-hidden">
-        <img src="/images/medilab/departments-3.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <MediaRenderer
+          url={config.contactMediaUrl || "/images/medilab/departments-3.jpg"}
+          alt=""
+          overlay
+          data-testid="media-contact-bg"
+        />
         <div className="absolute inset-0 bg-primary/90" />
         <div className="container relative z-10">
           <AnimateOnScroll animation="fade-up">

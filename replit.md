@@ -63,6 +63,23 @@ Role names are configurable per deployment via the `siteConfig` table.
 - `doctorProfiles` - Doctor credentials (license, NPI, DEA, phone, fax, address, specialty)
 - `autoMessageTriggers` - Automated messages triggered on application status changes
 
+### Site Media Management
+All landing page images are configurable from the Owner's Site Settings > Site Media tab. Each slot supports:
+- **Image URLs** (.jpg, .png, .webp, .gif)
+- **Video URLs** (.mp4, .webm) - autoplay, loop, muted
+- **Vimeo embeds** (paste vimeo.com link, auto-converted to embed)
+
+Configurable media slots stored in Firebase `siteConfig`:
+- `heroMediaUrl` - Hero section background
+- `aboutMediaUrl` - About section image
+- `ctaMediaUrl` - CTA section background
+- `contactMediaUrl` - Contact/footer CTA background
+- `departmentMediaUrls[]` - Department section images (5 slots)
+- `testimonialMediaUrls[]` - Testimonial profile images (5 slots)
+- `galleryImages[]` - Gallery section (unlimited slots)
+
+Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and renders img/video/iframe.
+
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
 - **Production**: Vite builds to `dist/public`, esbuild bundles server to `dist/index.cjs`
