@@ -502,18 +502,26 @@ export default function SiteSettings() {
                     <FormField
                       control={form.control}
                       name="heroMediaUrl"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Hero Media URL (Image, Video, GIF, or Vimeo)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="https://example.com/hero.mp4 or https://vimeo.com/123456789" data-testid="input-hero-media" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Add an image, video (.mp4, .webm), GIF, or Vimeo link for the hero section. Videos autoplay on loop.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const val = form.watch("heroMediaUrl");
+                        return (
+                          <FormItem>
+                            <FormLabel>Hero Media URL (Image, Video, GIF, or Vimeo)</FormLabel>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div>
+                                <FormControl>
+                                  <Input placeholder="https://example.com/hero.mp4 or https://vimeo.com/123456789" data-testid="input-hero-media" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Add an image, video (.mp4, .webm), GIF, or Vimeo link for the hero section. Videos autoplay on loop.
+                                </FormDescription>
+                                <FormMessage />
+                              </div>
+                              <MediaPreview url={val || "/images/medilab/hero-bg.jpg"} data-testid="preview-hero-media" />
+                            </div>
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <div className="grid gap-4 md:grid-cols-2">
@@ -766,7 +774,7 @@ export default function SiteSettings() {
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || ""} data-testid="preview-about-media" />
+                                <MediaPreview url={val || "/images/medilab/about.jpg"} data-testid="preview-about-media" />
                               </div>
                             </FormItem>
                           );
@@ -791,7 +799,7 @@ export default function SiteSettings() {
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || ""} data-testid="preview-cta-media" />
+                                <MediaPreview url={val || "/images/medilab/hero-bg.jpg"} data-testid="preview-cta-media" />
                               </div>
                             </FormItem>
                           );
@@ -816,7 +824,7 @@ export default function SiteSettings() {
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || ""} data-testid="preview-contact-media" />
+                                <MediaPreview url={val || "/images/medilab/departments-3.jpg"} data-testid="preview-contact-media" />
                               </div>
                             </FormItem>
                           );
@@ -862,7 +870,7 @@ export default function SiteSettings() {
                                 <Trash2 className="mr-1 h-3 w-3" /> Clear
                               </Button>
                             </div>
-                            <MediaPreview url={val || ""} className="aspect-[4/3]" data-testid={`preview-dept-media-${index}`} />
+                            <MediaPreview url={val || `/images/medilab/departments-${index + 1}.jpg`} className="aspect-[4/3]" data-testid={`preview-dept-media-${index}`} />
                           </div>
                         );
                       })}
@@ -891,7 +899,7 @@ export default function SiteSettings() {
                         const val = form.watch(`testimonialMedia.${index}.url`);
                         return (
                           <div key={field.id} className="flex gap-4 items-center border rounded-md p-3" data-testid={`testimonial-media-${index}`}>
-                            <MediaPreview url={val || ""} className="w-16 h-16 shrink-0 rounded-full overflow-hidden" data-testid={`preview-testimonial-media-${index}`} />
+                            <MediaPreview url={val || `/images/medilab/testimonials/testimonials-${index + 1}.jpg`} className="w-16 h-16 shrink-0 rounded-full overflow-hidden" data-testid={`preview-testimonial-media-${index}`} />
                             <div className="flex-1 space-y-1">
                               <p className="text-sm font-medium">{testimonialNames[index] || `Testimonial ${index + 1}`}</p>
                               <FormField
