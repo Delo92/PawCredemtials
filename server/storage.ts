@@ -92,6 +92,7 @@ export interface IStorage {
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommission(id: string, data: Partial<InsertCommission>): Promise<Commission | undefined>;
 
+  getNotification(id: string): Promise<Notification | undefined>;
   getNotificationsByUser(userId: string): Promise<Notification[]>;
   getUnreadNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -808,6 +809,11 @@ export class FirestoreStorage implements IStorage {
   // =========================================================================
   // NOTIFICATIONS
   // =========================================================================
+  async getNotification(id: string): Promise<Notification | undefined> {
+    const doc = await this.col("notifications").doc(id).get();
+    return docToRecord(doc) as Notification | undefined;
+  }
+
   async getNotificationsByUser(userId: string): Promise<Notification[]> {
     const snap = await this.col("notifications").where("userId", "==", userId).get();
     const results = docsToRecords(snap) as Notification[];
