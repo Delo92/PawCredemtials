@@ -1581,6 +1581,37 @@ export async function registerRoutes(
   // FIREBASE INITIALIZATION / SEED ENDPOINT
   // ===========================================================================
 
+  app.get("/api/admin/firebase-debug", async (req, res) => {
+    try {
+      const projectId = process.env.FIREBASE_PROJECT_ID || "(not set)";
+      const viteProjectId = process.env.VITE_FIREBASE_PROJECT_ID || "(not set)";
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || "(not set)";
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY || "(not set)";
+
+      const pkPreview = privateKey === "(not set)" ? "(not set)" :
+        `starts="${privateKey.substring(0, 30)}..." len=${privateKey.length} hasBeginMarker=${privateKey.includes("-----BEGIN")} hasNewlines=${privateKey.includes("\n")} hasEscapedNewlines=${privateKey.includes("\\n")}`;
+
+      const emailFull = clientEmail === "(not set)" ? "(not set)" : clientEmail;
+      const emailDomain = clientEmail.includes("@") ? clientEmail.split("@")[1] : "(no @ found)";
+      const emailUser = clientEmail.includes("@") ? clientEmail.split("@")[0] : clientEmail;
+
+      res.json({
+        FIREBASE_PROJECT_ID: projectId,
+        VITE_FIREBASE_PROJECT_ID: viteProjectId,
+        FIREBASE_CLIENT_EMAIL_full: emailFull,
+        FIREBASE_CLIENT_EMAIL_domain: emailDomain,
+        FIREBASE_CLIENT_EMAIL_user_prefix: emailUser.substring(0, 25),
+        FIREBASE_CLIENT_EMAIL_length: clientEmail.length,
+        FIREBASE_PRIVATE_KEY_info: pkPreview,
+        projectIdsMatch: projectId === viteProjectId,
+        emailMatchesProject: emailDomain.includes(projectId),
+        FIREBASE_SERVICE_ACCOUNT_KEY_set: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/admin/seed-firebase", async (req, res) => {
     try {
       const existingUsers = await storage.getAllUsers();
