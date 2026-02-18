@@ -337,20 +337,24 @@ export async function registerRoutes(
         const allowedFolders = ["media", "hero", "about", "cta", "contact", "departments", "testimonials", "gallery"];
         const rawFolder = (req.body.folder || "media").replace(/[^a-zA-Z0-9_-]/g, "");
         const folder = allowedFolders.includes(rawFolder) ? rawFolder : "media";
-        const uploadDir = path.resolve(process.cwd(), "uploads", folder);
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
+        const bucket = firebaseStorage.bucket();
         const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
         const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
-        const fileName = `${folder}-${uniqueSuffix}${ext}`;
-        const filePath = path.join(uploadDir, fileName);
-        fs.writeFileSync(filePath, req.file.buffer);
-        const url = `/uploads/${folder}/${fileName}`;
+        const fileName = `${folder}/${folder}-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype,
+          },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
         res.json({ url });
       } catch (error: any) {
         console.error("Media upload error:", error);
-        res.status(500).json({ message: "Failed to upload file" });
+        res.status(500).json({ message: "Failed to upload file to storage" });
       }
     });
   });
