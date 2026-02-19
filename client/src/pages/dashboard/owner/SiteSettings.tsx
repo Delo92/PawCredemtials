@@ -605,7 +605,7 @@ export default function SiteSettings() {
                                 </FormDescription>
                                 <FormMessage />
                               </div>
-                              <MediaPreview url={val || "/images/medilab/hero-bg.jpg"} data-testid="preview-hero-media" />
+                              <MediaPreview url={val || "/api/default-images/hero-bg"} data-testid="preview-hero-media" />
                             </div>
                           </FormItem>
                         );
@@ -863,11 +863,11 @@ export default function SiteSettings() {
                                     />
                                   </FormControl>
                                   <FormDescription>
-                                    Shown in the "About Us" section. Default: /images/medilab/about.jpg
+                                    Shown in the "About Us" section.
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || "/images/medilab/about.jpg"} data-testid="preview-about-media" />
+                                <MediaPreview url={val || "/api/default-images/about"} data-testid="preview-about-media" />
                               </div>
                             </FormItem>
                           );
@@ -893,11 +893,11 @@ export default function SiteSettings() {
                                     />
                                   </FormControl>
                                   <FormDescription>
-                                    Background for the "Register Now" call-to-action section. Default: /images/medilab/hero-bg.jpg
+                                    Background for the "Register Now" call-to-action section.
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || "/images/medilab/hero-bg.jpg"} data-testid="preview-cta-media" />
+                                <MediaPreview url={val || "/api/default-images/hero-bg"} data-testid="preview-cta-media" />
                               </div>
                             </FormItem>
                           );
@@ -923,11 +923,11 @@ export default function SiteSettings() {
                                     />
                                   </FormControl>
                                   <FormDescription>
-                                    Background for the bottom "Ready to Get Started?" section. Default: /images/medilab/departments-3.jpg
+                                    Background for the bottom "Ready to Get Started?" section.
                                   </FormDescription>
                                   <FormMessage />
                                 </div>
-                                <MediaPreview url={val || "/images/medilab/departments-3.jpg"} data-testid="preview-contact-media" />
+                                <MediaPreview url={val || "/api/default-images/departments-3"} data-testid="preview-contact-media" />
                               </div>
                             </FormItem>
                           );
@@ -978,7 +978,7 @@ export default function SiteSettings() {
                                 <Trash2 className="mr-1 h-3 w-3" /> Clear
                               </Button>
                             </div>
-                            <MediaPreview url={val || `/images/medilab/departments-${index + 1}.jpg`} className="aspect-[4/3]" data-testid={`preview-dept-media-${index}`} />
+                            <MediaPreview url={val || `/api/default-images/departments-${index + 1}`} className="aspect-[4/3]" data-testid={`preview-dept-media-${index}`} />
                           </div>
                         );
                       })}
@@ -1007,7 +1007,7 @@ export default function SiteSettings() {
                         const val = form.watch(`testimonialMedia.${index}.url`);
                         return (
                           <div key={field.id} className="flex gap-4 items-center border rounded-md p-3" data-testid={`testimonial-media-${index}`}>
-                            <MediaPreview url={val || `/images/medilab/testimonials/testimonials-${index + 1}.jpg`} className="w-16 h-16 shrink-0 rounded-full overflow-hidden" data-testid={`preview-testimonial-media-${index}`} />
+                            <MediaPreview url={val || `/api/default-images/testimonials-${index + 1}`} className="w-16 h-16 shrink-0 rounded-full overflow-hidden" data-testid={`preview-testimonial-media-${index}`} />
                             <div className="flex-1 space-y-1">
                               <p className="text-sm font-medium">{testimonialNames[index] || `Testimonial ${index + 1}`}</p>
                               <FormField

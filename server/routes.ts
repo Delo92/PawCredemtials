@@ -8,7 +8,7 @@ import { defaultConfig } from "@shared/config";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { firebaseStorage, firebaseAuth, getAdminAuth } from "./firebase-admin";
+import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
 
 async function fireAutoMessageTriggers(applicationId: string, newStatus: string) {
   try {
@@ -269,7 +269,7 @@ export async function registerRoutes(
   }
 
   // ===========================================================================
-  // FILE UPLOAD ROUTES (Firebase Storage)
+  // FILE UPLOAD ROUTES (Firestore)
   // ===========================================================================
 
   app.post("/api/upload/gallery", requireAuth, requireLevel(4), (req, res, next) => {
@@ -292,23 +292,25 @@ export async function registerRoutes(
       }
 
       try {
-        const bucket = firebaseStorage.bucket();
         const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
-        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
-        const fileName = `gallery/gallery-${uniqueSuffix}${ext}`;
-        const file = bucket.file(fileName);
+        const key = `gallery-${uniqueSuffix}`;
+        const base64 = req.file.buffer.toString("base64");
 
-        await file.save(req.file.buffer, {
-          metadata: {
-            contentType: req.file.mimetype,
-          },
+        await firestore.collection("uploadedMedia").doc(key).set({
+          key,
+          fileName: req.file.originalname || `${key}.jpg`,
+          folder: "gallery",
+          contentType: req.file.mimetype,
+          data: base64,
+          size: req.file.buffer.length,
+          uploadedBy: req.session.userId || "unknown",
+          createdAt: new Date().toISOString(),
         });
 
-        await file.makePublic();
-        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        const url = `/api/media/${key}`;
         res.json({ url });
       } catch (error: any) {
-        console.error("Firebase Storage upload error:", error);
+        console.error("Gallery upload error:", error);
         res.status(500).json({ message: "Failed to upload image" });
       }
     });
@@ -337,26 +339,140 @@ export async function registerRoutes(
         const allowedFolders = ["media", "hero", "about", "cta", "contact", "departments", "testimonials", "gallery"];
         const rawFolder = (req.body.folder || "media").replace(/[^a-zA-Z0-9_-]/g, "");
         const folder = allowedFolders.includes(rawFolder) ? rawFolder : "media";
-        const bucket = firebaseStorage.bucket();
         const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
-        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
-        const fileName = `${folder}/${folder}-${uniqueSuffix}${ext}`;
-        const file = bucket.file(fileName);
+        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : "";
+        const key = `${folder}-${uniqueSuffix}`;
+        const base64 = req.file.buffer.toString("base64");
 
-        await file.save(req.file.buffer, {
-          metadata: {
-            contentType: req.file.mimetype,
-          },
+        await firestore.collection("uploadedMedia").doc(key).set({
+          key,
+          fileName: req.file.originalname || `${key}${ext}`,
+          folder,
+          contentType: req.file.mimetype,
+          data: base64,
+          size: req.file.buffer.length,
+          uploadedBy: req.session.userId || "unknown",
+          createdAt: new Date().toISOString(),
         });
 
-        await file.makePublic();
-        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        imageCache.delete(key);
+
+        const url = `/api/media/${key}`;
         res.json({ url });
       } catch (error: any) {
         console.error("Media upload error:", error);
-        res.status(500).json({ message: "Failed to upload file to storage" });
+        res.status(500).json({ message: "Failed to upload file" });
       }
     });
+  });
+
+  // ===========================================================================
+  // DEFAULT IMAGES (served from Firestore)
+  // ===========================================================================
+
+  const imageCache = new Map<string, { data: Buffer; contentType: string; etag: string }>();
+
+  app.get("/api/default-images/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+        res.status(400).json({ message: "Invalid image key" });
+        return;
+      }
+
+      const cached = imageCache.get(key);
+      if (cached) {
+        const ifNoneMatch = req.headers["if-none-match"];
+        if (ifNoneMatch === cached.etag) {
+          res.status(304).end();
+          return;
+        }
+        res.set({
+          "Content-Type": cached.contentType,
+          "Content-Length": String(cached.data.length),
+          "Cache-Control": "public, max-age=86400",
+          "ETag": cached.etag,
+        });
+        res.send(cached.data);
+        return;
+      }
+
+      const doc = await firestore.collection("defaultImages").doc(key).get();
+      if (!doc.exists) {
+        res.status(404).json({ message: "Image not found" });
+        return;
+      }
+
+      const imgDoc = doc.data()!;
+      const buffer = Buffer.from(imgDoc.data, "base64");
+      const contentType = imgDoc.contentType || "image/jpeg";
+      const etag = `"${key}-${imgDoc.size}"`;
+
+      imageCache.set(key, { data: buffer, contentType, etag });
+
+      res.set({
+        "Content-Type": contentType,
+        "Content-Length": String(buffer.length),
+        "Cache-Control": "public, max-age=86400",
+        "ETag": etag,
+      });
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error serving default image:", error);
+      res.status(500).json({ message: "Failed to load image" });
+    }
+  });
+
+  // Serve uploaded media from Firestore
+  app.get("/api/media/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+        res.status(400).json({ message: "Invalid media key" });
+        return;
+      }
+
+      const cached = imageCache.get(`media-${key}`);
+      if (cached) {
+        const ifNoneMatch = req.headers["if-none-match"];
+        if (ifNoneMatch === cached.etag) {
+          res.status(304).end();
+          return;
+        }
+        res.set({
+          "Content-Type": cached.contentType,
+          "Content-Length": String(cached.data.length),
+          "Cache-Control": "public, max-age=86400",
+          "ETag": cached.etag,
+        });
+        res.send(cached.data);
+        return;
+      }
+
+      const doc = await firestore.collection("uploadedMedia").doc(key).get();
+      if (!doc.exists) {
+        res.status(404).json({ message: "Media not found" });
+        return;
+      }
+
+      const mediaDoc = doc.data()!;
+      const buffer = Buffer.from(mediaDoc.data, "base64");
+      const contentType = mediaDoc.contentType || "application/octet-stream";
+      const etag = `"media-${key}-${mediaDoc.size}"`;
+
+      imageCache.set(`media-${key}`, { data: buffer, contentType, etag });
+
+      res.set({
+        "Content-Type": contentType,
+        "Content-Length": String(buffer.length),
+        "Cache-Control": "public, max-age=86400",
+        "ETag": etag,
+      });
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error serving uploaded media:", error);
+      res.status(500).json({ message: "Failed to load media" });
+    }
   });
 
   // ===========================================================================
@@ -2069,21 +2185,24 @@ export async function registerRoutes(
             if (fs.existsSync(localPath)) {
               try {
                 const fileBuffer = fs.readFileSync(localPath);
-                const fileName = `gallery/${path.basename(localPath)}`;
-                const bucket = firebaseStorage.bucket();
-                const file = bucket.file(fileName);
                 const ext = path.extname(localPath).toLowerCase();
                 const mimeMap: Record<string, string> = {
                   ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                   ".png": "image/png", ".gif": "image/gif",
                   ".webp": "image/webp", ".svg": "image/svg+xml",
                 };
-                await file.save(fileBuffer, {
-                  metadata: { contentType: mimeMap[ext] || "image/jpeg" },
+                const key = `gallery-${Date.now()}-${randomBytes(4).toString("hex")}`;
+                await firestore.collection("uploadedMedia").doc(key).set({
+                  key,
+                  fileName: path.basename(localPath),
+                  folder: "gallery",
+                  contentType: mimeMap[ext] || "image/jpeg",
+                  data: fileBuffer.toString("base64"),
+                  size: fileBuffer.length,
+                  uploadedBy: "migration",
+                  createdAt: new Date().toISOString(),
                 });
-                await file.makePublic();
-                const firebaseUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-                newUrls.push(firebaseUrl);
+                newUrls.push(`/api/media/${key}`);
                 results.images++;
               } catch (e: any) {
                 (results.errors as string[]).push(`Failed to migrate ${imageUrl}: ${e.message}`);
@@ -2104,7 +2223,7 @@ export async function registerRoutes(
 
       res.json({
         success: true,
-        message: `Migration complete. ${results.images} images migrated to Firebase Storage.`,
+        message: `Migration complete. ${results.images} images migrated to Firestore.`,
         details: results,
       });
     } catch (error: any) {
