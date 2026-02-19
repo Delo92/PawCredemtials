@@ -31,6 +31,7 @@ function MediaUploadInput({
   folder = "media",
   accept = "image/*,video/mp4,video/webm",
   testId,
+  onUploadComplete,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -38,6 +39,7 @@ function MediaUploadInput({
   folder?: string;
   accept?: string;
   testId?: string;
+  onUploadComplete?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -61,13 +63,16 @@ function MediaUploadInput({
       const data = await res.json();
       onChange(data.url);
       toast({ title: "Uploaded", description: "File uploaded successfully." });
+      if (onUploadComplete) {
+        setTimeout(() => onUploadComplete(), 100);
+      }
     } catch (e: any) {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
-  }, [folder, onChange, toast]);
+  }, [folder, onChange, toast, onUploadComplete]);
 
   return (
     <div className="space-y-2">
@@ -321,6 +326,7 @@ export default function SiteSettings() {
     updateConfig.mutate(payload);
   };
 
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -346,6 +352,7 @@ export default function SiteSettings() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <Tabs defaultValue="branding" className="space-y-6">
+              <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-3 -mx-1 px-1 flex flex-wrap items-center justify-between gap-2">
               <TabsList className="flex-wrap">
                 <TabsTrigger value="branding" data-testid="tab-branding">
                   <Palette className="mr-2 h-4 w-4" />
