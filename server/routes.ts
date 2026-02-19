@@ -292,22 +292,18 @@ export async function registerRoutes(
       }
 
       try {
+        const bucket = firebaseStorage.bucket();
         const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
-        const key = `gallery-${uniqueSuffix}`;
-        const base64 = req.file.buffer.toString("base64");
+        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
+        const fileName = `gallery/gallery-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
 
-        await firestore.collection("uploadedMedia").doc(key).set({
-          key,
-          fileName: req.file.originalname || `${key}.jpg`,
-          folder: "gallery",
-          contentType: req.file.mimetype,
-          data: base64,
-          size: req.file.buffer.length,
-          uploadedBy: req.session.userId || "unknown",
-          createdAt: new Date().toISOString(),
+        await file.save(req.file.buffer, {
+          metadata: { contentType: req.file.mimetype },
         });
 
-        const url = `/api/media/${key}`;
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
         res.json({ url });
       } catch (error: any) {
         console.error("Gallery upload error:", error);
@@ -339,25 +335,18 @@ export async function registerRoutes(
         const allowedFolders = ["media", "hero", "about", "cta", "contact", "departments", "testimonials", "gallery"];
         const rawFolder = (req.body.folder || "media").replace(/[^a-zA-Z0-9_-]/g, "");
         const folder = allowedFolders.includes(rawFolder) ? rawFolder : "media";
+        const bucket = firebaseStorage.bucket();
         const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
-        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : "";
-        const key = `${folder}-${uniqueSuffix}`;
-        const base64 = req.file.buffer.toString("base64");
+        const ext = req.file.originalname ? "." + req.file.originalname.split(".").pop() : ".jpg";
+        const fileName = `${folder}/${folder}-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
 
-        await firestore.collection("uploadedMedia").doc(key).set({
-          key,
-          fileName: req.file.originalname || `${key}${ext}`,
-          folder,
-          contentType: req.file.mimetype,
-          data: base64,
-          size: req.file.buffer.length,
-          uploadedBy: req.session.userId || "unknown",
-          createdAt: new Date().toISOString(),
+        await file.save(req.file.buffer, {
+          metadata: { contentType: req.file.mimetype },
         });
 
-        imageCache.delete(key);
-
-        const url = `/api/media/${key}`;
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
         res.json({ url });
       } catch (error: any) {
         console.error("Media upload error:", error);
@@ -2191,18 +2180,15 @@ export async function registerRoutes(
                   ".png": "image/png", ".gif": "image/gif",
                   ".webp": "image/webp", ".svg": "image/svg+xml",
                 };
-                const key = `gallery-${Date.now()}-${randomBytes(4).toString("hex")}`;
-                await firestore.collection("uploadedMedia").doc(key).set({
-                  key,
-                  fileName: path.basename(localPath),
-                  folder: "gallery",
-                  contentType: mimeMap[ext] || "image/jpeg",
-                  data: fileBuffer.toString("base64"),
-                  size: fileBuffer.length,
-                  uploadedBy: "migration",
-                  createdAt: new Date().toISOString(),
+                const bucket = firebaseStorage.bucket();
+                const fileName = `gallery/${path.basename(localPath)}`;
+                const storageFile = bucket.file(fileName);
+                await storageFile.save(fileBuffer, {
+                  metadata: { contentType: mimeMap[ext] || "image/jpeg" },
                 });
-                newUrls.push(`/api/media/${key}`);
+                await storageFile.makePublic();
+                const firebaseUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                newUrls.push(firebaseUrl);
                 results.images++;
               } catch (e: any) {
                 (results.errors as string[]).push(`Failed to migrate ${imageUrl}: ${e.message}`);

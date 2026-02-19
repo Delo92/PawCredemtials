@@ -21,7 +21,7 @@ export default function Packages() {
   return (
     <div className="flex flex-col">
       <div className="relative py-20 md:py-24 overflow-hidden">
-        <img src="/api/default-images/hero-bg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <img src="https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/hero-bg.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-primary/85" />
         <div className="container relative z-10">
           <div className="text-center text-primary-foreground">

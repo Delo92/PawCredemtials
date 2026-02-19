@@ -118,7 +118,7 @@ function ensureInitialized(): App {
       clientEmail: creds.clientEmail,
       privateKey: creds.privateKey,
     }),
-    storageBucket: `${creds.projectId}.firebasestorage.app`,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${creds.projectId}.firebasestorage.app`,
   });
 
   return _app;

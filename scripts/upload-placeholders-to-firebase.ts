@@ -43,7 +43,7 @@ async function main() {
       clientEmail: creds.clientEmail,
       privateKey: creds.privateKey,
     }),
-    storageBucket: `${creds.projectId}.appspot.com`,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${creds.projectId}.firebasestorage.app`,
   });
 
   const storage = getStorage(app);
