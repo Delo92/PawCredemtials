@@ -1,6 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import session from "express-session";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
@@ -121,14 +120,6 @@ const mediaUpload = multer({
   },
 });
 
-declare module "express-session" {
-  interface SessionData {
-    userId: string;
-    userLevel: number;
-    firebaseUid: string;
-  }
-}
-
 declare global {
   namespace Express {
     interface Request {
@@ -149,54 +140,39 @@ const isAuthenticated = async (req: Request, res: Response, next: NextFunction) 
   try {
     const authHeader = req.headers.authorization;
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const idToken = authHeader.split('Bearer ')[1];
-      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ message: "Unauthorized - Firebase ID token required" });
+      return;
+    }
 
-      let user = await storage.getUserByFirebaseUid(decodedToken.uid);
+    const idToken = authHeader.split('Bearer ')[1];
+    const decodedToken = await getAdminAuth().verifyIdToken(idToken);
 
-      if (!user && decodedToken.email) {
-        user = await storage.getUserByEmail(decodedToken.email);
-        if (user) {
-          await storage.updateUser(user.id, { firebaseUid: decodedToken.uid });
-          user = (await storage.getUser(user.id))!;
-        }
-      }
+    let user = await storage.getUserByFirebaseUid(decodedToken.uid);
 
+    if (!user && decodedToken.email) {
+      user = await storage.getUserByEmail(decodedToken.email);
       if (user) {
-        req.user = {
-          id: user.id,
-          username: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          userLevel: user.userLevel,
-          email: user.email,
-          firebaseUid: decodedToken.uid,
-        };
-        req.session.userId = user.id;
-        req.session.userLevel = user.userLevel;
-        req.session.firebaseUid = decodedToken.uid;
-        return next();
+        await storage.updateUser(user.id, { firebaseUid: decodedToken.uid });
+        user = (await storage.getUser(user.id))!;
       }
     }
 
-    if (req.session.userId) {
-      const user = await storage.getUser(req.session.userId);
-      if (user) {
-        req.user = {
-          id: user.id,
-          username: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          userLevel: user.userLevel,
-          email: user.email,
-          firebaseUid: user.firebaseUid || user.id,
-        };
-        return next();
-      }
+    if (!user) {
+      res.status(401).json({ message: "Unauthorized - User not found" });
+      return;
     }
 
-    res.status(401).json({ message: "Unauthorized - Firebase ID token required" });
+    req.user = {
+      id: user.id,
+      username: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      userLevel: user.userLevel,
+      email: user.email,
+      firebaseUid: decodedToken.uid,
+    };
+    return next();
   } catch (error) {
     console.error("Auth middleware error:", error);
     res.status(401).json({ message: "Unauthorized - Firebase authentication failed" });
@@ -225,20 +201,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Session middleware
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "dev-secret-change-me",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      },
-    })
-  );
-
   // ===========================================================================
   // ONE-TIME CONFIG MIGRATION - Update branding to Support Animal Registry
   // ===========================================================================
@@ -510,10 +472,6 @@ export async function registerRoutes(
         isActive: true,
       });
 
-      // Create session
-      req.session.userId = user.id;
-      req.session.userLevel = user.userLevel;
-
       // Log activity
       await storage.createActivityLog({
         userId: user.id,
@@ -560,10 +518,6 @@ export async function registerRoutes(
         res.status(401).json({ message: "Account is deactivated" });
         return;
       }
-
-      // Create session
-      req.session.userId = user.id;
-      req.session.userLevel = user.userLevel;
 
       // Log activity
       await storage.createActivityLog({
@@ -646,9 +600,6 @@ export async function registerRoutes(
         return;
       }
 
-      req.session.userId = user.id;
-      req.session.userLevel = user.userLevel;
-
       await storage.createActivityLog({
         userId: user.id,
         action: "user_login",
@@ -669,50 +620,36 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        res.status(500).json({ message: "Logout failed" });
-        return;
-      }
-      res.json({ message: "Logged out" });
-    });
+  app.post("/api/auth/logout", (_req, res) => {
+    res.json({ message: "Logged out" });
   });
 
   app.get("/api/auth/me", async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ message: "Not authenticated - Firebase ID token required" });
+        return;
+      }
 
-        let user = await storage.getUserByFirebaseUid(decodedToken.uid);
-        if (!user && decodedToken.email) {
-          user = await storage.getUserByEmail(decodedToken.email);
-          if (user) {
-            await storage.updateUser(user.id, { firebaseUid: decodedToken.uid });
-            user = (await storage.getUser(user.id))!;
-          }
-        }
+      const idToken = authHeader.split('Bearer ')[1];
+      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
 
+      let user = await storage.getUserByFirebaseUid(decodedToken.uid);
+      if (!user && decodedToken.email) {
+        user = await storage.getUserByEmail(decodedToken.email);
         if (user) {
-          req.session.userId = user.id;
-          req.session.userLevel = user.userLevel;
-          req.session.firebaseUid = decodedToken.uid;
-          res.json({ user: { ...user, passwordHash: undefined } });
-          return;
+          await storage.updateUser(user.id, { firebaseUid: decodedToken.uid });
+          user = (await storage.getUser(user.id))!;
         }
       }
 
-      if (req.session.userId) {
-        const user = await storage.getUser(req.session.userId);
-        if (user) {
-          res.json({ user: { ...user, passwordHash: undefined } });
-          return;
-        }
+      if (user) {
+        res.json({ user: { ...user, passwordHash: undefined } });
+        return;
       }
 
-      res.status(401).json({ message: "Not authenticated" });
+      res.status(401).json({ message: "Not authenticated - User not found" });
     } catch (error) {
       res.status(401).json({ message: "Not authenticated" });
     }

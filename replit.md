@@ -30,8 +30,7 @@ Path aliases are configured: `@/` for client/src, `@shared/` for shared code, `@
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ES modules
-- **Session Management**: express-session with server-side storage
-- **Authentication**: Custom session-based auth with bcrypt password hashing
+- **Authentication**: Firebase Authentication with Bearer token verification (stateless, no server-side sessions)
 - **API Pattern**: RESTful endpoints under `/api/` prefix
 
 ### Data Layer
@@ -101,7 +100,6 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 
 ### Backend Libraries
 - **Authentication**: bcryptjs for password hashing
-- **Sessions**: express-session with connect-pg-simple for PostgreSQL session store
 - **File Uploads**: multer for multipart form data (gallery image uploads stored in `uploads/gallery/`)
 
 ### Development Tools
@@ -110,13 +108,12 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string (required)
-- `SESSION_SECRET` - Session encryption key (defaults to dev value)
 - `VITE_FIREBASE_*` - Optional Firebase configuration for enhanced auth
 
 ## Current Implementation Status
 
 ### Completed Features
-- **Authentication**: Session-based login/registration with bcrypt password hashing
+- **Authentication**: Stateless Firebase token-based auth (no server-side sessions)
 - **4 Role-Based Dashboards**: Each with unique stats, actions, and navigation
 - **Application Workflow**: 3-step wizard for creating new applications
 - **Package Management**: Browse and select service packages
