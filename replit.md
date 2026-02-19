@@ -42,8 +42,8 @@ Path aliases are configured: `@/` for client/src, `@shared/` for shared code, `@
 
 ### User Hierarchy (4 Levels)
 1. **Level 1 - Applicant**: End users who register support animals and submit applications
-2. **Level 2 - Reviewer**: Reviews applications, approves/denies, handles work queue
-3. **Level 3 - Admin**: Manage users, registration types, verification queue, and system settings
+2. **Level 2 - Doctor/Reviewer**: Reviews applications via secure email links (no login required), approves/denies
+3. **Level 3 - Admin**: Manage users, registration types, assign applications to doctors, and system settings
 4. **Level 4 - Owner**: Full platform control, white-label configuration
 
 Role names are configurable per deployment via the `siteConfig` table.
@@ -61,7 +61,9 @@ Role names are configurable per deployment via the `siteConfig` table.
 - `activityLogs` - Audit trail
 - `siteConfig` - White-label customization
 - `doctorProfiles` - Doctor credentials (license, NPI, DEA, phone, fax, address, specialty)
+- `doctorReviewTokens` - Secure single-use tokens for doctor review links (token, applicationId, doctorId, status, expiresAt)
 - `autoMessageTriggers` - Automated messages triggered on application status changes
+- `adminSettings` - Admin settings including `lastAssignedDoctorId` for round-robin doctor assignment
 
 ### Site Media Management
 All landing page images are configurable from the Owner's Site Settings > Site Media tab. Each slot supports:
@@ -115,10 +117,13 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 
 ### Completed Features
 - **Authentication**: Session-based login/registration with bcrypt password hashing
-- **5 Role-Based Dashboards**: Each with unique stats, actions, and navigation
+- **4 Role-Based Dashboards**: Each with unique stats, actions, and navigation
 - **Application Workflow**: 3-step wizard for creating new applications
-- **Package Management**: Browse and select service packages with "Requires Level 2 Interaction" toggle
-- **Call Queue System**: Pooled voice call queue where Level 1 users join queue, Level 2 users claim and handle calls
+- **Package Management**: Browse and select service packages
+- **Doctor Review System**: Secure token-based review links sent to doctors (no login required)
+- **Round-Robin Doctor Assignment**: Admin sends applications to doctors with automatic rotation
+- **Auto Document Generation**: Documents auto-generated upon doctor approval with doctor credentials
+- **Auto-Message Triggers**: Automated messages on status changes
 - **Owner Configuration**: Full white-label settings (branding, role names, contact info)
 - **Admin User Management**: Search, filter, and edit user levels/status
 - **Dark/Light Theme**: System-aware with manual toggle
@@ -127,36 +132,33 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 
 The complete workflow for processing applications through the platform:
 
-**Flow A: Package REQUIRES Level 2 Interaction**
-1. Level 1 purchases package → creates application
-2. Level 1 joins call queue
-3. Level 2 claims caller, conducts call, then **approves or denies**
-   - If **approved** → Application moves to Level 3 work queue
-   - If **denied** → Application is rejected
-4. Level 3 claims application, does their work, marks complete
-5. Level 4 verifies and confirms → Application completed
-
-**Flow B: Package does NOT require Level 2 Interaction**
-1. Level 1 purchases package → creates application
-2. Application goes **directly** to Level 3 work queue
-3. Level 3 claims application, does their work, marks complete
-4. Level 4 verifies and confirms → Application completed
+1. Level 1 (Applicant) creates account, selects package, completes payment
+2. Application created with status `pending`
+3. Level 3 (Admin) sends application to a doctor via "Send to Doctor" button
+   - Uses round-robin rotation to auto-assign doctors fairly
+   - Generates a secure one-time review link (expires in 7 days)
+   - Application status changes to `doctor_review`
+4. Doctor receives review link, opens public review portal (no login needed)
+   - Reviews patient info, application details, form data
+   - **Approves** → `doctor_approved` → auto-generates certificate document
+   - **Denies** → `doctor_denied` → patient notified with reason
+5. Upon approval, patient receives notification and certificate is available
 
 **Application Status Values:**
-- `pending` - New application
-- `level2_review` - Waiting for Level 2 review
-- `level2_approved` - Approved by Level 2
-- `level2_denied` - Denied by Level 2
-- `level3_work` - In Level 3 work queue
-- `level3_complete` - Level 3 work done
-- `level4_verification` - Pending Level 4 verification
+- `pending` - New application, ready to be sent to doctor
+- `doctor_review` - Sent to doctor, awaiting their decision
+- `doctor_approved` - Approved by doctor, certificate generated
+- `doctor_denied` - Denied by doctor
+- `level3_work` - In admin work queue (optional processing)
 - `completed` - Fully completed
 - `rejected` - Application rejected
 
-### Call Queue System (Voice Consultation)
-- **Level 1 (Applicant)**: Can join call queue, see position, leave queue
-- **Level 2 (Reviewer)**: Pooled queue - any reviewer can claim callers, start calls, complete calls with outcomes (approved/denied)
-- **Integration Ready**: Schema includes roomId, roomToken fields for Twilio/GHL voice integration
+### Doctor Review Token System
+- **Secure Tokens**: 32-byte hex tokens, single-use, expire in 7 days
+- **Public Review Portal**: `/review/:token` - no authentication required
+- **Round-Robin Assignment**: `adminSettings.lastAssignedDoctorId` tracks rotation
+- **Auto-Assignment**: Cycles through active doctors fairly (like a draft system)
+- **Manual Override**: Admin can specify a particular doctor when sending
 
 ### API Endpoints
 - `POST /api/auth/register` - User registration
@@ -167,40 +169,29 @@ The complete workflow for processing applications through the platform:
 - `GET /api/packages` - List active packages
 - `GET /api/applications` - Get user's applications
 - `POST /api/applications` - Create new application
-- `GET /api/queue` - Get review queue (Level 2+)
-- `GET /api/queue/stats` - Get queue stats (Level 2+)
-- `POST /api/queue/join` - Join call queue (Level 1)
-- `GET /api/queue/my-status` - Check queue position (Level 1)
-- `POST /api/queue/leave` - Leave call queue (Level 1)
-- `POST /api/queue/:id/claim` - Claim a caller (Level 2+)
-- `POST /api/queue/:id/start-call` - Start call with caller (Level 2+)
-- `POST /api/queue/:id/complete` - Complete call with outcome (approved/denied), moves to Level 3 if approved
-- `POST /api/queue/:id/release` - Release caller back to queue (Level 2+)
-- `GET /api/agent/work-queue` - Get Level 3 work queue
-- `GET /api/agent/work-queue/stats` - Get Level 3 queue stats
-- `POST /api/agent/work-queue/:id/claim` - Level 3 claims application
-- `POST /api/agent/work-queue/:id/complete` - Level 3 completes work, sends to Level 4
-- `GET /api/admin/verification-queue` - Get Level 4 verification queue
-- `GET /api/admin/verification-queue/stats` - Get Level 4 queue stats
-- `POST /api/admin/verification-queue/:id/verify` - Level 4 verifies (approved/rework)
-- `GET /api/commissions` - Get commissions (Level 3+)
-- `GET /api/admin/users` - List all users (Level 4+)
-- `PUT /api/admin/users/:id` - Update user (Level 4+)
-- `GET /api/admin/applications` - List all applications (Level 4+)
-- `PUT /api/owner/config` - Update site config (Level 5)
+- `POST /api/admin/applications/:id/send-to-doctor` - Send application to doctor (round-robin or manual), generates review token (Level 3+)
+- `GET /api/review/:token` - Public: Load application data for doctor review (no auth)
+- `POST /api/review/:token/decision` - Public: Submit doctor's approve/deny decision (no auth)
+- `GET /api/doctors` - List active doctors (Level 3+)
+- `GET /api/doctors/stats` - Get doctor's review stats and token history (Level 2+)
+- `GET /api/review-tokens` - Get review tokens for an application (Level 3+)
+- `GET /api/commissions` - Get commissions (Level 2+)
+- `GET /api/admin/users` - List all users (Level 3+)
+- `PUT /api/admin/users/:id` - Update user (Level 3+)
+- `GET /api/admin/applications` - List all applications (Level 3+)
+- `PUT /api/owner/config` - Update site config (Level 4)
 
 ### Key Routes
 - `/` - Landing page
 - `/login`, `/register` - Authentication
 - `/packages` - Service packages listing
+- `/review/:token` - Public doctor review portal (no auth required)
 - `/dashboard/applicant` - Applicant dashboard
 - `/dashboard/applicant/applications/new` - New application wizard
-- `/dashboard/applicant/call-queue` - Join call queue
-- `/dashboard/reviewer` - Reviewer dashboard with queue
-- `/dashboard/reviewer/call-queue` - Manage incoming calls
-- `/dashboard/agent` - Agent dashboard
-- `/dashboard/agent/queue` - Level 3 work queue
+- `/dashboard/doctor` - Doctor dashboard with review history
+- `/dashboard/doctor/reviews` - Doctor's completed reviews
 - `/dashboard/admin` - Admin dashboard
+- `/dashboard/admin/applications` - All applications with "Send to Doctor" action
 - `/dashboard/admin/users` - User management
 - `/dashboard/owner` - Owner dashboard
 - `/dashboard/owner/site-settings` - White-label configuration

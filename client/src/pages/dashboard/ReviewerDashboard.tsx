@@ -21,13 +21,13 @@ export default function ReviewerDashboard() {
   const { user } = useAuth();
   const { config, getLevelName } = useConfig();
 
-  const { data: queueEntries, isLoading } = useQuery<QueueEntry[]>({
+  const { data: queueEntries, isLoading } = useQuery<any[]>({
     queryKey: ["/api/queue"],
   });
 
-  const waitingEntries = queueEntries?.filter((e) => e.status === "waiting") || [];
+  const waitingEntries = queueEntries?.filter((e: any) => e.status === "waiting") || [];
   const myClaimedEntries = queueEntries?.filter(
-    (e) => e.status === "claimed" && e.reviewerId === user?.id
+    (e: any) => e.status === "claimed" && e.reviewerId === user?.id
   ) || [];
 
   return (

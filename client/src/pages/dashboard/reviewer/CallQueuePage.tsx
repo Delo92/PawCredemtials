@@ -36,7 +36,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { QueueEntry } from "@shared/schema";
 import {
   Phone,
   PhoneCall,
@@ -54,9 +53,9 @@ interface QueueStats {
   waitingCount: number;
   inCallCount: number;
   completedTodayCount: number;
-  waiting: QueueEntry[];
-  inCall: QueueEntry[];
-  completed: QueueEntry[];
+  waiting: any[];
+  inCall: any[];
+  completed: any[];
 }
 
 type CallTab = "waiting" | "in_call" | "completed";
@@ -66,8 +65,8 @@ export default function ReviewerCallQueuePage() {
   const { config } = useConfig();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<CallTab>("waiting");
-  const [selectedEntry, setSelectedEntry] = useState<QueueEntry | null>(null);
-  const [profileEntry, setProfileEntry] = useState<QueueEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+  const [profileEntry, setProfileEntry] = useState<any | null>(null);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [outcome, setOutcome] = useState("");
@@ -181,14 +180,14 @@ export default function ReviewerCallQueuePage() {
     return `${minutes} mins`;
   };
 
-  const getDisplayName = (entry: QueueEntry) => {
+  const getDisplayName = (entry: any) => {
     if (entry.applicantFirstName || entry.applicantLastName) {
       return `${entry.applicantFirstName || ""} ${entry.applicantLastName || ""}`.trim();
     }
     return `${level1Name} #${entry.id.slice(0, 6)}`;
   };
 
-  const filterEntries = (entries: QueueEntry[] | undefined) => {
+  const filterEntries = (entries: any[] | undefined) => {
     if (!entries) return [];
     if (!searchQuery) return entries;
     const query = searchQuery.toLowerCase();

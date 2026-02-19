@@ -15,31 +15,22 @@ export default function DoctorReviewPortal() {
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const { data: reviewData, isLoading, error } = useQuery({
-    queryKey: ["/api/review", token],
-    queryFn: async () => {
-      const res = await fetch(`/api/review/${token}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to load review");
-      }
-      return res.json();
-    },
+  const { data: reviewData, isLoading, error } = useQuery<{
+    patient: any;
+    application: any;
+    package: any;
+    doctor: any;
+    doctorProfile: any;
+    expiresAt: string;
+  }>({
+    queryKey: [`/api/review/${token}`],
     enabled: !!token,
     retry: false,
   });
 
   const submitMutation = useMutation({
     mutationFn: async (data: { decision: string; notes: string }) => {
-      const res = await fetch(`/api/review/${token}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to submit decision");
-      }
+      const res = await apiRequest("POST", `/api/review/${token}/decision`, data);
       return res.json();
     },
     onSuccess: () => {

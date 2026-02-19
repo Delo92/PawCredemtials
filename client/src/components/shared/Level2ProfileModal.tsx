@@ -8,7 +8,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useConfig } from "@/contexts/ConfigContext";
-import type { QueueEntry } from "@shared/schema";
 import { 
   User as UserIcon,
   MapPin,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 
 interface Level2ProfileModalProps {
-  entry: QueueEntry | null;
+  entry: any | null;
   onClose: () => void;
 }
 
