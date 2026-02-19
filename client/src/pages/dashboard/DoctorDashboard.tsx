@@ -7,18 +7,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
-import type { QueueEntry, Commission } from "@shared/schema";
+import type { Commission } from "@shared/schema";
 import {
-  ClipboardList,
-  Clock,
   CheckCircle2,
-  Users,
   ArrowRight,
-  Play,
-  Timer,
   DollarSign,
   TrendingUp,
   Copy,
+  XCircle,
+  Clock,
+  Stethoscope,
+  FileCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,20 +26,19 @@ export default function DoctorDashboard() {
   const { getLevelName } = useConfig();
   const { toast } = useToast();
 
-  const { data: queueEntries, isLoading: queueLoading } = useQuery<QueueEntry[]>({
-    queryKey: ["/api/queue"],
+  const { data: statsData, isLoading: statsLoading } = useQuery<{
+    total: number;
+    approved: number;
+    denied: number;
+    pending: number;
+    tokens: any[];
+  }>({
+    queryKey: ["/api/doctors/stats"],
   });
 
   const { data: commissions, isLoading: commissionsLoading } = useQuery<Commission[]>({
     queryKey: ["/api/commissions"],
   });
-
-  const waitingEntries = queueEntries?.filter((e) => e.status === "waiting") || [];
-  const myClaimedEntries = queueEntries?.filter(
-    (e) => e.status === "claimed" && e.reviewerId === user?.id
-  ) || [];
-
-  const completedCount = queueEntries?.filter((e) => e.status === "completed").length || 0;
 
   const totalEarnings = commissions
     ?.filter((c) => c.status === "paid")
@@ -68,7 +66,7 @@ export default function DoctorDashboard() {
             {getLevelName(2)} Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Review applications, manage referrals, and track commissions.
+            View your review history, referrals, and commissions.
           </p>
         </div>
 
@@ -98,45 +96,45 @@ export default function DoctorDashboard() {
           <Card data-testid="card-stat-pending">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {queueLoading ? (
+              {statsLoading ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <div className="text-2xl font-bold">{waitingEntries.length}</div>
+                <div className="text-2xl font-bold">{statsData?.pending || 0}</div>
               )}
-              <p className="text-xs text-muted-foreground">Awaiting review</p>
+              <p className="text-xs text-muted-foreground">Awaiting your decision</p>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-stat-active">
+          <Card data-testid="card-stat-approved">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">My Active</CardTitle>
-              <Timer className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              {queueLoading ? (
+              {statsLoading ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <div className="text-2xl font-bold">{myClaimedEntries.length}</div>
+                <div className="text-2xl font-bold">{statsData?.approved || 0}</div>
               )}
-              <p className="text-xs text-muted-foreground">Currently reviewing</p>
+              <p className="text-xs text-muted-foreground">Applications approved</p>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-stat-completed">
+          <Card data-testid="card-stat-denied">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Denied</CardTitle>
+              <XCircle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              {queueLoading ? (
+              {statsLoading ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <div className="text-2xl font-bold">{completedCount}</div>
+                <div className="text-2xl font-bold">{statsData?.denied || 0}</div>
               )}
-              <p className="text-xs text-muted-foreground">Applications completed</p>
+              <p className="text-xs text-muted-foreground">Applications denied</p>
             </CardContent>
           </Card>
 
@@ -156,114 +154,93 @@ export default function DoctorDashboard() {
           </Card>
         </div>
 
-        <Card data-testid="card-review-queue">
+        <Card data-testid="card-recent-reviews">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Review Queue</CardTitle>
+              <CardTitle>Recent Reviews</CardTitle>
               <CardDescription>
-                Applications waiting for your review
+                Your latest patient review activity
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/doctor/queue">
+              <Link href="/dashboard/doctor/reviews">
                 View All
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardHeader>
           <CardContent>
-            {queueLoading ? (
+            {statsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+                  <div key={i} className="flex items-center gap-4 p-4 border rounded-md">
                     <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-1/3" />
                       <Skeleton className="h-3 w-1/4" />
                     </div>
-                    <Skeleton className="h-9 w-24" />
+                    <Skeleton className="h-6 w-16" />
                   </div>
                 ))}
               </div>
-            ) : waitingEntries.length > 0 ? (
+            ) : statsData?.tokens && statsData.tokens.length > 0 ? (
               <div className="space-y-3">
-                {waitingEntries.slice(0, 5).map((entry) => (
+                {statsData.tokens.slice(0, 5).map((token: any) => (
                   <div
-                    key={entry.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-lg hover-elevate transition-all"
-                    data-testid={`queue-entry-${entry.id}`}
+                    key={token.id}
+                    className="flex flex-wrap items-center gap-3 p-4 border rounded-md"
+                    data-testid={`review-token-${token.id}`}
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Users className="h-5 w-5" />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                      token.status === "approved"
+                        ? "bg-green-500/10 text-green-500"
+                        : token.status === "denied"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-primary/10 text-primary"
+                    }`}>
+                      {token.status === "approved" ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : token.status === "denied" ? (
+                        <XCircle className="h-5 w-5" />
+                      ) : (
+                        <Stethoscope className="h-5 w-5" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium">Application #{(entry.applicationId || entry.id).slice(0, 8)}</p>
+                      <p className="font-medium">
+                        Application #{token.applicationId?.slice(0, 8)}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        Priority: {entry.priority || 0} • Added{" "}
-                        {new Date(entry.createdAt).toLocaleDateString()}
+                        {token.createdAt ? new Date(token.createdAt).toLocaleDateString() : ""}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Waiting</Badge>
-                      <Button size="sm" asChild data-testid={`button-claim-${entry.id}`}>
-                        <Link href={`/dashboard/doctor/queue/${entry.id}`}>
-                          <Play className="mr-1 h-3 w-3" />
-                          Claim
-                        </Link>
-                      </Button>
-                    </div>
+                    <Badge
+                      variant={
+                        token.status === "approved"
+                          ? "default"
+                          : token.status === "denied"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {token.status.charAt(0).toUpperCase() + token.status.slice(1)}
+                    </Badge>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                  <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
+                  <FileCheck className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Queue is empty</h3>
+                <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
                 <p className="text-muted-foreground max-w-sm">
-                  There are no applications waiting for review at the moment.
+                  When you are assigned patient reviews, they will appear here. You'll receive a secure link via email to review each patient.
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {myClaimedEntries.length > 0 && (
-          <Card data-testid="card-my-reviews">
-            <CardHeader>
-              <CardTitle>My Active Reviews</CardTitle>
-              <CardDescription>
-                Applications you're currently reviewing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {myClaimedEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-lg border-primary/20 bg-primary/5"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Timer className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">Application #{(entry.applicationId || entry.id).slice(0, 8)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Claimed {entry.claimedAt ? new Date(entry.claimedAt).toLocaleTimeString() : ""}
-                      </p>
-                    </div>
-                    <Button asChild>
-                      <Link href={`/dashboard/doctor/queue/${entry.id}`}>
-                        Continue Review
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card data-testid="card-recent-commissions">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -284,7 +261,7 @@ export default function DoctorDashboard() {
             {commissionsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+                  <div key={i} className="flex items-center gap-4 p-4 border rounded-md">
                     <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-1/3" />
@@ -299,7 +276,7 @@ export default function DoctorDashboard() {
                 {commissions.slice(0, 5).map((commission) => (
                   <div
                     key={commission.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-lg hover-elevate transition-all"
+                    className="flex flex-wrap items-center gap-3 p-4 border rounded-md"
                     data-testid={`commission-${commission.id}`}
                   >
                     <div className={`flex h-10 w-10 items-center justify-center rounded-full ${

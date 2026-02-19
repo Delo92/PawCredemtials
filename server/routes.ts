@@ -996,233 +996,315 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
-  // QUEUE ROUTES (Call Queue System)
+  // DOCTOR ASSIGNMENT & REVIEW ROUTES
   // ===========================================================================
 
-  // Get all waiting queue entries (for Level 2+ reviewers)
-  app.get("/api/queue", requireAuth, requireLevel(2), async (req, res) => {
+  app.get("/api/doctors", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const entries = await storage.getWaitingQueueEntries();
-      res.json(entries);
+      const doctors = await storage.getActiveDoctors();
+      const doctorsWithUsers = await Promise.all(
+        doctors.map(async (doc) => {
+          const user = doc.userId ? await storage.getUser(doc.userId) : null;
+          return {
+            ...doc,
+            firstName: user?.firstName,
+            lastName: user?.lastName,
+            email: user?.email,
+          };
+        })
+      );
+      res.json(doctorsWithUsers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Get queue stats for Level 2 dashboard
-  app.get("/api/queue/stats", requireAuth, requireLevel(2), async (req, res) => {
+  app.get("/api/doctors/stats", requireAuth, requireLevel(2), async (req, res) => {
     try {
-      const waiting = await storage.getWaitingQueueEntries();
-      const inCall = await storage.getInCallQueueEntries();
-      const completed = await storage.getCompletedQueueEntriesToday();
-      
-      res.json({
-        waitingCount: waiting.length,
-        inCallCount: inCall.length,
-        completedTodayCount: completed.length,
-        waiting,
-        inCall,
-        completed,
-      });
+      const doctorId = req.query.doctorId as string || req.user!.id;
+      const tokens = await storage.getDoctorReviewTokensByDoctor(doctorId);
+      const approved = tokens.filter(t => t.status === "approved").length;
+      const denied = tokens.filter(t => t.status === "denied").length;
+      const pending = tokens.filter(t => t.status === "pending").length;
+      res.json({ total: tokens.length, approved, denied, pending, tokens });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Level 1: Join the call queue
-  app.post("/api/queue/join", requireAuth, async (req, res) => {
+  app.post("/api/admin/applications/:id/send-to-doctor", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const { packageId, applicationId, phone } = req.body;
-      
-      // Check if user already in queue
-      const existing = await storage.getWaitingQueueEntries();
-      const alreadyInQueue = existing.find(e => e.applicantId === req.user!.id && e.status === "waiting");
-      if (alreadyInQueue) {
-        res.status(400).json({ message: "You are already in the queue", queueEntry: alreadyInQueue });
+      const applicationId = req.params.id as string;
+      const { doctorId: manualDoctorId } = req.body;
+
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        res.status(404).json({ message: "Application not found" });
         return;
       }
 
-      // Get user info for denormalized fields
-      const user = await storage.getUser(req.user!.id);
-      let pkg = null;
-      if (packageId) {
-        pkg = await storage.getPackage(packageId);
+      let doctor;
+      if (manualDoctorId) {
+        doctor = await storage.getDoctorProfile(manualDoctorId);
+        if (!doctor) {
+          const allDoctors = await storage.getActiveDoctors();
+          doctor = allDoctors.find(d => d.userId === manualDoctorId);
+        }
+      } else {
+        doctor = await storage.getNextDoctorForAssignment();
       }
 
-      const position = existing.length + 1;
+      if (!doctor) {
+        res.status(400).json({ message: "No active doctors available for assignment" });
+        return;
+      }
 
-      const entry = await storage.createQueueEntry({
-        applicantId: req.user!.id,
-        packageId,
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const reviewToken = await storage.createDoctorReviewToken({
         applicationId,
-        applicantPhone: phone,
-        applicantFirstName: user?.firstName || null,
-        applicantLastName: user?.lastName || null,
-        applicantState: user?.state || null,
-        packageName: pkg?.name || null,
-        packagePrice: pkg?.price || null,
-        queueType: "consultation",
-        status: "waiting",
-        position,
-        priority: 0,
+        doctorId: doctor.userId || doctor.id,
+        token,
+        status: "pending",
+        expiresAt,
       });
-      res.json(entry);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
 
-  // Level 1: Check my queue status
-  app.get("/api/queue/my-status", requireAuth, async (req, res) => {
-    try {
-      const entries = await storage.getWaitingQueueEntries();
-      const myEntry = entries.find(e => e.applicantId === req.user!.id);
-      if (!myEntry) {
-        res.json({ inQueue: false });
-        return;
-      }
-      const position = entries.filter(e => e.createdAt <= myEntry.createdAt && e.status === "waiting").length;
-      res.json({ inQueue: true, position, entry: myEntry });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Level 1: Leave the queue
-  app.post("/api/queue/leave", requireAuth, async (req, res) => {
-    try {
-      const entries = await storage.getWaitingQueueEntries();
-      const myEntry = entries.find(e => e.applicantId === req.user!.id && e.status === "waiting");
-      if (!myEntry) {
-        res.status(404).json({ message: "Not in queue" });
-        return;
-      }
-      await storage.updateQueueEntry(myEntry.id, { status: "cancelled" });
-      res.json({ message: "Left the queue" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Level 2+: Claim a caller from the queue
-  app.post("/api/queue/:id/claim", requireAuth, requireLevel(2), async (req, res) => {
-    try {
-      const entry = await storage.getQueueEntry(req.params.id as string);
-      if (!entry) {
-        res.status(404).json({ message: "Queue entry not found" });
-        return;
-      }
-      if (entry.status !== "waiting") {
-        res.status(400).json({ message: "This caller has already been claimed" });
-        return;
-      }
-      const updated = await storage.updateQueueEntry(req.params.id as string, {
-        reviewerId: req.user!.id,
-        status: "claimed",
-        claimedAt: new Date(),
+      await storage.updateApplication(applicationId, {
+        status: "doctor_review",
+        assignedReviewerId: doctor.userId || doctor.id,
       });
-      res.json(updated);
+
+      const patient = application.userId ? await storage.getUser(application.userId) : null;
+      const pkg = application.packageId ? await storage.getPackage(application.packageId) : null;
+      const doctorUser = await storage.getUser(doctor.userId || doctor.id);
+
+      const protocol = process.env.NODE_ENV === "production" ? "https" : "https";
+      const host = req.get("host") || "localhost:5000";
+      const reviewUrl = `${protocol}://${host}/review/${token}`;
+
+      await storage.createNotification({
+        userId: req.user!.id,
+        type: "doctor_assignment",
+        title: "Application Sent to Doctor",
+        message: `Application for ${patient?.firstName || "Patient"} ${patient?.lastName || ""} sent to Dr. ${doctorUser?.lastName || doctor.fullName || "Doctor"}. Review link: ${reviewUrl}`,
+        isRead: false,
+        actionUrl: reviewUrl,
+      });
+
+      if (doctorUser) {
+        await storage.createNotification({
+          userId: doctorUser.id,
+          type: "review_assigned",
+          title: "New Patient Review Assigned",
+          message: `You have been assigned to review ${patient?.firstName || "a patient"}'s application for ${pkg?.name || "a service"}.`,
+          isRead: false,
+        });
+      }
+
+      fireAutoMessageTriggers(applicationId, "doctor_review");
+
+      await storage.createActivityLog({
+        userId: req.user!.id,
+        action: "application_sent_to_doctor",
+        entityType: "application",
+        entityId: applicationId,
+        details: {
+          doctorId: doctor.userId || doctor.id,
+          doctorName: doctorUser ? `${doctorUser.firstName} ${doctorUser.lastName}` : doctor.fullName,
+          reviewUrl,
+          tokenId: reviewToken.id,
+        } as any,
+      });
+
+      res.json({
+        message: "Application sent to doctor for review",
+        reviewUrl,
+        token: reviewToken,
+        doctor: {
+          id: doctor.userId || doctor.id,
+          name: doctorUser ? `${doctorUser.firstName} ${doctorUser.lastName}` : doctor.fullName,
+        },
+      });
     } catch (error: any) {
+      console.error("Send to doctor error:", error);
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Level 2+: Start call with claimed caller
-  app.post("/api/queue/:id/start-call", requireAuth, requireLevel(2), async (req, res) => {
+  app.get("/api/review/:token", async (req, res) => {
     try {
-      const entry = await storage.getQueueEntry(req.params.id as string);
-      if (!entry) {
-        res.status(404).json({ message: "Queue entry not found" });
+      const tokenRecord = await storage.getDoctorReviewTokenByToken(req.params.token);
+      if (!tokenRecord) {
+        res.status(404).json({ message: "Review link not found or invalid" });
         return;
       }
-      if (entry.reviewerId !== req.user!.id) {
-        res.status(403).json({ message: "This caller is not assigned to you" });
+
+      if (tokenRecord.status !== "pending") {
+        res.status(410).json({ message: "This review has already been completed", status: tokenRecord.status });
         return;
       }
-      
-      // Here is where Twilio/GHL integration would generate a call
-      // For now, just update status
-      const updated = await storage.updateQueueEntry(req.params.id as string, {
-        status: "in_call",
-        callStartedAt: new Date(),
-        // roomId would be set here when Twilio/GHL is integrated
+
+      if (new Date() > new Date(tokenRecord.expiresAt)) {
+        await storage.updateDoctorReviewToken(tokenRecord.id, { status: "expired" } as any);
+        res.status(410).json({ message: "This review link has expired" });
+        return;
+      }
+
+      const application = await storage.getApplication(tokenRecord.applicationId);
+      if (!application) {
+        res.status(404).json({ message: "Application not found" });
+        return;
+      }
+
+      const patient = application.userId ? await storage.getUser(application.userId) : null;
+      const pkg = application.packageId ? await storage.getPackage(application.packageId) : null;
+      const doctorUser = await storage.getUser(tokenRecord.doctorId);
+      const doctorProfile = await storage.getDoctorProfileByUserId(tokenRecord.doctorId);
+
+      res.json({
+        tokenId: tokenRecord.id,
+        status: tokenRecord.status,
+        expiresAt: tokenRecord.expiresAt,
+        patient: patient ? {
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          email: patient.email,
+          phone: patient.phone,
+          dateOfBirth: patient.dateOfBirth,
+          address: patient.address,
+          city: patient.city,
+          state: patient.state,
+          zipCode: patient.zipCode,
+        } : null,
+        application: {
+          id: application.id,
+          status: application.status,
+          formData: application.formData,
+          createdAt: application.createdAt,
+        },
+        package: pkg ? {
+          name: pkg.name,
+          description: pkg.description,
+        } : null,
+        doctor: doctorUser ? {
+          firstName: doctorUser.firstName,
+          lastName: doctorUser.lastName,
+        } : null,
+        doctorProfile: doctorProfile ? {
+          fullName: doctorProfile.fullName,
+          licenseNumber: doctorProfile.licenseNumber,
+          specialty: doctorProfile.specialty,
+          state: doctorProfile.state,
+        } : null,
       });
-      res.json(updated);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Review token lookup error:", error);
+      res.status(500).json({ message: "Failed to load review" });
     }
   });
 
-  // Level 2+: Complete a call (approve or deny - moves to Level 3 if approved)
-  app.post("/api/queue/:id/complete", requireAuth, requireLevel(2), async (req, res) => {
+  app.post("/api/review/:token/decision", async (req, res) => {
     try {
-      const { notes, outcome } = req.body; // outcome: "approved" or "denied"
-      const entry = await storage.getQueueEntry(req.params.id as string);
-      if (!entry) {
-        res.status(404).json({ message: "Queue entry not found" });
+      const { decision, notes } = req.body;
+      if (!decision || !["approved", "denied"].includes(decision)) {
+        res.status(400).json({ message: "Decision must be 'approved' or 'denied'" });
         return;
       }
-      if (entry.reviewerId !== req.user!.id) {
-        res.status(403).json({ message: "This caller is not assigned to you" });
+
+      const tokenRecord = await storage.getDoctorReviewTokenByToken(req.params.token);
+      if (!tokenRecord) {
+        res.status(404).json({ message: "Review link not found" });
         return;
       }
-      const updated = await storage.updateQueueEntry(req.params.id as string, {
-        status: "completed",
-        callEndedAt: new Date(),
-        completedAt: new Date(),
-        notes,
-        outcome,
-      });
-      
-      if (entry.applicationId) {
-        if (outcome === "approved") {
-          await storage.updateApplication(entry.applicationId, {
-            status: "level3_work",
-            currentLevel: 2,
-            level2Notes: notes,
-            level2ApprovedAt: new Date(),
-            level2ApprovedBy: req.user!.id,
-            assignedReviewerId: req.user!.id,
+
+      if (tokenRecord.status !== "pending") {
+        res.status(410).json({ message: "This review has already been completed" });
+        return;
+      }
+
+      if (new Date() > new Date(tokenRecord.expiresAt)) {
+        await storage.updateDoctorReviewToken(tokenRecord.id, { status: "expired" } as any);
+        res.status(410).json({ message: "This review link has expired" });
+        return;
+      }
+
+      await storage.updateDoctorReviewToken(tokenRecord.id, {
+        status: decision,
+        usedAt: new Date(),
+        doctorNotes: notes || null,
+      } as any);
+
+      const application = await storage.getApplication(tokenRecord.applicationId);
+
+      if (decision === "approved") {
+        await storage.updateApplication(tokenRecord.applicationId, {
+          status: "doctor_approved",
+          level2Notes: notes,
+          level2ApprovedAt: new Date(),
+          level2ApprovedBy: tokenRecord.doctorId,
+          assignedReviewerId: tokenRecord.doctorId,
+        });
+
+        await autoGenerateDocument(tokenRecord.applicationId, tokenRecord.doctorId);
+        fireAutoMessageTriggers(tokenRecord.applicationId, "doctor_approved");
+
+        if (application?.userId) {
+          await storage.createNotification({
+            userId: application.userId,
+            type: "application_approved",
+            title: "Application Approved",
+            message: "Your application has been approved by the reviewing doctor. Your documents are being prepared.",
+            isRead: false,
           });
-          await autoGenerateDocument(entry.applicationId, req.user!.id);
-          fireAutoMessageTriggers(entry.applicationId, "level2_approved");
-        } else if (outcome === "denied") {
-          await storage.updateApplication(entry.applicationId, {
-            status: "level2_denied",
-            currentLevel: 2,
-            level2Notes: notes,
-            rejectedAt: new Date(),
-            rejectedBy: req.user!.id,
-            rejectionReason: notes,
+        }
+      } else {
+        await storage.updateApplication(tokenRecord.applicationId, {
+          status: "doctor_denied",
+          level2Notes: notes,
+          rejectedAt: new Date(),
+          rejectedBy: tokenRecord.doctorId,
+          rejectionReason: notes,
+        });
+
+        fireAutoMessageTriggers(tokenRecord.applicationId, "doctor_denied");
+
+        if (application?.userId) {
+          await storage.createNotification({
+            userId: application.userId,
+            type: "application_denied",
+            title: "Application Not Approved",
+            message: notes ? `Your application was not approved. Reason: ${notes}` : "Your application was not approved at this time.",
+            isRead: false,
           });
-          fireAutoMessageTriggers(entry.applicationId, "level2_denied");
         }
       }
-      
-      res.json(updated);
+
+      await storage.createActivityLog({
+        userId: tokenRecord.doctorId,
+        action: `doctor_${decision}`,
+        entityType: "application",
+        entityId: tokenRecord.applicationId,
+        details: { notes, tokenId: tokenRecord.id } as any,
+      });
+
+      res.json({ message: `Application ${decision} successfully`, decision });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Doctor decision error:", error);
+      res.status(500).json({ message: "Failed to submit decision" });
     }
   });
 
-  // Level 2+: Release a claimed caller back to queue
-  app.post("/api/queue/:id/release", requireAuth, requireLevel(2), async (req, res) => {
+  app.get("/api/review-tokens", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const entry = await storage.getQueueEntry(req.params.id as string);
-      if (!entry) {
-        res.status(404).json({ message: "Queue entry not found" });
-        return;
+      const applicationId = req.query.applicationId as string;
+      if (applicationId) {
+        const tokens = await storage.getDoctorReviewTokensByApplication(applicationId);
+        res.json(tokens);
+      } else {
+        res.status(400).json({ message: "applicationId query parameter required" });
       }
-      if (entry.reviewerId !== req.user!.id) {
-        res.status(403).json({ message: "This caller is not assigned to you" });
-        return;
-      }
-      const updated = await storage.updateQueueEntry(req.params.id as string, {
-        reviewerId: null,
-        status: "waiting",
-        claimedAt: null,
-      });
-      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

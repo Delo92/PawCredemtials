@@ -6,18 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useConfig } from "@/contexts/ConfigContext";
-import type { User, Application, QueueEntry } from "@shared/schema";
+import type { User, Application } from "@shared/schema";
 import {
   Users,
   FileText,
   DollarSign,
-  ClipboardList,
   ArrowRight,
-  TrendingUp,
   AlertCircle,
   CheckCircle2,
   Clock,
   BarChart3,
+  Stethoscope,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -31,10 +30,6 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/applications"],
   });
 
-  const { data: queueEntries, isLoading: queueLoading } = useQuery<QueueEntry[]>({
-    queryKey: ["/api/queue"],
-  });
-
   const totalUsers = users?.length || 0;
   const newUsersToday = users?.filter((u) => {
     const today = new Date();
@@ -43,15 +38,16 @@ export default function AdminDashboard() {
   }).length || 0;
 
   const pendingApplications = applications?.filter(
-    (a) => a.status === "pending" || a.status === "in_review"
+    (a) => a.status === "pending" || a.status === "level3_work"
   ).length || 0;
 
-  const waitingInQueue = queueEntries?.filter((e) => e.status === "waiting").length || 0;
+  const awaitingDoctor = applications?.filter(
+    (a) => a.status === "doctor_review"
+  ).length || 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Welcome Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
             {getLevelName(3)} Dashboard
@@ -61,7 +57,6 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Quick Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-stat-users">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
@@ -97,19 +92,19 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-stat-queue">
+          <Card data-testid="card-stat-doctor-review">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Queue Length</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">With Doctor</CardTitle>
+              <Stethoscope className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {queueLoading ? (
+              {applicationsLoading ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <div className="text-2xl font-bold">{waitingInQueue}</div>
+                <div className="text-2xl font-bold">{awaitingDoctor}</div>
               )}
               <p className="text-xs text-muted-foreground">
-                Waiting for review
+                Awaiting doctor approval
               </p>
             </CardContent>
           </Card>
@@ -128,8 +123,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
             <Link href="/dashboard/admin/users">
               <Users className="h-5 w-5" />
@@ -143,12 +137,6 @@ export default function AdminDashboard() {
             </Link>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
-            <Link href="/dashboard/admin/queue">
-              <ClipboardList className="h-5 w-5" />
-              <span>Queue Management</span>
-            </Link>
-          </Button>
-          <Button variant="outline" className="h-auto py-4 flex-col gap-2" asChild>
             <Link href="/dashboard/admin/analytics">
               <BarChart3 className="h-5 w-5" />
               <span>Analytics</span>
@@ -156,9 +144,7 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Recent Activity */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Users */}
           <Card data-testid="card-recent-users">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -214,7 +200,6 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Applications */}
           <Card data-testid="card-recent-applications">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -248,15 +233,15 @@ export default function AdminDashboard() {
                   {applications.slice(0, 5).map((app) => (
                     <div key={app.id} className="flex items-center gap-3">
                       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                        app.status === "completed"
+                        app.status === "completed" || app.status === "doctor_approved"
                           ? "bg-chart-2/10 text-chart-2"
-                          : app.status === "rejected"
+                          : app.status === "rejected" || app.status === "doctor_denied"
                           ? "bg-destructive/10 text-destructive"
                           : "bg-primary/10 text-primary"
                       }`}>
-                        {app.status === "completed" ? (
+                        {app.status === "completed" || app.status === "doctor_approved" ? (
                           <CheckCircle2 className="h-5 w-5" />
-                        ) : app.status === "rejected" ? (
+                        ) : app.status === "rejected" || app.status === "doctor_denied" ? (
                           <AlertCircle className="h-5 w-5" />
                         ) : (
                           <Clock className="h-5 w-5" />
@@ -272,14 +257,14 @@ export default function AdminDashboard() {
                       </div>
                       <Badge
                         variant={
-                          app.status === "completed"
+                          app.status === "completed" || app.status === "doctor_approved"
                             ? "default"
-                            : app.status === "rejected"
+                            : app.status === "rejected" || app.status === "doctor_denied"
                             ? "destructive"
                             : "secondary"
                         }
                       >
-                        {app.status}
+                        {app.status.replace(/_/g, " ")}
                       </Badge>
                     </div>
                   ))}

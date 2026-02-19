@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
-import type { QueueEntry } from "@shared/schema";
 import {
   ClipboardList,
   Clock,

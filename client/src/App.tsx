@@ -18,6 +18,7 @@ const Register = lazy(() => import("@/pages/Register"));
 const Packages = lazy(() => import("@/pages/Packages"));
 const SetupRequired = lazy(() => import("@/pages/SetupRequired"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+const DoctorReviewPortal = lazy(() => import("@/pages/DoctorReviewPortal"));
 
 // Dashboard pages
 const ApplicantDashboard = lazy(() => import("@/pages/dashboard/ApplicantDashboard"));
@@ -37,7 +38,6 @@ const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage
 // Shared pages (used across multiple levels)
 const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsPage"));
 const SharedMessagesPage = lazy(() => import("@/pages/dashboard/shared/MessagesPage"));
-const SharedQueuePage = lazy(() => import("@/pages/dashboard/shared/QueuePage"));
 const SharedCompletedPage = lazy(() => import("@/pages/dashboard/shared/CompletedPage"));
 const SharedApplicationsListPage = lazy(() => import("@/pages/dashboard/shared/ApplicationsListPage"));
 const SharedPaymentsManagementPage = lazy(() => import("@/pages/dashboard/shared/PaymentsManagementPage"));
@@ -124,12 +124,7 @@ function App() {
                   </Route>
 
                   {/* Doctor Routes (Level 2+) */}
-                  <Route path="/dashboard/doctor/queue">
-                    <ProtectedRoute minLevel={2}>
-                      <SharedQueuePage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/doctor/completed">
+                  <Route path="/dashboard/doctor/reviews">
                     <ProtectedRoute minLevel={2}>
                       <SharedCompletedPage />
                     </ProtectedRoute>
@@ -200,11 +195,6 @@ function App() {
                       <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/admin/queue">
-                    <ProtectedRoute minLevel={3}>
-                      <SharedQueuePage />
-                    </ProtectedRoute>
-                  </Route>
                   <Route path="/dashboard/admin/reports">
                     <ProtectedRoute minLevel={3}>
                       <PlaceholderPage />
@@ -271,6 +261,11 @@ function App() {
                     <ProtectedRoute minLevel={4}>
                       <OwnerDashboard />
                     </ProtectedRoute>
+                  </Route>
+
+                  {/* Public Doctor Review Portal (no auth needed) */}
+                  <Route path="/review/:token">
+                    <DoctorReviewPortal />
                   </Route>
 
                   {/* Fallback */}

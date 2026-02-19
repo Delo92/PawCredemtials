@@ -98,8 +98,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   sentMessages: many(messages, { relationName: "sender" }),
   receivedMessages: many(messages, { relationName: "receiver" }),
   documents: many(documents),
-  queueEntriesAsApplicant: many(queueEntries, { relationName: "applicant" }),
-  queueEntriesAsReviewer: many(queueEntries, { relationName: "reviewer" }),
+  doctorReviewTokens: many(doctorReviewTokens),
 }));
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
@@ -151,7 +150,7 @@ export const applications = pgTable("applications", {
   packageId: varchar("package_id").notNull().references(() => packages.id),
   currentStep: integer("current_step").notNull().default(1),
   totalSteps: integer("total_steps").notNull().default(6),
-  status: text("status").notNull().default("pending"), // pending, level2_review, level2_approved, level2_denied, level3_work, level3_complete, level4_verification, completed, rejected
+  status: text("status").notNull().default("pending"), // pending, doctor_review, doctor_approved, doctor_denied, level3_work, level3_complete, level4_verification, completed, rejected
   currentLevel: integer("current_level").default(1), // Which level is currently handling: 1, 2, 3, 4, 5
   formData: jsonb("form_data").$type<Record<string, any>>().default({}),
   paymentStatus: text("payment_status").default("unpaid"),
@@ -315,58 +314,35 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
 
 // ============================================================================
-// QUEUE ENTRIES
+// DOCTOR REVIEW TOKENS (secure links for doctor approvals - no login needed)
 // ============================================================================
 
-export const queueEntries = pgTable("queue_entries", {
+export const doctorReviewTokens = pgTable("doctor_review_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  applicationId: varchar("application_id").references(() => applications.id),
-  packageId: varchar("package_id").references(() => packages.id),
-  applicantId: varchar("applicant_id").notNull().references(() => users.id),
-  reviewerId: varchar("reviewer_id").references(() => users.id),
-  queueType: text("queue_type").notNull().default("consultation"), // consultation, review, support
-  status: text("status").notNull().default("waiting"), // waiting, claimed, in_call, completed, cancelled
-  priority: integer("priority").default(0),
-  position: integer("position"), // Position in queue
-  roomId: text("room_id"), // Video room ID (Twilio/GHL)
-  roomToken: text("room_token"), // Access token for video room
-  applicantPhone: text("applicant_phone"),
-  applicantFirstName: text("applicant_first_name"),
-  applicantLastName: text("applicant_last_name"),
-  applicantState: text("applicant_state"),
-  packageName: text("package_name"),
-  packagePrice: decimal("package_price", { precision: 10, scale: 2 }),
-  claimedAt: timestamp("claimed_at"),
-  callStartedAt: timestamp("call_started_at"),
-  callEndedAt: timestamp("call_ended_at"),
-  timerExpiresAt: timestamp("timer_expires_at"),
-  completedAt: timestamp("completed_at"),
-  notes: text("notes"),
-  outcome: text("outcome"), // approved, denied, follow_up, etc.
+  applicationId: varchar("application_id").notNull().references(() => applications.id),
+  doctorId: varchar("doctor_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending, approved, denied, expired
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  doctorNotes: text("doctor_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const queueEntriesRelations = relations(queueEntries, ({ one }) => ({
+export const doctorReviewTokensRelations = relations(doctorReviewTokens, ({ one }) => ({
   application: one(applications, {
-    fields: [queueEntries.applicationId],
+    fields: [doctorReviewTokens.applicationId],
     references: [applications.id],
   }),
-  applicant: one(users, {
-    fields: [queueEntries.applicantId],
+  doctor: one(users, {
+    fields: [doctorReviewTokens.doctorId],
     references: [users.id],
-    relationName: "applicant",
-  }),
-  reviewer: one(users, {
-    fields: [queueEntries.reviewerId],
-    references: [users.id],
-    relationName: "reviewer",
   }),
 }));
 
-export const insertQueueEntrySchema = createInsertSchema(queueEntries).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertQueueEntry = z.infer<typeof insertQueueEntrySchema>;
-export type QueueEntry = typeof queueEntries.$inferSelect;
+export const insertDoctorReviewTokenSchema = createInsertSchema(doctorReviewTokens).omit({ id: true, createdAt: true });
+export type InsertDoctorReviewToken = z.infer<typeof insertDoctorReviewTokenSchema>;
+export type DoctorReviewToken = typeof doctorReviewTokens.$inferSelect;
 
 // ============================================================================
 // PAYMENTS

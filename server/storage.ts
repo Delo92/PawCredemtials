@@ -11,8 +11,8 @@ import {
   type InsertDocument,
   type Message,
   type InsertMessage,
-  type QueueEntry,
-  type InsertQueueEntry,
+  type DoctorReviewToken,
+  type InsertDoctorReviewToken,
   type Payment,
   type InsertPayment,
   type Commission,
@@ -71,13 +71,14 @@ export interface IStorage {
   createMessage(msg: InsertMessage): Promise<Message>;
   markMessageAsRead(id: string): Promise<Message | undefined>;
 
-  getQueueEntry(id: string): Promise<QueueEntry | undefined>;
-  getWaitingQueueEntries(): Promise<QueueEntry[]>;
-  getInCallQueueEntries(): Promise<QueueEntry[]>;
-  getCompletedQueueEntriesToday(): Promise<QueueEntry[]>;
-  getQueueEntriesByReviewer(reviewerId: string): Promise<QueueEntry[]>;
-  createQueueEntry(entry: InsertQueueEntry): Promise<QueueEntry>;
-  updateQueueEntry(id: string, data: Partial<InsertQueueEntry>): Promise<QueueEntry | undefined>;
+  getDoctorReviewToken(id: string): Promise<DoctorReviewToken | undefined>;
+  getDoctorReviewTokenByToken(token: string): Promise<DoctorReviewToken | undefined>;
+  getDoctorReviewTokensByDoctor(doctorId: string): Promise<DoctorReviewToken[]>;
+  getDoctorReviewTokensByApplication(applicationId: string): Promise<DoctorReviewToken[]>;
+  createDoctorReviewToken(data: InsertDoctorReviewToken): Promise<DoctorReviewToken>;
+  updateDoctorReviewToken(id: string, data: Partial<InsertDoctorReviewToken>): Promise<DoctorReviewToken | undefined>;
+  getNextDoctorForAssignment(): Promise<Record<string, any> | undefined>;
+  getActiveDoctors(): Promise<Record<string, any>[]>;
 
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByUser(userId: string): Promise<Payment[]>;
@@ -645,72 +646,81 @@ export class FirestoreStorage implements IStorage {
   }
 
   // =========================================================================
-  // QUEUE ENTRIES
+  // DOCTOR REVIEW TOKENS
   // =========================================================================
-  async getQueueEntry(id: string): Promise<QueueEntry | undefined> {
-    const doc = await this.col("queueEntries").doc(id).get();
-    return docToRecord(doc) as QueueEntry | undefined;
+  async getDoctorReviewToken(id: string): Promise<DoctorReviewToken | undefined> {
+    const doc = await this.col("doctorReviewTokens").doc(id).get();
+    return docToRecord(doc) as DoctorReviewToken | undefined;
   }
 
-  async getWaitingQueueEntries(): Promise<QueueEntry[]> {
-    const snap = await this.col("queueEntries").where("status", "==", "waiting").get();
-    const results = docsToRecords(snap) as QueueEntry[];
-    return results.sort((a, b) => {
-      const pDiff = (b.priority ?? 0) - (a.priority ?? 0);
-      if (pDiff !== 0) return pDiff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+  async getDoctorReviewTokenByToken(token: string): Promise<DoctorReviewToken | undefined> {
+    const snap = await this.col("doctorReviewTokens").where("token", "==", token).limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0] as DoctorReviewToken;
   }
 
-  async getInCallQueueEntries(): Promise<QueueEntry[]> {
-    const snap1 = await this.col("queueEntries").where("status", "==", "in_call").get();
-    const snap2 = await this.col("queueEntries").where("status", "==", "claimed").get();
-    const all = [...docsToRecords(snap1), ...docsToRecords(snap2)] as QueueEntry[];
-    return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  async getCompletedQueueEntriesToday(): Promise<QueueEntry[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const snap = await this.col("queueEntries")
-      .where("status", "==", "completed")
-      .get();
-    const results = docsToRecords(snap) as QueueEntry[];
-    return results
-      .filter(r => r.completedAt && new Date(r.completedAt).getTime() >= today.getTime())
-      .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
-  }
-
-  async getQueueEntriesByReviewer(reviewerId: string): Promise<QueueEntry[]> {
-    const snap = await this.col("queueEntries").where("reviewerId", "==", reviewerId).get();
-    const results = docsToRecords(snap) as QueueEntry[];
+  async getDoctorReviewTokensByDoctor(doctorId: string): Promise<DoctorReviewToken[]> {
+    const snap = await this.col("doctorReviewTokens").where("doctorId", "==", doctorId).get();
+    const results = docsToRecords(snap) as DoctorReviewToken[];
     return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createQueueEntry(entry: InsertQueueEntry): Promise<QueueEntry> {
-    const id = randomUUID();
-    const entryData = cleanForFirestore({
-      ...entry,
-      status: entry.status ?? "waiting",
-      queueType: entry.queueType ?? "consultation",
-      priority: entry.priority ?? 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    await this.col("queueEntries").doc(id).set(entryData);
-    const created = await this.col("queueEntries").doc(id).get();
-    await this.incrementCounter("queueEntries");
-    return docToRecord(created) as QueueEntry;
+  async getDoctorReviewTokensByApplication(applicationId: string): Promise<DoctorReviewToken[]> {
+    const snap = await this.col("doctorReviewTokens").where("applicationId", "==", applicationId).get();
+    return docsToRecords(snap) as DoctorReviewToken[];
   }
 
-  async updateQueueEntry(id: string, data: Partial<InsertQueueEntry>): Promise<QueueEntry | undefined> {
-    const ref = this.col("queueEntries").doc(id);
+  async createDoctorReviewToken(data: InsertDoctorReviewToken): Promise<DoctorReviewToken> {
+    const id = randomUUID();
+    const tokenData = cleanForFirestore({
+      ...data,
+      status: data.status ?? "pending",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await this.col("doctorReviewTokens").doc(id).set(tokenData);
+    const created = await this.col("doctorReviewTokens").doc(id).get();
+    await this.incrementCounter("doctorReviewTokens");
+    return docToRecord(created) as DoctorReviewToken;
+  }
+
+  async updateDoctorReviewToken(id: string, data: Partial<InsertDoctorReviewToken>): Promise<DoctorReviewToken | undefined> {
+    const ref = this.col("doctorReviewTokens").doc(id);
     const existing = await ref.get();
     if (!existing.exists) return undefined;
-    const updateData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
-    await ref.update(updateData);
+    await ref.update(cleanForFirestore(data));
     const updated = await ref.get();
-    return docToRecord(updated) as QueueEntry;
+    return docToRecord(updated) as DoctorReviewToken;
+  }
+
+  async getNextDoctorForAssignment(): Promise<Record<string, any> | undefined> {
+    const doctors = await this.getActiveDoctors();
+    if (doctors.length === 0) return undefined;
+
+    const settings = await this.getAdminSettings();
+    const lastAssignedDoctorId = settings?.lastAssignedDoctorId || null;
+
+    if (!lastAssignedDoctorId) {
+      await this.updateAdminSettings({ lastAssignedDoctorId: doctors[0].userId });
+      return doctors[0];
+    }
+
+    const lastIndex = doctors.findIndex(d => d.userId === lastAssignedDoctorId);
+    const nextIndex = (lastIndex + 1) % doctors.length;
+    const nextDoctor = doctors[nextIndex];
+
+    await this.updateAdminSettings({ lastAssignedDoctorId: nextDoctor.userId });
+    return nextDoctor;
+  }
+
+  async getActiveDoctors(): Promise<Record<string, any>[]> {
+    const snap = await this.col("doctorProfiles").get();
+    const profiles = docsToRecords(snap);
+    const active = profiles.filter(p => !p._isPlaceholder && p.isActive !== false);
+    return active.sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return aDate - bDate;
+    });
   }
 
   // =========================================================================
