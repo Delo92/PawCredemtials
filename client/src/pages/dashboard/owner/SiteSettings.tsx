@@ -31,7 +31,6 @@ function MediaUploadInput({
   folder = "media",
   accept = "image/*,video/mp4,video/webm",
   testId,
-  onUploadComplete,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -39,7 +38,6 @@ function MediaUploadInput({
   folder?: string;
   accept?: string;
   testId?: string;
-  onUploadComplete?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -63,16 +61,13 @@ function MediaUploadInput({
       const data = await res.json();
       onChange(data.url);
       toast({ title: "Uploaded", description: "File uploaded successfully." });
-      if (onUploadComplete) {
-        setTimeout(() => onUploadComplete(), 100);
-      }
     } catch (e: any) {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
-  }, [folder, onChange, toast, onUploadComplete]);
+  }, [folder, onChange, toast]);
 
   return (
     <div className="space-y-2">
@@ -352,7 +347,6 @@ export default function SiteSettings() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <Tabs defaultValue="branding" className="space-y-6">
-              <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-3 -mx-1 px-1 flex flex-wrap items-center justify-between gap-2">
               <TabsList className="flex-wrap">
                 <TabsTrigger value="branding" data-testid="tab-branding">
                   <Palette className="mr-2 h-4 w-4" />
@@ -539,6 +533,11 @@ export default function SiteSettings() {
                     />
                   </CardContent>
                 </Card>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-branding">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="hero">
@@ -678,6 +677,11 @@ export default function SiteSettings() {
                     </div>
                   </CardContent>
                 </Card>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-hero">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="gallery">
@@ -839,6 +843,11 @@ export default function SiteSettings() {
                     </div>
                   </CardContent>
                 </Card>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-gallery">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="media">
@@ -1060,6 +1069,11 @@ export default function SiteSettings() {
                     </CardContent>
                   </Card>
                 </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-media">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="footer">
@@ -1210,6 +1224,11 @@ export default function SiteSettings() {
                     </CardContent>
                   </Card>
                 </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-footer">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="roles">
@@ -1291,6 +1310,11 @@ export default function SiteSettings() {
 
                   </CardContent>
                 </Card>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-roles">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="contact">
@@ -1349,24 +1373,13 @@ export default function SiteSettings() {
                     />
                   </CardContent>
                 </Card>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-contact">
+                    {updateConfig.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+                  </Button>
+                </div>
               </TabsContent>
             </Tabs>
-
-            <div className="flex justify-end mt-6">
-              <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save-settings">
-                {updateConfig.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Settings
-                  </>
-                )}
-              </Button>
-            </div>
           </form>
         </Form>
       </div>
