@@ -749,6 +749,11 @@ export async function registerRoutes(
           contactEmail: config.contactEmail,
           contactPhone: config.contactPhone,
           address: config.address,
+          aboutMediaUrl: config.aboutMediaUrl || "",
+          ctaMediaUrl: config.ctaMediaUrl || "",
+          contactMediaUrl: config.contactMediaUrl || "",
+          departmentMediaUrls: config.departmentMediaUrls || [],
+          testimonialMediaUrls: config.testimonialMediaUrls || [],
           galleryImages: config.galleryImages || [],
           levelNames: {
             level1: config.level1Name,
@@ -1491,6 +1496,11 @@ export async function registerRoutes(
         level3Name,
         level4Name,
         galleryImages: rawGalleryImages,
+        aboutMediaUrl,
+        ctaMediaUrl,
+        contactMediaUrl,
+        departmentMediaUrls,
+        testimonialMediaUrls,
       } = req.body;
 
       const galleryImages = Array.isArray(rawGalleryImages)
@@ -1525,6 +1535,11 @@ export async function registerRoutes(
         level3Name,
         level4Name,
         galleryImages,
+        aboutMediaUrl,
+        ctaMediaUrl,
+        contactMediaUrl,
+        departmentMediaUrls,
+        testimonialMediaUrls,
       });
 
       res.json(config);
