@@ -1706,7 +1706,7 @@ export async function registerRoutes(
     try {
       const {
         email, password, firstName, lastName, phone, userLevel,
-        // Doctor profile fields (only used when userLevel === 2)
+        doctorProfile,
         doctorFullName, licenseNumber, npiNumber, deaNumber,
         doctorPhone, fax, doctorAddress, specialty
       } = req.body;
@@ -1752,19 +1752,32 @@ export async function registerRoutes(
         isActive: true,
       });
 
-      // If creating a doctor (Level 2), also create their doctor profile
-      if (userLevel === 2 && licenseNumber) {
+      if (userLevel === 2) {
+        const dp = doctorProfile || {};
+        const dpFullName = dp.fullName || doctorFullName || `${firstName} ${lastName}`;
+        const dpLicense = dp.licenseNumber || licenseNumber || "";
+        const dpNPI = dp.npiNumber || npiNumber || null;
+        const dpDEA = dp.deaNumber || deaNumber || null;
+        const dpPhone = dp.phone || doctorPhone || phone || null;
+        const dpFax = dp.fax || fax || null;
+        const dpAddress = dp.address || doctorAddress || null;
+        const dpSpecialty = dp.specialty || specialty || null;
+        const dpState = dp.state || null;
+        const dpFormTemplate = dp.formTemplate || null;
+
         await storage.createDoctorProfile({
           userId: newUser.id,
           firebaseUid,
-          fullName: doctorFullName || `${firstName} ${lastName}`,
-          licenseNumber,
-          npiNumber: npiNumber || null,
-          deaNumber: deaNumber || null,
-          phone: doctorPhone || phone || null,
-          fax: fax || null,
-          address: doctorAddress || null,
-          specialty: specialty || null,
+          fullName: dpFullName,
+          licenseNumber: dpLicense,
+          npiNumber: dpNPI,
+          deaNumber: dpDEA,
+          phone: dpPhone,
+          fax: dpFax,
+          address: dpAddress,
+          specialty: dpSpecialty,
+          state: dpState,
+          formTemplate: dpFormTemplate,
           isActive: true,
         });
       }
