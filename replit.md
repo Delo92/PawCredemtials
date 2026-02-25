@@ -97,6 +97,7 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Forms**: react-hook-form with @hookform/resolvers and Zod
 - **Date Handling**: date-fns
 - **Charts**: Recharts (via shadcn chart component)
+- **PDF**: pdf-lib (write/fill PDFs), pdfjs-dist (parse text layer for placeholder detection)
 
 ### Backend Libraries
 - **Authentication**: bcryptjs for password hashing
@@ -135,6 +136,10 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Custom Form Fields per Package**: Admin can define custom fields (text/textarea/select/date/email/phone/number) per package
 - **Admin Create User**: Admin/Owner can create new user accounts directly from User Management, with auto-generated password and welcome email with login credentials
 - **Doctor Profile Creation**: When creating a Level 2 (Doctor) user, admin can fill in professional credentials (license, NPI, DEA, specialty) inline
+- **Doctor Profile Tabs**: Tabbed Add User dialog (Account/Credentials/Form Template) and Doctor tab in UserProfileModal for editing doctor credentials and HTML form templates with placeholder reference
+- **Gizmo Form System**: Browser-side PDF auto-fill using pdf-lib + pdfjs-dist. Supports AcroForm (interactive fields) and Placeholder (token-based) PDFs. Component: `client/src/components/shared/GizmoForm.tsx`
+- **PDF Proxy**: `GET /api/forms/proxy-pdf?url=...` proxies external PDF fetches to avoid CORS
+- **Form Data API**: `GET /api/forms/data/:applicationId` assembles patient + doctor data for PDF filling
 
 ### Application Processing Workflow
 

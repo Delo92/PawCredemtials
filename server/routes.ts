@@ -2112,6 +2112,119 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
+  // GIZMO FORM SYSTEM — PDF proxy + form data
+  // ===========================================================================
+
+  app.get("/api/forms/proxy-pdf", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) {
+        res.status(400).json({ error: "url required" });
+        return;
+      }
+      const response = await fetch(url);
+      if (!response.ok) {
+        res.status(502).json({ error: "Failed to fetch PDF" });
+        return;
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "no-store");
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Proxy fetch failed" });
+    }
+  });
+
+  app.get("/api/forms/data/:applicationId", requireAuth, requireLevel(2), async (req, res) => {
+    try {
+      const application = await storage.getApplication(req.params.applicationId);
+      if (!application) {
+        res.status(404).json({ message: "Application not found" });
+        return;
+      }
+
+      const applicant = await storage.getUser(application.userId);
+      if (!applicant) {
+        res.status(404).json({ message: "Applicant not found" });
+        return;
+      }
+
+      let doctorProfile: Record<string, any> | undefined;
+      if (application.assignedDoctorId) {
+        doctorProfile = await storage.getDoctorProfile(application.assignedDoctorId);
+        if (!doctorProfile) {
+          doctorProfile = await storage.getDoctorProfileByUserId(application.assignedDoctorId);
+        }
+      }
+
+      const formData = (application.formData as Record<string, any>) || {};
+      const pkg = application.packageId ? await storage.getPackage(application.packageId) : null;
+
+      const patientData: Record<string, string> = {
+        firstName: applicant.firstName || formData.firstName || "",
+        middleName: applicant.middleName || formData.middleName || "",
+        lastName: applicant.lastName || formData.lastName || "",
+        suffix: formData.suffix || "",
+        dateOfBirth: applicant.dateOfBirth || formData.dateOfBirth || "",
+        address: applicant.address || formData.address || "",
+        apt: formData.apt || "",
+        city: applicant.city || formData.city || "",
+        state: applicant.state || formData.state || "",
+        zipCode: applicant.zipCode || formData.zipCode || "",
+        phone: applicant.phone || formData.phone || "",
+        email: applicant.email || formData.email || "",
+        medicalCondition: applicant.medicalCondition || formData.medicalCondition || "",
+        idNumber: applicant.driverLicenseNumber || formData.driverLicenseNumber || "",
+        idExpirationDate: formData.idExpirationDate || "",
+        idType: formData.idType || "",
+      };
+
+      const doctorData: Record<string, string> = doctorProfile
+        ? {
+            firstName: (doctorProfile.fullName || "").split(" ")[0] || "",
+            middleName: "",
+            lastName: (doctorProfile.fullName || "").split(" ").slice(-1)[0] || "",
+            phone: doctorProfile.phone || "",
+            address: doctorProfile.address || "",
+            city: "",
+            state: doctorProfile.state || "",
+            zipCode: "",
+            licenseNumber: doctorProfile.licenseNumber || "",
+            npiNumber: doctorProfile.npiNumber || "",
+          }
+        : {
+            firstName: "", middleName: "", lastName: "",
+            phone: "", address: "", city: "", state: "", zipCode: "",
+            licenseNumber: "", npiNumber: "",
+          };
+
+      const gizmoFormUrl = doctorProfile?.formTemplate
+        ? null
+        : (formData.gizmoFormUrl || null);
+
+      const today = new Date();
+      const generatedDate = today.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      res.json({
+        success: true,
+        patientData,
+        doctorData,
+        gizmoFormUrl,
+        generatedDate,
+        patientName: `${patientData.firstName} ${patientData.lastName}`.trim(),
+        packageName: pkg?.name || "",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
   // DOCTOR PROFILES (Level 2+ for own, Level 3+ for all)
   // ===========================================================================
 
