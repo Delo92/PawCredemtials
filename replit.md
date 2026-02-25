@@ -133,6 +133,8 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **SendGrid Email Integration**: Doctor approval emails, admin notification emails, patient approval emails via `server/email.ts`
 - **Admin Notification Email**: Configurable notification email in Settings (Level 3+)
 - **Custom Form Fields per Package**: Admin can define custom fields (text/textarea/select/date/email/phone/number) per package
+- **Admin Create User**: Admin/Owner can create new user accounts directly from User Management, with auto-generated password and welcome email with login credentials
+- **Doctor Profile Creation**: When creating a Level 2 (Doctor) user, admin can fill in professional credentials (license, NPI, DEA, specialty) inline
 
 ### Application Processing Workflow
 

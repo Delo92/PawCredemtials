@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
-import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail } from "./email";
+import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail } from "./email";
 
 async function fireAutoMessageTriggers(applicationId: string, newStatus: string) {
   try {
@@ -1669,6 +1669,104 @@ export async function registerRoutes(
       res.json(users.map((u) => ({ ...u, passwordHash: undefined })));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const {
+        email, password, firstName, lastName, phone, userLevel,
+        // Doctor profile fields (only used when userLevel === 2)
+        doctorFullName, licenseNumber, npiNumber, deaNumber,
+        doctorPhone, fax, doctorAddress, specialty
+      } = req.body;
+
+      if (!email || !password || !firstName || !lastName) {
+        res.status(400).json({ message: "Email, password, first name, and last name are required" });
+        return;
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        res.status(400).json({ message: "A user with this email already exists" });
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const profileId = randomBytes(4).toString("hex").toUpperCase();
+      const referralCode = randomBytes(4).toString("hex").toUpperCase();
+
+      let firebaseUid: string | null = null;
+      try {
+        const adminAuth = getAdminAuth();
+        const fbUser = await adminAuth.createUser({
+          email,
+          password,
+          displayName: `${firstName} ${lastName}`,
+        });
+        firebaseUid = fbUser.uid;
+      } catch (fbErr: any) {
+        console.error("Firebase user creation failed (non-blocking):", fbErr.message);
+      }
+
+      const newUser = await storage.createUser({
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        phone: phone || null,
+        firebaseUid,
+        userLevel: userLevel || 1,
+        profileId,
+        referralCode,
+        isActive: true,
+      });
+
+      // If creating a doctor (Level 2), also create their doctor profile
+      if (userLevel === 2 && licenseNumber) {
+        await storage.createDoctorProfile({
+          userId: newUser.id,
+          firebaseUid,
+          fullName: doctorFullName || `${firstName} ${lastName}`,
+          licenseNumber,
+          npiNumber: npiNumber || null,
+          deaNumber: deaNumber || null,
+          phone: doctorPhone || phone || null,
+          fax: fax || null,
+          address: doctorAddress || null,
+          specialty: specialty || null,
+          isActive: true,
+        });
+      }
+
+      // Send welcome email with login credentials
+      const protocol = process.env.NODE_ENV === "production" ? "https" : "https";
+      const host = req.get("host") || "localhost:5000";
+      const loginUrl = `${protocol}://${host}/login`;
+
+      const levelNames: Record<number, string> = { 1: "Applicant", 2: "Doctor", 3: "Admin", 4: "Owner" };
+
+      sendWelcomeEmail({
+        userEmail: email,
+        userName: `${firstName} ${lastName}`,
+        tempPassword: password,
+        loginUrl,
+        userLevel: userLevel || 1,
+        levelName: levelNames[userLevel || 1] || "User",
+      }).catch(err => console.error("Welcome email error:", err));
+
+      await storage.createActivityLog({
+        userId: req.user!.id,
+        action: "admin_created_user",
+        entityType: "user",
+        entityId: newUser.id,
+        details: { createdUserEmail: email, userLevel: userLevel || 1 },
+      });
+
+      res.status(201).json({ ...newUser, passwordHash: undefined });
+    } catch (error: any) {
+      console.error("Admin create user error:", error);
+      res.status(500).json({ message: error.message || "Failed to create user" });
     }
   });
 

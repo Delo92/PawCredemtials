@@ -152,6 +152,68 @@ export async function sendAdminNotificationEmail(data: AdminEmailData): Promise<
   }
 }
 
+interface WelcomeEmailData {
+  userEmail: string;
+  userName: string;
+  tempPassword: string;
+  loginUrl: string;
+  userLevel: number;
+  levelName: string;
+}
+
+export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+  const roleDescription = data.userLevel === 2
+    ? "You have been set up as a reviewing doctor on our platform. You will receive review requests via email."
+    : data.userLevel === 3
+    ? "You have been set up as an administrator on our platform."
+    : "Welcome to Paw Credentials! Your account has been created.";
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#1a365d;color:white;padding:20px;text-align:center;">
+        <h1 style="margin:0;">Paw Credentials</h1>
+        <p style="margin:5px 0 0;">Welcome to the Platform</p>
+      </div>
+      <div style="padding:20px;background:#f9fafb;">
+        <h2>Welcome, ${data.userName}!</h2>
+        <p>${roleDescription}</p>
+        <div style="background:white;padding:15px;border-radius:8px;margin:16px 0;border:2px solid #2563eb;">
+          <h3 style="margin-top:0;color:#1a365d;">Your Login Credentials</h3>
+          <p><strong>Email:</strong> ${data.userEmail}</p>
+          <p><strong>Temporary Password:</strong> ${data.tempPassword}</p>
+          <p style="color:#dc2626;font-size:13px;margin-top:10px;">Please change your password after your first login.</p>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${data.loginUrl}" style="background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:bold;">
+            Log In Now
+          </a>
+        </div>
+        <p style="color:#666;font-size:12px;">If you did not expect this email, please disregard it.</p>
+      </div>
+    </div>
+  `;
+
+  if (!SENDGRID_API_KEY) {
+    console.log(`[email] Would send welcome email to ${data.userEmail}`);
+    console.log(`[email] Temp password: ${data.tempPassword}`);
+    return true;
+  }
+
+  try {
+    await sgMail.send({
+      to: data.userEmail,
+      from: SENDGRID_FROM_EMAIL,
+      subject: `Welcome to Paw Credentials — Your Account is Ready`,
+      html,
+    });
+    console.log(`Welcome email sent to ${data.userEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Failed to send welcome email:", error?.response?.body || error.message);
+    return false;
+  }
+}
+
 export async function sendPatientApprovalEmail(data: PatientApprovalEmailData): Promise<boolean> {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
