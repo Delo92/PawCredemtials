@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -27,7 +29,8 @@ import {
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, ShoppingCart } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, Save, ShoppingCart, CheckCircle2, AlertCircle } from "lucide-react";
 
 const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
@@ -52,6 +55,7 @@ const registrationSchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   medicalCondition: z.string().optional(),
+  driverLicenseNumber: z.string().optional(),
   hasMedicare: z.boolean().default(false),
   ssn: z.string().optional(),
   isVeteran: z.boolean().default(false),
@@ -63,25 +67,47 @@ const registrationSchema = z.object({
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
 
+function isProfileComplete(data: any): boolean {
+  return !!(
+    data?.firstName &&
+    data?.lastName &&
+    data?.phone &&
+    data?.dateOfBirth &&
+    data?.address &&
+    data?.city &&
+    data?.state &&
+    data?.zipCode &&
+    data?.smsConsent &&
+    data?.emailConsent &&
+    data?.chargeUnderstanding &&
+    data?.patientAuthorization
+  );
+}
+
 export default function RegistrationPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+
+  const { data: profile, isLoading: profileLoading } = useQuery<any>({
+    queryKey: ["/api/profile"],
+  });
 
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
+      firstName: "",
       middleName: "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-      phone: user?.phone || "",
-      dateOfBirth: user?.dateOfBirth || "",
-      address: user?.address || "",
-      city: user?.city || "",
-      state: user?.state || "",
-      zipCode: user?.zipCode || "",
+      lastName: "",
+      email: "",
+      phone: "",
+      dateOfBirth: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
       medicalCondition: "",
+      driverLicenseNumber: "",
       hasMedicare: false,
       ssn: "",
       isVeteran: false,
@@ -92,17 +118,72 @@ export default function RegistrationPage() {
     },
   });
 
+  useEffect(() => {
+    if (profile) {
+      form.reset({
+        firstName: profile.firstName || "",
+        middleName: profile.middleName || "",
+        lastName: profile.lastName || "",
+        email: profile.email || user?.email || "",
+        phone: profile.phone || "",
+        dateOfBirth: profile.dateOfBirth || "",
+        address: profile.address || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        zipCode: profile.zipCode || "",
+        medicalCondition: profile.medicalCondition || "",
+        driverLicenseNumber: profile.driverLicenseNumber || "",
+        hasMedicare: profile.hasMedicare || false,
+        ssn: profile.ssn || "",
+        isVeteran: profile.isVeteran || false,
+        smsConsent: profile.smsConsent || false,
+        emailConsent: profile.emailConsent || false,
+        chargeUnderstanding: profile.chargeUnderstanding || false,
+        patientAuthorization: profile.patientAuthorization || false,
+      });
+    }
+  }, [profile, user, form]);
+
+  const profileComplete = isProfileComplete(form.getValues());
+
   const onSubmit = async (data: RegistrationFormData) => {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast({
-      title: "Profile Saved",
-      description: "Your profile information has been updated.",
-    });
-    setIsSaving(false);
+    try {
+      const { email, ...profileData } = data;
+      await apiRequest("PUT", "/api/profile", {
+        ...profileData,
+        registrationComplete: true,
+      });
+      await refreshUser();
+      toast({
+        title: "Profile Saved",
+        description: "Your profile information has been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Could not save your profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!user) return null;
+
+  if (profileLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const watchedValues = form.watch();
+  const currentComplete = isProfileComplete(watchedValues);
 
   return (
     <DashboardLayout>
@@ -117,16 +198,31 @@ export default function RegistrationPage() {
             </p>
           </div>
           <Link href="/packages">
-            <Button data-testid="button-buy-package">
+            <Button disabled={!currentComplete} data-testid="button-apply-esa">
               <ShoppingCart className="mr-2 h-4 w-4" />
-              Register Support Animal
+              Apply for ESA Letter
             </Button>
           </Link>
         </div>
 
+        {currentComplete ? (
+          <Alert className="border-green-500/50 bg-green-500/10" data-testid="alert-profile-complete">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-700 dark:text-green-400">
+              Your profile is complete. You can now apply for an ESA letter.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="border-amber-500/50 bg-amber-500/10" data-testid="alert-profile-incomplete">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              Please complete all required fields and consent checkboxes before applying for an ESA letter.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Account Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Account Information</CardTitle>
@@ -140,9 +236,9 @@ export default function RegistrationPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" data-testid="input-email" {...field} />
+                        <Input type="email" disabled data-testid="input-email" {...field} />
                       </FormControl>
-                      <FormDescription>Please ensure you have personal access to this email.</FormDescription>
+                      <FormDescription>Email cannot be changed. Contact support if needed.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -150,11 +246,10 @@ export default function RegistrationPage() {
               </CardContent>
             </Card>
 
-            {/* Personal Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
-                <CardDescription>This information will be used on your certifications</CardDescription>
+                <CardDescription>This information will be used on your ESA certifications</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -230,12 +325,11 @@ export default function RegistrationPage() {
               </CardContent>
             </Card>
 
-            {/* Address Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Address Information</CardTitle>
                 <CardDescription>
-                  Please verify your address does not have a P.O. Box. This information will be used on your certifications.
+                  Please verify your address is correct. This information will be used on your ESA certifications.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -272,7 +366,7 @@ export default function RegistrationPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>State</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-state">
                               <SelectValue placeholder="Select state" />
@@ -305,12 +399,11 @@ export default function RegistrationPage() {
               </CardContent>
             </Card>
 
-            {/* Medical Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Animal Information (Optional)</CardTitle>
+                <CardTitle>Additional Information (Optional)</CardTitle>
                 <CardDescription>
-                  This is optional. You can provide this information now or update it later in your profile.
+                  This is optional. You can provide this information now or update it later.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -319,14 +412,29 @@ export default function RegistrationPage() {
                   name="medicalCondition"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Animal Type and Details</FormLabel>
+                      <FormLabel>Medical Condition / Reason for ESA</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="E.g., Dog - Golden Retriever, Cat - Domestic Shorthair... (optional)"
+                        <Textarea
+                          placeholder="Describe your condition or reason for needing an Emotional Support Animal (optional)"
                           data-testid="input-medical-condition"
                           {...field}
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="driverLicenseNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Driver License Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your driver license number" data-testid="input-driver-license" {...field} />
+                      </FormControl>
+                      <FormDescription>Some states may require this for verification.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -393,11 +501,10 @@ export default function RegistrationPage() {
               </CardContent>
             </Card>
 
-            {/* Communication Consent */}
             <Card>
               <CardHeader>
                 <CardTitle>Communication Consent</CardTitle>
-                <CardDescription>Required consents for processing your order</CardDescription>
+                <CardDescription>Required consents for processing your ESA application</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -481,7 +588,7 @@ export default function RegistrationPage() {
                       <div className="space-y-1 leading-none">
                         <FormLabel>Applicant Authorization</FormLabel>
                         <FormDescription>
-                          I authorize the platform and its staff to access my information to assist with processing my order.
+                          I authorize the platform and its staff to access my information to assist with processing my ESA application.
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -490,7 +597,6 @@ export default function RegistrationPage() {
               </CardContent>
             </Card>
 
-            {/* Submit */}
             <div className="flex justify-end gap-4">
               <Button type="submit" disabled={isSaving} data-testid="button-save-registration">
                 {isSaving ? (

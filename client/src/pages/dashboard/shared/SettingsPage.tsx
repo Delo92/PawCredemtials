@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,8 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useToast } from "@/hooks/use-toast";
-import { User, Bell, Lock, Loader2 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { User, Bell, Lock, Loader2, Mail } from "lucide-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -31,6 +33,87 @@ const profileSchema = z.object({
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
+
+function AdminNotificationSettings() {
+  const { toast } = useToast();
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { data: adminSettings } = useQuery<Record<string, any>>({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  useEffect(() => {
+    if (adminSettings?.notificationEmail) {
+      setNotificationEmail(adminSettings.notificationEmail);
+    }
+  }, [adminSettings]);
+
+  const saveNotificationEmail = async () => {
+    setIsSaving(true);
+    try {
+      await apiRequest("PUT", "/api/admin/settings", {
+        notificationEmail: notificationEmail.trim(),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({
+        title: "Notification Email Saved",
+        description: "The admin notification email has been updated.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Mail className="h-5 w-5" />
+          <CardTitle>Admin Notification Email</CardTitle>
+        </div>
+        <CardDescription>
+          Set an email address that receives a copy of every approval request sent to doctors.
+          Both the doctor and this email will get the same review link with an Approve button.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-3">
+          <Input
+            type="email"
+            placeholder="admin@pawcredentials.com"
+            value={notificationEmail}
+            onChange={(e) => setNotificationEmail(e.target.value)}
+            data-testid="input-notification-email"
+            className="flex-1"
+          />
+          <Button
+            onClick={saveNotificationEmail}
+            disabled={isSaving}
+            data-testid="button-save-notification-email"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Save"
+            )}
+          </Button>
+        </div>
+        {adminSettings?.notificationEmail && (
+          <p className="text-sm text-muted-foreground">
+            Currently sending notifications to: <strong>{adminSettings.notificationEmail}</strong>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -242,6 +325,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {user.userLevel >= 3 && <AdminNotificationSettings />}
       </div>
     </DashboardLayout>
   );

@@ -31,6 +31,21 @@ interface RegisterData {
   lastName: string;
   phone?: string;
   referralCode?: string;
+  middleName?: string;
+  dateOfBirth?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  driverLicenseNumber?: string;
+  medicalCondition?: string;
+  ssn?: string;
+  hasMedicare?: boolean;
+  isVeteran?: boolean;
+  smsConsent?: boolean;
+  emailConsent?: boolean;
+  chargeUnderstanding?: boolean;
+  patientAuthorization?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

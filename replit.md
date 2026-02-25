@@ -109,6 +109,8 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `VITE_FIREBASE_*` - Optional Firebase configuration for enhanced auth
+- `SENDGRID_API_KEY` - SendGrid API key for transactional emails
+- `SENDGRID_FROM_EMAIL` - Sender email address for SendGrid (default: noreply@pawcredentials.com)
 
 ## Current Implementation Status
 
@@ -116,7 +118,7 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Authentication**: Stateless Firebase token-based auth (no server-side sessions)
 - **4 Role-Based Dashboards**: Each with unique stats, actions, and navigation
 - **Application Workflow**: 3-step wizard for creating new applications
-- **Package Management**: Browse and select service packages
+- **Package Management**: Browse and select service packages with custom form fields per package
 - **Doctor Review System**: Secure token-based review links sent to doctors (no login required)
 - **Round-Robin Doctor Assignment**: Admin sends applications to doctors with automatic rotation
 - **Auto Document Generation**: Documents auto-generated upon doctor approval with doctor credentials
@@ -124,22 +126,32 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Owner Configuration**: Full white-label settings (branding, role names, contact info)
 - **Admin User Management**: Search, filter, and edit user levels/status
 - **Dark/Light Theme**: System-aware with manual toggle
+- **Extended Registration**: Full patient profile collection (name, DOB, address, medical info, SSN, veteran status, 4 consent checkboxes)
+- **Profile Completeness Gate**: Applications blocked until profile is complete (green/amber banner)
+- **Auto-Fill Applications**: Profile data auto-fills into application formData on submit
+- **Auto-Send to Doctor**: Applications auto-sent to doctor via round-robin when payment is marked "paid"
+- **SendGrid Email Integration**: Doctor approval emails, admin notification emails, patient approval emails via `server/email.ts`
+- **Admin Notification Email**: Configurable notification email in Settings (Level 3+)
+- **Custom Form Fields per Package**: Admin can define custom fields (text/textarea/select/date/email/phone/number) per package
 
 ### Application Processing Workflow
 
-The complete workflow for processing applications through the platform:
+The complete automated workflow:
 
-1. Level 1 (Applicant) creates account, selects package, completes payment
-2. Application created with status `pending`
-3. Level 3 (Admin) sends application to a doctor via "Send to Doctor" button
-   - Uses round-robin rotation to auto-assign doctors fairly
-   - Generates a secure one-time review link (expires in 7 days)
-   - Application status changes to `doctor_review`
-4. Doctor receives review link, opens public review portal (no login needed)
-   - Reviews patient info, application details, form data
-   - **Approves** → `doctor_approved` → auto-generates certificate document
+1. Level 1 (Applicant) creates account with full profile (name, DOB, address, medical info, 4 consents)
+2. Applicant completes profile on dashboard (profile completeness gate blocks applications)
+3. Applicant selects ESA package, application auto-fills profile data
+4. On submit with `paymentStatus: "paid"`, system auto-assigns doctor via round-robin
+   - Generates secure one-time review link (expires 7 days)
+   - Sends doctor email via SendGrid with "Review & Approve" button
+   - Sends admin notification email to configured address
+   - Application status → `doctor_review`
+5. Doctor clicks email link → public review portal (no login needed)
+   - Reviews patient info, form data, package details
+   - **Approves** → `doctor_approved` → auto-generates certificate → emails patient
    - **Denies** → `doctor_denied` → patient notified with reason
-5. Upon approval, patient receives notification and certificate is available
+6. Upon approval, patient receives email with link to dashboard to view documents
+7. Admin can also manually send/resend to doctor via "Send to Doctor" button (also triggers emails)
 
 **Application Status Values:**
 - `pending` - New application, ready to be sent to doctor
@@ -158,10 +170,14 @@ The complete workflow for processing applications through the platform:
 - **Manual Override**: Admin can specify a particular doctor when sending
 
 ### API Endpoints
-- `POST /api/auth/register` - User registration
+- `POST /api/auth/register` - User registration (accepts full profile fields + consents)
 - `POST /api/auth/login` - User login
 - `POST /api/auth/logout` - User logout
 - `GET /api/auth/me` - Get current user
+- `GET /api/profile` - Get current user's full profile (authenticated)
+- `PUT /api/profile` - Update current user's profile (authenticated)
+- `GET /api/admin/settings` - Get admin settings including notificationEmail (Level 3+)
+- `PUT /api/admin/settings` - Update admin settings (Level 3+)
 - `GET /api/config` - Get site configuration
 - `GET /api/packages` - List active packages
 - `GET /api/applications` - Get user's applications

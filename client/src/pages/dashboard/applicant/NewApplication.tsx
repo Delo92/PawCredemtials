@@ -12,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -25,22 +27,35 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Package } from "@shared/schema";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User } from "lucide-react";
 
 const applicationSchema = z.object({
   packageId: z.string().min(1, "Please select a registration type"),
-  fullName: z.string().min(1, "Full name is required"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
-  address: z.string().min(1, "Address is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  zipCode: z.string().min(5, "Valid zip code required"),
-  phone: z.string().min(10, "Valid phone number required"),
   reason: z.string().min(10, "Please provide more details"),
-  additionalInfo: z.string().optional(),
 });
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
+
+function isProfileComplete(profile: any): boolean {
+  if (!profile) return false;
+  const requiredFields = [
+    profile.firstName,
+    profile.lastName,
+    profile.phone,
+    profile.dateOfBirth,
+    profile.address,
+    profile.city,
+    profile.state,
+    profile.zipCode,
+  ];
+  const requiredConsents = [
+    profile.smsConsent,
+    profile.emailConsent,
+    profile.chargeUnderstanding,
+    profile.patientAuthorization,
+  ];
+  return requiredFields.every((f) => !!f) && requiredConsents.every((c) => !!c);
+}
 
 export default function NewApplication() {
   const { user } = useAuth();
@@ -52,32 +67,59 @@ export default function NewApplication() {
 
   const [step, setStep] = useState(1);
   const totalSteps = 3;
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
+
+  const { data: profile, isLoading: profileLoading } = useQuery<any>({
+    queryKey: ["/api/profile"],
+  });
 
   const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
     queryKey: ["/api/packages"],
   });
 
+  const profileComplete = isProfileComplete(profile);
+
   const form = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
       packageId: preselectedPackage,
-      fullName: user ? `${user.firstName} ${user.lastName}` : "",
-      dateOfBirth: user?.dateOfBirth || "",
-      address: user?.address || "",
-      city: user?.city || "",
-      state: user?.state || "",
-      zipCode: user?.zipCode || "",
-      phone: user?.phone || "",
       reason: "",
-      additionalInfo: "",
     },
   });
 
+  const selectedPackage = packages?.find((p) => p.id === form.watch("packageId"));
+
+  const fullName = [profile?.firstName, profile?.middleName, profile?.lastName]
+    .filter(Boolean)
+    .join(" ");
+
   const createApplication = useMutation({
     mutationFn: async (data: ApplicationFormData) => {
+      const formData = {
+        ...data,
+        ...customFields,
+        fullName,
+        firstName: profile?.firstName,
+        middleName: profile?.middleName,
+        lastName: profile?.lastName,
+        email: profile?.email,
+        phone: profile?.phone,
+        dateOfBirth: profile?.dateOfBirth,
+        address: profile?.address,
+        city: profile?.city,
+        state: profile?.state,
+        zipCode: profile?.zipCode,
+        driverLicenseNumber: profile?.driverLicenseNumber,
+        medicalCondition: profile?.medicalCondition,
+        ssn: profile?.ssn,
+        hasMedicare: profile?.hasMedicare,
+        isVeteran: profile?.isVeteran,
+      };
       const response = await apiRequest("POST", "/api/applications", {
         packageId: data.packageId,
-        formData: data,
+        formData,
+        autoSendToDoctor: true,
+        paymentStatus: "paid",
       });
       return response.json();
     },
@@ -85,7 +127,7 @@ export default function NewApplication() {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       toast({
         title: "Order Submitted!",
-        description: "Your support animal registration has been submitted successfully.",
+        description: "Your ESA letter application has been submitted successfully.",
       });
       setLocation(`/dashboard/applicant/applications/${application.id}`);
     },
@@ -97,8 +139,6 @@ export default function NewApplication() {
       });
     },
   });
-
-  const selectedPackage = packages?.find((p) => p.id === form.watch("packageId"));
 
   const nextStep = () => {
     if (step === 1 && !form.getValues("packageId")) {
@@ -120,6 +160,49 @@ export default function NewApplication() {
     createApplication.mutate(data);
   };
 
+  if (profileLoading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!profileComplete) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              Please complete your profile before applying for an ESA letter.
+            </AlertDescription>
+          </Alert>
+          <Card>
+            <CardHeader>
+              <CardTitle>Complete Your Profile First</CardTitle>
+              <CardDescription>
+                Your profile information will be used on your medical forms and ESA letter application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/dashboard/applicant/registration">
+                <Button className="w-full" data-testid="button-complete-profile">
+                  <User className="mr-2 h-4 w-4" />
+                  Complete My Profile
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto space-y-6">
@@ -131,7 +214,7 @@ export default function NewApplication() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-new-app-title">
-              Register Support Animal
+              Apply for ESA Letter
             </h1>
             <p className="text-muted-foreground">
               Step {step} of {totalSteps}
@@ -143,13 +226,12 @@ export default function NewApplication() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            {/* Step 1: Package Selection */}
             {step === 1 && (
               <Card data-testid="step-package-selection">
                 <CardHeader>
                   <CardTitle>Select Registration Type</CardTitle>
                   <CardDescription>
-                    Choose the type of registration you need
+                    Choose the type of ESA registration you need
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -180,7 +262,7 @@ export default function NewApplication() {
                                   />
                                   <Label
                                     htmlFor={pkg.id}
-                                    className="flex items-center justify-between p-4 border rounded-lg cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover-elevate transition-all"
+                                    className="flex items-center justify-between gap-4 p-4 border rounded-md cursor-pointer peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover-elevate transition-all"
                                     data-testid={`package-option-${pkg.id}`}
                                   >
                                     <div>
@@ -206,184 +288,206 @@ export default function NewApplication() {
               </Card>
             )}
 
-            {/* Step 2: Personal Information */}
             {step === 2 && (
-              <Card data-testid="step-personal-info">
-                <CardHeader>
-                  <CardTitle>Your Information</CardTitle>
-                  <CardDescription>
-                    Please provide your details for the registration
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="fullName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Legal Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" data-testid="input-full-name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              <div className="space-y-6">
+                <Card data-testid="step-review-info">
+                  <CardHeader>
+                    <CardTitle>Your Information</CardTitle>
+                    <CardDescription>
+                      This information is pulled from your profile and will be used on your ESA letter application
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                        <p className="font-medium" data-testid="text-profile-name">{fullName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Email</p>
+                        <p className="font-medium" data-testid="text-profile-email">{profile?.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                        <p className="font-medium" data-testid="text-profile-phone">{profile?.phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
+                        <p className="font-medium" data-testid="text-profile-dob">{profile?.dateOfBirth}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-sm font-medium text-muted-foreground">Address</p>
+                        <p className="font-medium" data-testid="text-profile-address">
+                          {profile?.address}, {profile?.city}, {profile?.state} {profile?.zipCode}
+                        </p>
+                      </div>
+                      {profile?.driverLicenseNumber && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Driver License</p>
+                          <p className="font-medium" data-testid="text-profile-dl">{profile.driverLicenseNumber}</p>
+                        </div>
+                      )}
+                      {profile?.medicalCondition && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Medical Condition</p>
+                          <p className="font-medium" data-testid="text-profile-condition">{profile.medicalCondition}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <Link href="/dashboard/applicant/registration">
+                        <Button variant="outline" size="sm" type="button" data-testid="button-edit-profile">
+                          Edit Profile Information
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <FormField
-                    control={form.control}
-                    name="dateOfBirth"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Birth</FormLabel>
-                        <FormControl>
-                          <Input type="date" data-testid="input-dob" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(555) 555-5555" data-testid="input-phone" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Street Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="123 Main St" data-testid="input-address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Reason for ESA Letter</CardTitle>
+                    <CardDescription>
+                      Please describe why you need an Emotional Support Animal letter
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
                     <FormField
                       control={form.control}
-                      name="city"
+                      name="reason"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>City</FormLabel>
+                          <FormLabel>Purpose of Registration</FormLabel>
                           <FormControl>
-                            <Input placeholder="City" data-testid="input-city" {...field} />
+                            <Textarea
+                              placeholder="What do you need this ESA letter for? (e.g., housing ESA, travel, emotional support, etc.)"
+                              className="min-h-[120px]"
+                              data-testid="input-reason"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
 
-                    <FormField
-                      control={form.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>State</FormLabel>
-                          <FormControl>
-                            <Input placeholder="State" data-testid="input-state" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="zipCode"
-                      render={({ field }) => (
-                        <FormItem className="col-span-2 md:col-span-1">
-                          <FormLabel>Zip Code</FormLabel>
-                          <FormControl>
-                            <Input placeholder="12345" data-testid="input-zip" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                {Array.isArray((selectedPackage as any)?.formFields) &&
+                  (selectedPackage as any).formFields.length > 0 && (
+                    <Card data-testid="card-custom-fields">
+                      <CardHeader>
+                        <CardTitle>Additional Information</CardTitle>
+                        <CardDescription>
+                          Please fill out the following fields required for this registration type
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {(selectedPackage as any).formFields.map((field: any, idx: number) => (
+                          <div key={field.name || idx}>
+                            <Label>
+                              {field.label || field.name}
+                              {field.required && <span className="text-destructive ml-1">*</span>}
+                            </Label>
+                            {field.type === "textarea" ? (
+                              <Textarea
+                                value={customFields[field.name] || ""}
+                                onChange={(e) =>
+                                  setCustomFields({ ...customFields, [field.name]: e.target.value })
+                                }
+                                data-testid={`input-custom-${field.name}`}
+                              />
+                            ) : field.type === "select" ? (
+                              <Select
+                                value={customFields[field.name] || ""}
+                                onValueChange={(value) =>
+                                  setCustomFields({ ...customFields, [field.name]: value })
+                                }
+                              >
+                                <SelectTrigger data-testid={`select-custom-${field.name}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(field.options || []).map((opt: string) => (
+                                    <SelectItem key={opt} value={opt}>
+                                      {opt}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                type={field.type === "phone" ? "tel" : field.type || "text"}
+                                value={customFields[field.name] || ""}
+                                onChange={(e) =>
+                                  setCustomFields({ ...customFields, [field.name]: e.target.value })
+                                }
+                                data-testid={`input-custom-${field.name}`}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+              </div>
             )}
 
-            {/* Step 3: Application Details */}
             {step === 3 && (
-              <Card data-testid="step-application-details">
+              <Card data-testid="step-final-review">
                 <CardHeader>
-                  <CardTitle>Registration Details</CardTitle>
+                  <CardTitle>Review & Submit</CardTitle>
                   <CardDescription>
-                    Provide the details needed for your registration
+                    Please review your application details before submitting
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="reason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Purpose of Registration</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="What do you need this registration for? (e.g., housing ESA, travel, emotional support, etc.)"
-                            className="min-h-[120px]"
-                            data-testid="input-reason"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="additionalInfo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Additional Information (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Any other details you'd like to share..."
-                            className="min-h-[80px]"
-                            data-testid="input-additional"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   {selectedPackage && (
-                    <div className="p-4 rounded-lg border bg-muted/30">
+                    <div className="p-4 rounded-md border bg-muted/30">
                       <p className="text-sm font-medium mb-1">Selected Registration Type</p>
-                      <p className="text-lg font-bold">{selectedPackage.name}</p>
-                      <p className="text-2xl font-bold text-primary mt-2">
+                      <p className="text-lg font-bold" data-testid="text-selected-package">
+                        {selectedPackage.name}
+                      </p>
+                      <p className="text-2xl font-bold text-primary mt-2" data-testid="text-selected-price">
                         ${Number(selectedPackage.price).toFixed(2)}
                       </p>
+                    </div>
+                  )}
+
+                  <div className="p-4 rounded-md border bg-muted/30">
+                    <p className="text-sm font-medium mb-1">Applicant</p>
+                    <p className="font-bold">{fullName}</p>
+                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                    <p className="text-sm text-muted-foreground">{profile?.phone}</p>
+                  </div>
+
+                  {form.getValues("reason") && (
+                    <div className="p-4 rounded-md border bg-muted/30">
+                      <p className="text-sm font-medium mb-1">Reason</p>
+                      <p className="text-sm">{form.getValues("reason")}</p>
+                    </div>
+                  )}
+
+                  {Object.keys(customFields).length > 0 && (
+                    <div className="p-4 rounded-md border bg-muted/30">
+                      <p className="text-sm font-medium mb-2">Additional Details</p>
+                      {Object.entries(customFields).map(([key, value]) => (
+                        value && (
+                          <div key={key} className="mb-1">
+                            <span className="text-sm text-muted-foreground capitalize">{key.replace(/_/g, " ")}: </span>
+                            <span className="text-sm">{value}</span>
+                          </div>
+                        )
+                      ))}
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between mt-6">
+            <div className="flex justify-between gap-4 mt-6">
               {step > 1 ? (
-                <Button type="button" variant="outline" onClick={prevStep}>
+                <Button type="button" variant="outline" onClick={prevStep} data-testid="button-prev-step">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Button>
