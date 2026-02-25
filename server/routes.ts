@@ -554,12 +554,42 @@ export async function registerRoutes(
         entityId: user.id,
       });
 
+      let customToken: string | null = null;
+      let firebaseUid = user.firebaseUid;
+
+      try {
+        const adminAuth = getAdminAuth();
+        if (!firebaseUid) {
+          try {
+            const fbUser = await adminAuth.createUser({
+              email: user.email,
+              password,
+              displayName: `${user.firstName} ${user.lastName}`,
+            });
+            firebaseUid = fbUser.uid;
+            await storage.updateUser(user.id, { firebaseUid } as any);
+          } catch (createErr: any) {
+            if (createErr.code === 'auth/email-already-exists') {
+              const fbUser = await adminAuth.getUserByEmail(user.email);
+              firebaseUid = fbUser.uid;
+              await storage.updateUser(user.id, { firebaseUid } as any);
+            }
+          }
+        }
+        if (firebaseUid) {
+          customToken = await adminAuth.createCustomToken(firebaseUid);
+        }
+      } catch (fbErr: any) {
+        console.error("Firebase custom token generation failed (non-blocking):", fbErr.message);
+      }
+
       res.json({
         user: {
           ...user,
           passwordHash: undefined,
           password: undefined,
         },
+        customToken,
       });
     } catch (error: any) {
       console.error("Login error:", error);
