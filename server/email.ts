@@ -214,6 +214,73 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean>
   }
 }
 
+interface DoctorCompletionCopyData {
+  doctorEmail: string;
+  doctorName: string;
+  patientName: string;
+  patientEmail: string;
+  packageName: string;
+  applicationId: string;
+  formData: Record<string, any>;
+}
+
+export async function sendDoctorCompletionCopyEmail(data: DoctorCompletionCopyData): Promise<boolean> {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+      <div style="background:#0d9488;padding:24px 32px;">
+        <h1 style="color:#ffffff;margin:0;font-size:22px;">Paw Credentials</h1>
+        <p style="color:#ccfbf1;margin:4px 0 0;font-size:14px;">Application Auto-Completed — Doctor Copy</p>
+      </div>
+      <div style="padding:32px;">
+        <p style="color:#374151;font-size:16px;line-height:1.6;">
+          Hello Dr. ${data.doctorName},
+        </p>
+        <p style="color:#374151;font-size:16px;line-height:1.6;">
+          The following application has been <strong style="color:#0d9488;">auto-completed</strong> and the patient has been sent their ESA document. This email is for your records.
+        </p>
+        <div style="background:#f9fafb;border-radius:8px;padding:20px;margin:20px 0;border:1px solid #e5e7eb;">
+          <h3 style="color:#0d9488;margin:0 0 12px;font-size:16px;">Patient Information</h3>
+          <p style="margin:4px 0;color:#4b5563;"><strong>Name:</strong> ${data.patientName}</p>
+          <p style="margin:4px 0;color:#4b5563;"><strong>Email:</strong> ${data.patientEmail}</p>
+          <p style="margin:4px 0;color:#4b5563;"><strong>Package:</strong> ${data.packageName}</p>
+          <p style="margin:4px 0;color:#4b5563;"><strong>Application ID:</strong> ${data.applicationId}</p>
+        </div>
+        <div style="margin:20px 0;">
+          <h3 style="color:#0d9488;margin:0 0 12px;font-size:16px;">Application Details</h3>
+          ${formatFormData(data.formData)}
+        </div>
+        <p style="color:#6b7280;font-size:13px;text-align:center;">
+          No action is required from you. This is a copy for your records.
+        </p>
+      </div>
+      <div style="background:#f3f4f6;padding:16px 32px;text-align:center;">
+        <p style="color:#9ca3af;font-size:12px;margin:0;">
+          Paw Credentials &bull; Doctor Records Copy
+        </p>
+      </div>
+    </div>
+  `;
+
+  if (!SENDGRID_API_KEY) {
+    console.log(`[email] Would send doctor completion copy to ${data.doctorEmail} for application ${data.applicationId}`);
+    return true;
+  }
+
+  try {
+    await sgMail.send({
+      to: data.doctorEmail,
+      from: SENDGRID_FROM_EMAIL,
+      subject: `[Records] Auto-Completed: ${data.patientName} — ${data.packageName}`,
+      html,
+    });
+    console.log(`Doctor completion copy email sent to ${data.doctorEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Failed to send doctor completion copy email:", error?.response?.body || error.message);
+    return false;
+  }
+}
+
 export async function sendPatientApprovalEmail(data: PatientApprovalEmailData): Promise<boolean> {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">

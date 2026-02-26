@@ -272,7 +272,7 @@ export default function NewApplication() {
                                       </p>
                                     </div>
                                     <div className="text-xl font-bold text-primary">
-                                      ${Number(pkg.price).toFixed(2)}
+                                      ${(Number(pkg.price) / 100).toFixed(2)}
                                     </div>
                                   </Label>
                                 </div>
@@ -449,7 +449,7 @@ export default function NewApplication() {
                         {selectedPackage.name}
                       </p>
                       <p className="text-2xl font-bold text-primary mt-2" data-testid="text-selected-price">
-                        ${Number(selectedPackage.price).toFixed(2)}
+                        ${(Number(selectedPackage.price) / 100).toFixed(2)}
                       </p>
                     </div>
                   )}

@@ -76,7 +76,7 @@ export default function Packages() {
                   </CardHeader>
                   <CardContent className="flex-1">
                     <div className="text-4xl font-bold mb-6" data-testid={`text-price-${pkg.id}`}>
-                      ${Number(pkg.price).toFixed(2)}
+                      ${(Number(pkg.price) / 100).toFixed(2)}
                     </div>
                     <ul className="space-y-3">
                       <li className="flex items-center gap-2 text-sm">

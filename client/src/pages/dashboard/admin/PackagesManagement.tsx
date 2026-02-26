@@ -116,7 +116,7 @@ export default function PackagesManagement() {
     mutationFn: async (data: PackageFormData) => {
       const response = await apiRequest("POST", "/api/admin/packages", {
         ...data,
-        price: parseFloat(data.price),
+        price: Math.round(parseFloat(data.price) * 100),
         features: data.features ? data.features.split("\n").filter(Boolean) : [],
         formFields,
       });
@@ -144,7 +144,7 @@ export default function PackagesManagement() {
     mutationFn: async ({ id, data }: { id: string; data: PackageFormData }) => {
       const response = await apiRequest("PUT", `/api/admin/packages/${id}`, {
         ...data,
-        price: parseFloat(data.price),
+        price: Math.round(parseFloat(data.price) * 100),
         features: data.features ? data.features.split("\n").filter(Boolean) : [],
         formFields,
       });
@@ -211,7 +211,7 @@ export default function PackagesManagement() {
     form.reset({
       name: pkg.name,
       description: pkg.description || "",
-      price: pkg.price.toString(),
+      price: (Number(pkg.price) / 100).toFixed(2),
       features: Array.isArray(pkg.features) ? pkg.features.join("\n") : "",
       processingTime: pkg.processingTime || "",
       requiresLevel2Interaction: pkg.requiresLevel2Interaction || false,
@@ -282,7 +282,7 @@ export default function PackagesManagement() {
                           <TableCell className="max-w-xs truncate">
                             {pkg.description || "-"}
                           </TableCell>
-                          <TableCell>${Number(pkg.price).toFixed(2)}</TableCell>
+                          <TableCell>${(Number(pkg.price) / 100).toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant={pkg.isActive ? "default" : "secondary"}>
                               {pkg.isActive ? "Active" : "Inactive"}

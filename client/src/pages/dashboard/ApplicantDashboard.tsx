@@ -197,7 +197,7 @@ export default function ApplicantDashboard() {
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold text-primary">
-                        ${Number(pkg.price).toFixed(2)}
+                        ${(Number(pkg.price) / 100).toFixed(2)}
                       </span>
                       <Button size="sm" variant="outline" asChild>
                         <Link href={`/dashboard/applicant/applications/new?package=${pkg.id}`}>

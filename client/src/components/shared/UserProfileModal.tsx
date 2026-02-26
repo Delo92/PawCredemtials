@@ -270,6 +270,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         firstName: selectedUser.firstName,
         lastName: selectedUser.lastName,
         email: selectedUser.email,
+        contactEmail: (selectedUser as any).contactEmail || "",
         phone: selectedUser.phone || "",
         dateOfBirth: selectedUser.dateOfBirth || "",
         address: selectedUser.address || "",
@@ -427,20 +428,32 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
 
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> Email
+                  <Mail className="h-3 w-3" /> Sign-In Email
+                </Label>
+                <p className="text-sm text-muted-foreground p-2 bg-muted rounded-md">
+                  {selectedUser?.email || "-"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Mail className="h-3 w-3" /> Contact Email
                 </Label>
                 {isEditing ? (
                   <Input
                     type="email"
-                    value={editedUser.email || ""}
-                    onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
-                    data-testid="input-email"
+                    placeholder="Optional — receives receipts & notifications"
+                    value={editedUser.contactEmail || ""}
+                    onChange={(e) => setEditedUser({ ...editedUser, contactEmail: e.target.value })}
+                    data-testid="input-contact-email"
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground p-2 bg-muted rounded-md">
-                    {selectedUser?.email || "-"}
+                    {(selectedUser as any)?.contactEmail || selectedUser?.email || "-"}
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Used for receipts, notifications, and approvals. Falls back to sign-in email if empty.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -604,7 +617,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                         </span>
                         {app.package?.price && (
                           <span className="font-medium text-foreground">
-                            ${app.package.price}
+                            ${(Number(app.package.price) / 100).toFixed(2)}
                           </span>
                         )}
                       </div>

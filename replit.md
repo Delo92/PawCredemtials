@@ -131,8 +131,11 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Profile Completeness Gate**: Applications blocked until profile is complete (green/amber banner)
 - **Auto-Fill Applications**: Profile data auto-fills into application formData on submit
 - **Auto-Send to Doctor**: Applications auto-sent to doctor via round-robin when payment is marked "paid"
-- **SendGrid Email Integration**: Doctor approval emails, admin notification emails, patient approval emails via `server/email.ts`
+- **Auto-Complete Applications**: Toggle in Admin Settings (Level 3+) to skip doctor review — auto-approves, generates form, emails patient, sends doctor a copy
+- **SendGrid Email Integration**: Doctor approval emails, admin notification emails, patient approval emails, doctor completion copy emails via `server/email.ts`
 - **Admin Notification Email**: Configurable notification email in Settings (Level 3+)
+- **Contact Email System**: Users can have a separate contact email for receipts/notifications (falls back to sign-in email)
+- **Price Display**: Prices stored in cents, displayed as dollars (divide by 100) across all pages
 - **Custom Form Fields per Package**: Admin can define custom fields (text/textarea/select/date/email/phone/number) per package
 - **Admin Create User**: Admin/Owner can create new user accounts directly from User Management, with auto-generated password and welcome email with login credentials
 - **Doctor Profile Creation**: When creating a Level 2 (Doctor) user, admin can fill in professional credentials (license, NPI, DEA, specialty) inline
@@ -152,10 +155,9 @@ The complete automated workflow:
 2. Applicant completes profile on dashboard (profile completeness gate blocks applications)
 3. Applicant selects ESA package, application auto-fills profile data
 4. On submit with `paymentStatus: "paid"`, system auto-assigns doctor via round-robin
-   - Generates secure one-time review link (expires 7 days)
-   - Sends doctor email via SendGrid with "Review & Approve" button
-   - Sends admin notification email to configured address
-   - Application status → `doctor_review`
+   - **If Auto-Complete ON**: Auto-approves, generates form, emails patient, sends doctor a copy
+   - **If Auto-Complete OFF**: Generates secure one-time review link (expires 7 days), sends doctor email, sends admin notification
+   - Application status → `doctor_approved` (auto) or `doctor_review` (manual)
 5. Doctor clicks email link → public review portal (no login needed)
    - Reviews patient info, form data, package details
    - **Approves** → `doctor_approved` → auto-generates certificate → emails patient

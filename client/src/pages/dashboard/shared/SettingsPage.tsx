@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -29,10 +30,78 @@ const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
+  contactEmail: z.string().email("Invalid email address").or(z.literal("")).optional(),
   phone: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
+
+function AutoCompleteSettings() {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const { data: adminSettings } = useQuery<Record<string, any>>({
+    queryKey: ["/api/admin/settings"],
+  });
+  const autoComplete = adminSettings?.autoCompleteApplications || false;
+  const toggleAutoComplete = async (enabled: boolean) => {
+    setIsSaving(true);
+    try {
+      await apiRequest("PUT", "/api/admin/settings", {
+        autoCompleteApplications: enabled,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({
+        title: enabled ? "Auto-Complete Enabled" : "Auto-Complete Disabled",
+        description: enabled
+          ? "Applications will be automatically completed after payment. The doctor will receive a copy."
+          : "Applications will be sent to a doctor for manual review before completion.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Bell className="h-5 w-5" />
+          <CardTitle>Auto-Complete Applications</CardTitle>
+        </div>
+        <CardDescription>
+          When enabled, applications are automatically approved and completed after payment —
+          no doctor review required. The patient receives their completed form immediately,
+          and the assigned doctor gets a copy for their records.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">
+              {autoComplete ? "Auto-Complete is ON" : "Auto-Complete is OFF"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {autoComplete
+                ? "Applications skip doctor review and complete instantly after payment."
+                : "Applications are sent to a doctor for review before completion."}
+            </p>
+          </div>
+          <Switch
+            checked={autoComplete}
+            onCheckedChange={toggleAutoComplete}
+            disabled={isSaving}
+            data-testid="switch-auto-complete"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function AdminNotificationSettings() {
   const { toast } = useToast();
@@ -127,6 +196,7 @@ export default function SettingsPage() {
       firstName: user?.firstName || "",
       lastName: user?.lastName || "",
       email: user?.email || "",
+      contactEmail: (user as any)?.contactEmail || "",
       phone: user?.phone || "",
     },
   });
@@ -220,10 +290,25 @@ export default function SettingsPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Sign-In Email</FormLabel>
                       <FormControl>
-                        <Input type="email" data-testid="input-email" {...field} />
+                        <Input type="email" data-testid="input-email" {...field} disabled className="bg-muted" />
                       </FormControl>
+                      <FormDescription>This is your login email and cannot be changed here.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Optional — for receipts & notifications" data-testid="input-contact-email" {...field} />
+                      </FormControl>
+                      <FormDescription>Receipts, approvals, and notifications go here. If empty, your sign-in email is used.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -326,6 +411,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {user.userLevel >= 3 && <AutoCompleteSettings />}
         {user.userLevel >= 3 && <AdminNotificationSettings />}
       </div>
     </DashboardLayout>
