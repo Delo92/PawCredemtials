@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,8 @@ import {
   Upload,
   Trash2
 } from "lucide-react";
-import { GizmoForm } from "@/components/shared/GizmoForm";
+
+const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
 
 const PLACEHOLDERS_REFERENCE = [
   { tag: "{{doctorName}}", desc: "Doctor's full name" },
@@ -1118,28 +1119,30 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
             <DialogTitle>PDF Form Preview</DialogTitle>
             <DialogDescription>Preview and fill the PDF form</DialogDescription>
           </DialogHeader>
-          <GizmoForm
-            data={{
-              success: true,
-              patientData: {},
-              doctorData: {
-                firstName: doctorProfileData.fullName?.split(" ")[0] || "",
-                lastName: doctorProfileData.fullName?.split(" ").slice(1).join(" ") || "",
-                phone: doctorProfileData.phone || "",
-                address: doctorProfileData.address || "",
-                state: doctorProfileData.state || "",
-                licenseNumber: doctorProfileData.licenseNumber || "",
-                npiNumber: doctorProfileData.npiNumber || "",
-                deaNumber: doctorProfileData.deaNumber || "",
-                specialty: doctorProfileData.specialty || "",
-                fax: doctorProfileData.fax || "",
-              },
-              gizmoFormUrl: doctorProfileData.gizmoFormUrl,
-              generatedDate: new Date().toLocaleDateString(),
-              patientName: "Test Patient",
-            }}
-            onClose={() => setShowGizmoPreview(false)}
-          />
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <LazyGizmoForm
+              data={{
+                success: true,
+                patientData: {},
+                doctorData: {
+                  firstName: doctorProfileData.fullName?.split(" ")[0] || "",
+                  lastName: doctorProfileData.fullName?.split(" ").slice(1).join(" ") || "",
+                  phone: doctorProfileData.phone || "",
+                  address: doctorProfileData.address || "",
+                  state: doctorProfileData.state || "",
+                  licenseNumber: doctorProfileData.licenseNumber || "",
+                  npiNumber: doctorProfileData.npiNumber || "",
+                  deaNumber: doctorProfileData.deaNumber || "",
+                  specialty: doctorProfileData.specialty || "",
+                  fax: doctorProfileData.fax || "",
+                },
+                gizmoFormUrl: doctorProfileData.gizmoFormUrl,
+                generatedDate: new Date().toLocaleDateString(),
+                patientName: "Test Patient",
+              }}
+              onClose={() => setShowGizmoPreview(false)}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
     )}
