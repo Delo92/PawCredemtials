@@ -131,7 +131,7 @@ function getRadioGroup(option: string): string {
   return "other";
 }
 
-const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<string, string> }> = {
+const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<string, string>; defaultOption?: string }> = {
   idtype: {
     sourceField: "idType",
     valueMap: {
@@ -143,6 +143,7 @@ const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<st
   },
   condition: {
     sourceField: "disabilityCondition",
+    defaultOption: "7",
     valueMap: {
       A: "7", B: "8", C: "9", D: "10",
       E: "11", F: "12", G: "13", H: "14",
@@ -174,6 +175,25 @@ function sanitizeFilename(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
+async function checkForPlaceholderTokens(pdf: pdfjsLib.PDFDocumentProxy): Promise<boolean> {
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const allText = textContent.items
+      .filter((item): item is { str: string } => "str" in item)
+      .map((item) => item.str)
+      .join("");
+
+    if (/\{(firstName|lastName|middleName|dateOfBirth|address|city|state|zipCode|zip|phone|email|date|driverLicenseNumber|medicalCondition|idNumber|suffix|apt)\}?/i.test(allText)) {
+      return true;
+    }
+    if (/\{radio[_\s]/i.test(allText) || /radio\s*_?\s*id/i.test(allText)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -194,6 +214,241 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
   const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
+
+  const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
+    const fields: PlaceholderField[] = [];
+    const radios: RadioField[] = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+
+      interface TextItem {
+        str: string;
+        transform: number[];
+        width: number;
+        height: number;
+      }
+
+      const items = textContent.items.filter((item): item is TextItem => "str" in item && item.str.length > 0);
+
+      const lines: TextItem[][] = [];
+      for (const item of items) {
+        const y = item.transform[5];
+        let foundLine = false;
+        for (const line of lines) {
+          const lineY = line[0].transform[5];
+          if (Math.abs(y - lineY) < 3) {
+            line.push(item);
+            foundLine = true;
+            break;
+          }
+        }
+        if (!foundLine) {
+          lines.push([item]);
+        }
+      }
+
+      interface PendingField {
+        token: string;
+        mapping: { source: "patient" | "doctor" | "meta"; key: string };
+        x: number;
+        y: number;
+        pageIndex: number;
+      }
+
+      const pendingFields: PendingField[] = [];
+
+      for (const line of lines) {
+        line.sort((a, b) => a.transform[4] - b.transform[4]);
+        const fullText = line.map((i) => i.str).join("");
+
+        const placeholderRegex = /\{([a-zA-Z]+)\}?/g;
+        let match;
+        while ((match = placeholderRegex.exec(fullText)) !== null) {
+          const tokenName = match[1];
+          const token = `{${tokenName}}`;
+          const mapping = PLACEHOLDER_MAP[token];
+
+          if (mapping) {
+            let charPos = 0;
+            let anchorItem: TextItem | null = null;
+            let anchorOffset = 0;
+
+            for (const item of line) {
+              if (charPos + item.str.length > match.index) {
+                anchorItem = item;
+                anchorOffset = match.index - charPos;
+                break;
+              }
+              charPos += item.str.length;
+            }
+
+            if (anchorItem) {
+              const x = anchorItem.transform[4] + (anchorOffset * (anchorItem.width / Math.max(anchorItem.str.length, 1)));
+              const y = anchorItem.transform[5];
+
+              pendingFields.push({
+                token,
+                mapping,
+                x,
+                y,
+                pageIndex: pageNum - 1,
+              });
+            }
+          }
+        }
+
+        const radioRegex = /\{radio_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}/g;
+        let radioMatch;
+        while ((radioMatch = radioRegex.exec(fullText)) !== null) {
+          const rawGroup = radioMatch[1].toLowerCase();
+          const option = radioMatch[2].toLowerCase();
+          const group = rawGroup === "id" ? getRadioGroup(option) : rawGroup;
+
+          let charPos = 0;
+          let anchorItem: TextItem | null = null;
+
+          for (const item of line) {
+            if (charPos + item.str.length > radioMatch.index) {
+              anchorItem = item;
+              break;
+            }
+            charPos += item.str.length;
+          }
+
+          if (anchorItem) {
+            const x = anchorItem.transform[4] + offsets.x;
+            const y = viewport.height - anchorItem.transform[5] + offsets.y;
+            const fontSize = anchorItem.height || 12;
+
+            let selected = false;
+            const autoFill = RADIO_AUTO_FILL[group];
+            if (autoFill) {
+              const patientVal = data.patientData[autoFill.sourceField] || "";
+              const expectedOption = autoFill.valueMap[patientVal];
+              if (expectedOption === option) {
+                selected = true;
+              } else if (!patientVal && autoFill.defaultOption === option) {
+                selected = true;
+              }
+            }
+
+            radios.push({
+              token: radioMatch[0],
+              group,
+              option,
+              x,
+              y,
+              pageIndex: pageNum - 1,
+              selected,
+              fontSize,
+            });
+          }
+        }
+      }
+
+      for (const pf of pendingFields) {
+        const sameLine = pendingFields.filter(
+          (other) => other.pageIndex === pf.pageIndex
+            && Math.abs(other.y - pf.y) < 3
+            && other.x > pf.x
+        );
+        const nextX = sameLine.length > 0 ? Math.min(...sameLine.map((f) => f.x)) : null;
+        const fieldWidth = nextX ? nextX - pf.x - 5 : viewport.width - pf.x - 20;
+
+        fields.push({
+          token: pf.token,
+          key: pf.mapping.key,
+          source: pf.mapping.source,
+          dataKey: pf.mapping.key,
+          x: pf.x + offsets.x,
+          y: viewport.height - pf.y + offsets.y,
+          width: Math.max(fieldWidth, 40),
+          pageIndex: pf.pageIndex,
+          value: resolveValue(pf.mapping.source, pf.mapping.key, data),
+        });
+      }
+
+      const radioItemRegex = /^[{\s]*radio\s*$/i;
+      const idItemRegex = /^[_\s]*id[_\s]*(\d{1,2})\s*\}?\s*$/i;
+      const combinedRadioRegex = /\{?\s*radio\s*_?\s*id\s*_?\s*(\d{1,2})\s*\}?/i;
+      const seenRadioOptions = new Set(radios.filter(r => r.pageIndex === pageNum - 1).map(r => r.option));
+
+      const addRadioFromItem = (option: string, itemX: number, itemY: number, itemHeight: number) => {
+        if (seenRadioOptions.has(option)) return;
+        seenRadioOptions.add(option);
+
+        const group = getRadioGroup(option);
+        const x = itemX + offsets.x;
+        const y = viewport.height - itemY + offsets.y;
+        const fontSize = itemHeight || 12;
+
+        let selected = false;
+        const autoFill = RADIO_AUTO_FILL[group];
+        if (autoFill) {
+          const patientVal = data.patientData[autoFill.sourceField] || "";
+          const expectedOption = autoFill.valueMap[patientVal];
+          if (expectedOption === option) {
+            selected = true;
+          } else if (!patientVal && autoFill.defaultOption === option) {
+            selected = true;
+          }
+        }
+
+        radios.push({
+          token: `{radio_id_${option}}`,
+          group,
+          option,
+          x,
+          y,
+          pageIndex: pageNum - 1,
+          selected,
+          fontSize,
+        });
+      };
+
+      for (const item of items) {
+        const trimmed = item.str.trim();
+        const combined = combinedRadioRegex.exec(trimmed);
+        if (combined) {
+          addRadioFromItem(combined[1], item.transform[4], item.transform[5], item.height);
+          continue;
+        }
+
+        const idMatch = idItemRegex.exec(trimmed);
+        if (idMatch) {
+          addRadioFromItem(idMatch[1], item.transform[4], item.transform[5], item.height);
+        }
+      }
+
+      const radioOnlyRegex = /^\{?\s*radio\s*$/i;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!radioOnlyRegex.test(item.str.trim())) continue;
+
+        for (let j = 0; j < items.length; j++) {
+          if (j === i) continue;
+          const other = items[j];
+          const dx = Math.abs(other.transform[4] - item.transform[4]);
+          const dy = Math.abs(other.transform[5] - item.transform[5]);
+          if (dx > 60 || dy > 20) continue;
+
+          const otherMatch = idItemRegex.exec(other.str.trim());
+          if (!otherMatch) continue;
+
+          const option = otherMatch[1];
+          const anchorX = Math.min(item.transform[4], other.transform[4]);
+          const anchorY = Math.max(item.transform[5], other.transform[5]);
+          addRadioFromItem(option, anchorX, anchorY, other.height || item.height);
+        }
+      }
+    }
+
+    setPlaceholderFields(fields);
+    setRadioFields(radios);
+  };
 
   const loadPdf = useCallback(async () => {
     if (!data.gizmoFormUrl) {
@@ -219,6 +474,15 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
+
+      const hasPlaceholders = await checkForPlaceholderTokens(pdf);
+
+      if (hasPlaceholders) {
+        setMode("placeholder");
+        await extractPlaceholdersFromPdf(pdf);
+        setLoading(false);
+        return;
+      }
 
       const { PDFDocument } = await import("pdf-lib");
       const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0));
@@ -328,224 +592,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   useEffect(() => {
     renderPage();
   }, [renderPage]);
-
-  const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
-    const fields: PlaceholderField[] = [];
-    const radios: RadioField[] = [];
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1 });
-
-      interface TextItem {
-        str: string;
-        transform: number[];
-        width: number;
-        height: number;
-      }
-
-      const items = textContent.items.filter((item): item is TextItem => "str" in item && item.str.length > 0);
-
-      const lines: TextItem[][] = [];
-      for (const item of items) {
-        const y = item.transform[5];
-        let foundLine = false;
-        for (const line of lines) {
-          const lineY = line[0].transform[5];
-          if (Math.abs(y - lineY) < 3) {
-            line.push(item);
-            foundLine = true;
-            break;
-          }
-        }
-        if (!foundLine) {
-          lines.push([item]);
-        }
-      }
-
-      for (const line of lines) {
-        line.sort((a, b) => a.transform[4] - b.transform[4]);
-        const fullText = line.map((i) => i.str).join("");
-
-        const placeholderRegex = /\{([a-zA-Z]+)\}/g;
-        let match;
-        while ((match = placeholderRegex.exec(fullText)) !== null) {
-          const token = match[0];
-          const mapping = PLACEHOLDER_MAP[token];
-
-          if (mapping) {
-            let charPos = 0;
-            let anchorItem: TextItem | null = null;
-            let anchorOffset = 0;
-
-            for (const item of line) {
-              if (charPos + item.str.length > match.index) {
-                anchorItem = item;
-                anchorOffset = match.index - charPos;
-                break;
-              }
-              charPos += item.str.length;
-            }
-
-            if (anchorItem) {
-              const x = anchorItem.transform[4] + (anchorOffset * (anchorItem.width / Math.max(anchorItem.str.length, 1)));
-              const y = anchorItem.transform[5];
-
-              let labelItem: TextItem | null = null;
-              for (let li = line.indexOf(anchorItem) - 1; li >= 0; li--) {
-                const candidate = line[li];
-                if (anchorItem.transform[4] - (candidate.transform[4] + candidate.width) < 15) {
-                  labelItem = candidate;
-                  break;
-                }
-              }
-
-              const anchorX = labelItem ? labelItem.transform[4] : x;
-              const nextFieldOnLine = fields.filter(
-                (f) => f.pageIndex === pageNum - 1 && Math.abs(f.y - y) < 3 && f.x > anchorX
-              );
-              const nextX = nextFieldOnLine.length > 0 ? Math.min(...nextFieldOnLine.map((f) => f.x)) : null;
-              const fieldWidth = nextX ? nextX - anchorX - 8 : viewport.width - anchorX - 20;
-
-              fields.push({
-                token,
-                key: mapping.key,
-                source: mapping.source,
-                dataKey: mapping.key,
-                x: anchorX + offsets.x,
-                y: viewport.height - y + offsets.y,
-                width: Math.max(fieldWidth, 60),
-                pageIndex: pageNum - 1,
-                value: resolveValue(mapping.source, mapping.key, data),
-              });
-            }
-          }
-        }
-
-        const radioRegex = /\{radio_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}/g;
-        let radioMatch;
-        while ((radioMatch = radioRegex.exec(fullText)) !== null) {
-          const rawGroup = radioMatch[1].toLowerCase();
-          const option = radioMatch[2].toLowerCase();
-          const group = rawGroup === "id" ? getRadioGroup(option) : rawGroup;
-
-          let charPos = 0;
-          let anchorItem: TextItem | null = null;
-
-          for (const item of line) {
-            if (charPos + item.str.length > radioMatch.index) {
-              anchorItem = item;
-              break;
-            }
-            charPos += item.str.length;
-          }
-
-          if (anchorItem) {
-            const x = anchorItem.transform[4] + offsets.x;
-            const y = viewport.height - anchorItem.transform[5] + offsets.y;
-            const fontSize = anchorItem.height || 12;
-
-            let selected = false;
-            const autoFill = RADIO_AUTO_FILL[group];
-            if (autoFill) {
-              const patientVal = data.patientData[autoFill.sourceField] || "";
-              const expectedOption = autoFill.valueMap[patientVal];
-              if (expectedOption === option) {
-                selected = true;
-              }
-            }
-
-            radios.push({
-              token: radioMatch[0],
-              group,
-              option,
-              x,
-              y,
-              pageIndex: pageNum - 1,
-              selected,
-              fontSize,
-            });
-          }
-        }
-      }
-
-      const radioItemRegex = /^[{\s]*radio\s*$/i;
-      const idItemRegex = /^[_\s]*id[_\s]*(\d{1,2})\s*\}?\s*$/i;
-      const combinedRadioRegex = /\{?\s*radio\s*_?\s*id\s*_?\s*(\d{1,2})\s*\}?/i;
-      const seenRadioOptions = new Set(radios.filter(r => r.pageIndex === pageNum - 1).map(r => r.option));
-
-      const addRadioFromItem = (option: string, itemX: number, itemY: number, itemHeight: number) => {
-        if (seenRadioOptions.has(option)) return;
-        seenRadioOptions.add(option);
-
-        const group = getRadioGroup(option);
-        const x = itemX + offsets.x;
-        const y = viewport.height - itemY + offsets.y;
-        const fontSize = itemHeight || 12;
-
-        let selected = false;
-        const autoFill = RADIO_AUTO_FILL[group];
-        if (autoFill) {
-          const patientVal = data.patientData[autoFill.sourceField] || "";
-          const expectedOption = autoFill.valueMap[patientVal];
-          if (expectedOption === option) {
-            selected = true;
-          }
-        }
-
-        radios.push({
-          token: `{radio_id_${option}}`,
-          group,
-          option,
-          x,
-          y,
-          pageIndex: pageNum - 1,
-          selected,
-          fontSize,
-        });
-      };
-
-      for (const item of items) {
-        const trimmed = item.str.trim();
-        const combined = combinedRadioRegex.exec(trimmed);
-        if (combined) {
-          addRadioFromItem(combined[1], item.transform[4], item.transform[5], item.height);
-          continue;
-        }
-
-        const idMatch = idItemRegex.exec(trimmed);
-        if (idMatch) {
-          addRadioFromItem(idMatch[1], item.transform[4], item.transform[5], item.height);
-        }
-      }
-
-      const radioOnlyRegex = /^\{?\s*radio\s*$/i;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (!radioOnlyRegex.test(item.str.trim())) continue;
-
-        for (let j = 0; j < items.length; j++) {
-          if (j === i) continue;
-          const other = items[j];
-          const dx = Math.abs(other.transform[4] - item.transform[4]);
-          const dy = Math.abs(other.transform[5] - item.transform[5]);
-          if (dx > 60 || dy > 20) continue;
-
-          const otherMatch = idItemRegex.exec(other.str.trim());
-          if (!otherMatch) continue;
-
-          const option = otherMatch[1];
-          const anchorX = Math.min(item.transform[4], other.transform[4]);
-          const anchorY = Math.max(item.transform[5], other.transform[5]);
-          addRadioFromItem(option, anchorX, anchorY, other.height || item.height);
-        }
-      }
-    }
-
-    setPlaceholderFields(fields);
-    setRadioFields(radios);
-  };
 
   const updateFieldValue = (index: number, value: string) => {
     setPlaceholderFields((prev) => {
