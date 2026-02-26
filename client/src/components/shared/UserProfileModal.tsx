@@ -363,7 +363,9 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         <Tabs defaultValue="profile" className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="profile" className="flex-1" data-testid="tab-profile">Profile</TabsTrigger>
-            <TabsTrigger value="purchases" className="flex-1" data-testid="tab-purchases">Purchases</TabsTrigger>
+            {!isUserDoctor && (
+              <TabsTrigger value="purchases" className="flex-1" data-testid="tab-purchases">Purchases</TabsTrigger>
+            )}
             <TabsTrigger value="notes" className="flex-1" data-testid="tab-notes">Notes</TabsTrigger>
             {isUserDoctor && (
               <TabsTrigger value="doctor" className="flex-1" data-testid="tab-doctor">
