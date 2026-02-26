@@ -56,6 +56,16 @@ import {
 
 const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
 
+const ALL_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+  "Wisconsin", "Wyoming"
+];
 
 type ApplicationWithPackage = Application & {
   package?: { name: string; price: number };
@@ -76,6 +86,7 @@ interface DoctorProfileData {
   specialty: string;
   state: string;
   gizmoFormUrl: string;
+  stateForms: Record<string, string>;
 }
 
 interface UserProfileModalProps {
@@ -95,6 +106,8 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
   const [newNote, setNewNote] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
   const [showGizmoPreview, setShowGizmoPreview] = useState(false);
+  const [selectedPdfState, setSelectedPdfState] = useState<string>("");
+  const [previewPdfState, setPreviewPdfState] = useState<string>("");
   const [doctorProfileData, setDoctorProfileData] = useState<DoctorProfileData>({
     fullName: "",
     licenseNumber: "",
@@ -106,6 +119,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     specialty: "",
     state: "",
     gizmoFormUrl: "",
+    stateForms: {},
   });
 
   const isUserDoctor = selectedUser?.userLevel === 2;
@@ -178,6 +192,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         specialty: doctorProfile.specialty || "",
         state: doctorProfile.state || "",
         gizmoFormUrl: doctorProfile.gizmoFormUrl || "",
+        stateForms: doctorProfile.stateForms || {},
       });
     } else if (selectedUser && isUserDoctor) {
       setDoctorProfileData({
@@ -191,6 +206,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         specialty: "",
         state: "",
         gizmoFormUrl: "",
+        stateForms: {},
       });
     }
   }, [doctorProfile, selectedUser, isUserDoctor]);
@@ -851,43 +867,82 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                       </span>
                     </div>
 
+                    {Object.keys(doctorProfileData.stateForms || {}).length > 0 && (
+                      <div className="space-y-2">
+                        {Object.entries(doctorProfileData.stateForms).map(([st, url]) => (
+                          <div key={st} className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md" data-testid={`state-form-card-${st}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="font-medium">{st}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setPreviewPdfState(st); setShowGizmoPreview(true); }}
+                                  data-testid={`button-preview-state-form-${st}`}
+                                >
+                                  <FileText className="h-3 w-3 mr-1" /> Preview & Fill
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    const updated = { ...doctorProfileData.stateForms };
+                                    delete updated[st];
+                                    setDoctorProfileData({ ...doctorProfileData, stateForms: updated });
+                                  }}
+                                  data-testid={`button-remove-state-form-${st}`}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" /> Remove
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 truncate">{(url as string).split("/").pop()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {doctorProfileData.gizmoFormUrl && (
-                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md overflow-hidden">
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="uploaded-pdf-card">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300 min-w-0">
-                            <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                            <span className="font-medium">PDF form uploaded</span>
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowGizmoPreview(true)}
-                              data-testid="button-preview-gizmo"
-                            >
-                              <FileText className="h-3 w-3 mr-1" /> Preview & Fill
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDoctorProfileData({ ...doctorProfileData, gizmoFormUrl: "" })}
-                              data-testid="button-remove-gizmo"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" /> Remove
-                            </Button>
-                          </div>
+                          <span className="font-medium text-sm text-amber-700 dark:text-amber-300">Uploaded PDF</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => setDoctorProfileData({ ...doctorProfileData, gizmoFormUrl: "" })}
+                            data-testid="button-clear-uploaded-pdf"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" /> Clear
+                          </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate max-w-full break-all">
-                          {doctorProfileData.gizmoFormUrl.split("/").pop()}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.gizmoFormUrl.split("/").pop()}</p>
+                        <Select value={selectedPdfState} onValueChange={(val) => {
+                          const updated = { ...doctorProfileData.stateForms, [val]: doctorProfileData.gizmoFormUrl };
+                          setDoctorProfileData({ ...doctorProfileData, stateForms: updated });
+                          setSelectedPdfState("");
+                        }}>
+                          <SelectTrigger className="mt-2" data-testid="select-assign-state">
+                            <SelectValue placeholder="Assign to state..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ALL_STATES.filter(s => !(doctorProfileData.stateForms || {})[s]).map(st => (
+                              <SelectItem key={st} value={st}>{st}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
 
                     <div className="space-y-1.5">
-                      <Label>{doctorProfileData.gizmoFormUrl ? "Replace PDF Form" : "Upload PDF Form"}</Label>
+                      <Label>Upload PDF Form</Label>
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
@@ -1041,8 +1096,8 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
       </DialogContent>
     </Dialog>
 
-    {showGizmoPreview && doctorProfileData.gizmoFormUrl && (
-      <Dialog open={showGizmoPreview} onOpenChange={setShowGizmoPreview}>
+    {showGizmoPreview && (previewPdfState ? (doctorProfileData.stateForms || {})[previewPdfState] : doctorProfileData.gizmoFormUrl) && (
+      <Dialog open={showGizmoPreview} onOpenChange={(open) => { setShowGizmoPreview(open); if (!open) setPreviewPdfState(""); }}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-auto [&>button.absolute]:hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>PDF Form Preview</DialogTitle>
@@ -1065,11 +1120,13 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                   specialty: doctorProfileData.specialty || "",
                   fax: doctorProfileData.fax || "",
                 },
-                gizmoFormUrl: doctorProfileData.gizmoFormUrl,
+                gizmoFormUrl: previewPdfState
+                  ? (doctorProfileData.stateForms || {})[previewPdfState]
+                  : doctorProfileData.gizmoFormUrl,
                 generatedDate: new Date().toLocaleDateString(),
                 patientName: "Test Patient",
               }}
-              onClose={() => setShowGizmoPreview(false)}
+              onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); }}
             />
           </Suspense>
         </DialogContent>

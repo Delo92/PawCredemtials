@@ -9,6 +9,7 @@ import path from "path";
 import fs from "fs";
 import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
 import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail } from "./email";
+import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
 
 function getContactEmail(user: Record<string, any>): string {
   return user.contactEmail || user.email;
@@ -855,6 +856,240 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
+  // PROFILE ROUTES
+  // ===========================================================================
+
+  app.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+      res.json(user);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const updated = await storage.updateUser(req.user!.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/profile/draft-form", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      res.json({ draftFormData: (user as any)?.draftFormData || {} });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/profile/draft-form", requireAuth, async (req, res) => {
+    try {
+      await storage.updateUser(req.user!.id, { draftFormData: req.body.draftFormData || {} } as any);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
+  // PAYMENT ROUTES
+  // ===========================================================================
+
+  app.get("/api/payment/config", (req, res) => {
+    res.json({
+      configured: isAuthorizeNetConfigured(),
+      acceptJsUrl: getAcceptJsUrl(),
+      apiLoginId: getApiLoginId(),
+      clientKey: process.env.AUTHORIZENET_CLIENT_KEY || "",
+    });
+  });
+
+  app.post("/api/payment/charge", requireAuth, async (req, res) => {
+    try {
+      const { opaqueDataDescriptor, opaqueDataValue, packageId, formData } = req.body;
+
+      if (!opaqueDataDescriptor || !opaqueDataValue) {
+        res.status(400).json({ message: "Payment token is required" });
+        return;
+      }
+      if (!packageId) {
+        res.status(400).json({ message: "Package is required" });
+        return;
+      }
+
+      const pkg = await storage.getPackage(packageId);
+      if (!pkg) {
+        res.status(404).json({ message: "Package not found" });
+        return;
+      }
+
+      const patient = req.user!;
+      const patientName = `${patient.firstName} ${patient.lastName}`;
+
+      const chargeResult = await chargeCard({
+        opaqueDataDescriptor,
+        opaqueDataValue,
+        amount: Number(pkg.price),
+        orderId: `APP-${Date.now()}`,
+        customerEmail: patient.email,
+        customerFirstName: patient.firstName,
+        customerLastName: patient.lastName,
+        description: `${pkg.name} - ESA Application`,
+      });
+
+      if (!chargeResult.success) {
+        res.status(402).json({ message: chargeResult.message });
+        return;
+      }
+
+      const rawSteps = pkg.workflowSteps as string[] | undefined;
+      const workflowSteps = (rawSteps && rawSteps.length > 0) ? rawSteps : defaultConfig.workflowSteps;
+      const application = await storage.createApplication({
+        userId: patient.id,
+        packageId,
+        currentStep: 1,
+        totalSteps: workflowSteps.length,
+        status: "pending",
+        formData: {
+          ...(formData || {}),
+          paymentTransactionId: chargeResult.transactionId,
+          paymentAuthCode: chargeResult.authCode,
+        },
+        paymentStatus: "paid",
+        paymentAmount: pkg.price,
+      });
+
+      for (let i = 0; i < workflowSteps.length; i++) {
+        await storage.createApplicationStep({
+          applicationId: application.id,
+          stepNumber: i + 1,
+          name: workflowSteps[i],
+          status: i === 0 ? "in-progress" : "pending",
+        });
+      }
+
+      const adminSettings = await storage.getAdminSettings();
+      const patientAppState = formData?.state || patient.state || "";
+      const doctor = await storage.getNextDoctorForAssignment();
+
+      if (doctor) {
+        const doctorUser = await storage.getUser(doctor.userId || doctor.id);
+        const protocol = "https";
+        const host = req.get("host") || "localhost:5000";
+
+        if (adminSettings?.autoCompleteApplications) {
+          await storage.updateApplication(application.id, {
+            status: "doctor_approved",
+            assignedReviewerId: doctor.userId || doctor.id,
+            level2ApprovedAt: new Date(),
+            level2ApprovedBy: doctor.userId || doctor.id,
+          });
+          await autoGenerateDocument(application.id, doctor.userId || doctor.id);
+          fireAutoMessageTriggers(application.id, "doctor_approved");
+
+          const patientContactEmail = getContactEmail(patient);
+          if (patientContactEmail) {
+            const dashboardUrl = `${protocol}://${host}/dashboard/applicant/documents`;
+            sendPatientApprovalEmail({
+              patientEmail: patientContactEmail, patientName,
+              packageName: pkg.name, applicationId: application.id, dashboardUrl,
+            }).catch(err => console.error("Payment auto-complete patient email error:", err));
+          }
+          if (doctorUser) {
+            sendDoctorCompletionCopyEmail({
+              doctorEmail: getContactEmail(doctorUser),
+              doctorName: doctorUser.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg.name, applicationId: application.id,
+              formData: formData || {},
+            }).catch(err => console.error("Payment auto-complete doctor copy error:", err));
+          }
+          const notificationEmail = adminSettings?.notificationEmail;
+          if (notificationEmail) {
+            sendAdminNotificationEmail({
+              adminEmail: notificationEmail,
+              doctorName: doctorUser?.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg.name, formData: formData || {},
+              reviewUrl: `${protocol}://${host}/dashboard/admin/applications`,
+              applicationId: application.id,
+            }).catch(err => console.error("Payment auto-complete admin email error:", err));
+          }
+        } else {
+          const token = randomBytes(32).toString("hex");
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 7);
+
+          await storage.createDoctorReviewToken({
+            applicationId: application.id,
+            doctorId: doctor.userId || doctor.id,
+            token, status: "pending", expiresAt,
+          });
+          await storage.updateApplication(application.id, {
+            status: "doctor_review",
+            assignedReviewerId: doctor.userId || doctor.id,
+          });
+
+          const reviewUrl = `${protocol}://${host}/review/${token}`;
+
+          if (doctorUser) {
+            sendDoctorApprovalEmail({
+              doctorEmail: getContactEmail(doctorUser),
+              doctorName: doctorUser.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg.name, formData: formData || {},
+              reviewUrl, applicationId: application.id,
+            }).catch(err => console.error("Payment doctor email error:", err));
+          }
+          const notificationEmail = adminSettings?.notificationEmail;
+          if (notificationEmail) {
+            sendAdminNotificationEmail({
+              adminEmail: notificationEmail,
+              doctorName: doctorUser?.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg.name, formData: formData || {},
+              reviewUrl, applicationId: application.id,
+            }).catch(err => console.error("Payment admin email error:", err));
+          }
+          fireAutoMessageTriggers(application.id, "doctor_review");
+        }
+      }
+
+      await storage.createActivityLog({
+        userId: patient.id,
+        action: "payment_completed",
+        entityType: "application",
+        entityId: application.id,
+        details: {
+          transactionId: chargeResult.transactionId,
+          amount: Number(pkg.price),
+          packageName: pkg.name,
+        },
+      });
+
+      await storage.updateUser(patient.id, { draftFormData: {} } as any);
+
+      res.json({
+        success: true,
+        application,
+        transactionId: chargeResult.transactionId,
+        message: "Payment processed and application submitted successfully",
+      });
+    } catch (error: any) {
+      console.error("Payment charge error:", error);
+      res.status(500).json({ message: error.message || "Payment processing failed" });
+    }
+  });
+
+  // ===========================================================================
   // PACKAGE ROUTES
   // ===========================================================================
 
@@ -1243,7 +1478,11 @@ export async function registerRoutes(
 
   app.post("/api/doctor-profiles", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const profile = await storage.createDoctorProfile(req.body);
+      const data = { ...req.body };
+      if (data.stateForms !== undefined) {
+        data.stateForms = data.stateForms;
+      }
+      const profile = await storage.createDoctorProfile(data);
       res.status(201).json(profile);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1252,7 +1491,11 @@ export async function registerRoutes(
 
   app.put("/api/doctor-profiles/:id", requireAuth, requireLevel(3), async (req, res) => {
     try {
-      const profile = await storage.updateDoctorProfile(req.params.id, req.body);
+      const data = { ...req.body };
+      if (data.stateForms !== undefined) {
+        data.stateForms = data.stateForms;
+      }
+      const profile = await storage.updateDoctorProfile(req.params.id, data);
       if (!profile) {
         res.status(404).json({ message: "Doctor profile not found" });
         return;
@@ -1294,9 +1537,12 @@ export async function registerRoutes(
       }
       const rawSteps = pkg.workflowSteps as string[] | undefined;
       const workflowSteps = (rawSteps && rawSteps.length > 0) ? rawSteps : ["Registration", "Payment", "Review", "Approval", "Completed"];
+      const draftData = (targetUser as any).draftFormData || {};
+      const draftCustomFields = draftData.customFields || {};
+
       const application = await storage.createApplication({
         userId: targetUser.id,
-        packageId,
+        packageId: draftData.packageId || packageId,
         currentStep: 1,
         totalSteps: workflowSteps.length,
         status: "pending",
@@ -1315,6 +1561,10 @@ export async function registerRoutes(
           city: targetUser.city || "",
           state: targetUser.state || "",
           zipCode: targetUser.zipCode || "",
+          disabilityCondition: draftData.disabilityCondition || "",
+          reason: draftData.reason || "",
+          additionalInfo: draftData.additionalInfo || "",
+          ...draftCustomFields,
         },
         paymentStatus: "paid",
         paymentAmount: pkg.price,
@@ -1423,9 +1673,123 @@ export async function registerRoutes(
           packageName: pkg.name,
         },
       });
+      await storage.updateUser(targetUser.id, { draftFormData: {} } as any);
       res.json({ application, message: "Manual payment processed successfully" });
     } catch (error: any) {
       console.error("Manual payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/applications/:id/process-payment", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const applicationId = req.params.id as string;
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        res.status(404).json({ message: "Application not found" });
+        return;
+      }
+      if (application.status !== "awaiting_payment") {
+        res.status(400).json({ message: "Application is not awaiting payment" });
+        return;
+      }
+      const pkg = application.packageId ? await storage.getPackage(application.packageId) : null;
+      const patient = await storage.getUser(application.userId);
+      if (!patient) {
+        res.status(404).json({ message: "Patient not found" });
+        return;
+      }
+      const patientName = `${patient.firstName} ${patient.lastName}`;
+      const formData = (application as any).formData || {};
+
+      await storage.updateApplication(applicationId, {
+        paymentStatus: "paid",
+        status: "pending",
+      });
+
+      const adminSettings = await storage.getAdminSettings();
+      const doctor = await storage.getNextDoctorForAssignment();
+      const protocol = "https";
+      const host = req.get("host") || "localhost:5000";
+
+      if (doctor) {
+        const doctorUser = await storage.getUser(doctor.userId || doctor.id);
+
+        if (adminSettings?.autoCompleteApplications) {
+          await storage.updateApplication(applicationId, {
+            status: "doctor_approved",
+            assignedReviewerId: doctor.userId || doctor.id,
+            level2ApprovedAt: new Date(),
+            level2ApprovedBy: doctor.userId || doctor.id,
+          });
+          await autoGenerateDocument(applicationId, doctor.userId || doctor.id);
+          fireAutoMessageTriggers(applicationId, "doctor_approved");
+
+          const patientContactEmail = getContactEmail(patient);
+          if (patientContactEmail) {
+            sendPatientApprovalEmail({
+              patientEmail: patientContactEmail, patientName,
+              packageName: pkg?.name || "", applicationId,
+              dashboardUrl: `${protocol}://${host}/dashboard/applicant/documents`,
+            }).catch(err => console.error("Process payment auto-complete patient email error:", err));
+          }
+          if (doctorUser) {
+            sendDoctorCompletionCopyEmail({
+              doctorEmail: getContactEmail(doctorUser),
+              doctorName: doctorUser.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg?.name || "", applicationId, formData,
+            }).catch(err => console.error("Process payment auto-complete doctor copy error:", err));
+          }
+        } else {
+          const token = randomBytes(32).toString("hex");
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 7);
+
+          await storage.createDoctorReviewToken({
+            applicationId, doctorId: doctor.userId || doctor.id,
+            token, status: "pending", expiresAt,
+          });
+          await storage.updateApplication(applicationId, {
+            status: "doctor_review",
+            assignedReviewerId: doctor.userId || doctor.id,
+          });
+
+          const reviewUrl = `${protocol}://${host}/review/${token}`;
+          if (doctorUser) {
+            sendDoctorApprovalEmail({
+              doctorEmail: getContactEmail(doctorUser),
+              doctorName: doctorUser.lastName || doctor.fullName || "Doctor",
+              patientName, patientEmail: getContactEmail(patient),
+              packageName: pkg?.name || "", formData, reviewUrl, applicationId,
+            }).catch(err => console.error("Process payment doctor email error:", err));
+          }
+        }
+
+        const notificationEmail = adminSettings?.notificationEmail;
+        if (notificationEmail) {
+          sendAdminNotificationEmail({
+            adminEmail: notificationEmail,
+            doctorName: "Assigned Doctor", patientName,
+            patientEmail: getContactEmail(patient),
+            packageName: pkg?.name || "", formData,
+            reviewUrl: `${protocol}://${host}/dashboard/admin/applications`,
+            applicationId,
+          }).catch(err => console.error("Process payment admin email error:", err));
+        }
+      }
+
+      await storage.createActivityLog({
+        userId: req.user!.id,
+        action: "process_payment",
+        entityType: "application",
+        entityId: applicationId,
+        details: { processedBy: `${req.user!.firstName} ${req.user!.lastName}` },
+      });
+
+      res.json({ success: true, message: "Payment processed and application submitted" });
+    } catch (error: any) {
+      console.error("Process payment error:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -2530,7 +2894,24 @@ export async function registerRoutes(
             licenseNumber: "", npiNumber: "",
           };
 
-      const gizmoFormUrl = doctorProfile?.gizmoFormUrl || formData.gizmoFormUrl || null;
+      const patientState = patientData.state || "";
+      const stateForms = (doctorProfile?.stateForms as Record<string, string>) || {};
+      const gizmoFormUrl = (patientState && stateForms[patientState])
+        ? stateForms[patientState]
+        : (doctorProfile?.gizmoFormUrl || formData.gizmoFormUrl || null);
+
+      const selectedRadioIds: string[] = [];
+      const pkgFormFields = (pkg as any)?.formFields || (pkg as any)?.requiredFields || [];
+      if (Array.isArray(pkgFormFields)) {
+        for (const field of pkgFormFields as any[]) {
+          if (field.radioOptions && Array.isArray(field.radioOptions)) {
+            const val = formData[field.name];
+            if (val) {
+              selectedRadioIds.push(String(val));
+            }
+          }
+        }
+      }
 
       const generatedDate = new Date().toLocaleDateString("en-US", {
         month: "2-digit",
@@ -2546,6 +2927,7 @@ export async function registerRoutes(
         generatedDate,
         patientName: `${patientData.firstName} ${patientData.lastName}`.trim(),
         packageName: pkg?.name || "",
+        selectedRadioIds,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2597,7 +2979,7 @@ export async function registerRoutes(
 
   app.post("/api/doctor-profiles", requireAuth, requireLevel(2), async (req, res) => {
     try {
-      const { fullName, licenseNumber, npiNumber, deaNumber, phone, fax, address, specialty, bio } = req.body;
+      const { fullName, licenseNumber, npiNumber, deaNumber, phone, fax, address, specialty, bio, stateForms } = req.body;
       if (!fullName || !licenseNumber) {
         res.status(400).json({ message: "fullName and licenseNumber are required" });
         return;
@@ -2607,11 +2989,15 @@ export async function registerRoutes(
         res.status(400).json({ message: "Doctor profile already exists. Use PUT to update." });
         return;
       }
-      const profile = await storage.createDoctorProfile({
+      const profileData: Record<string, any> = {
         fullName, licenseNumber, npiNumber, deaNumber, phone, fax, address, specialty, bio,
         userId: req.user!.id,
         firebaseUid: req.user!.firebaseUid,
-      });
+      };
+      if (stateForms !== undefined) {
+        profileData.stateForms = stateForms;
+      }
+      const profile = await storage.createDoctorProfile(profileData);
       res.status(201).json(profile);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2629,7 +3015,7 @@ export async function registerRoutes(
         res.status(403).json({ message: "Not authorized to update this profile" });
         return;
       }
-      const { fullName, licenseNumber, npiNumber, deaNumber, phone, fax, address, specialty, bio } = req.body;
+      const { fullName, licenseNumber, npiNumber, deaNumber, phone, fax, address, specialty, bio, stateForms } = req.body;
       const updateData: Record<string, any> = {};
       if (fullName !== undefined) updateData.fullName = fullName;
       if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber;
@@ -2640,6 +3026,7 @@ export async function registerRoutes(
       if (address !== undefined) updateData.address = address;
       if (specialty !== undefined) updateData.specialty = specialty;
       if (bio !== undefined) updateData.bio = bio;
+      if (stateForms !== undefined) updateData.stateForms = stateForms;
       const updated = await storage.updateDoctorProfile(req.params.id as string, updateData);
       res.json(updated);
     } catch (error: any) {

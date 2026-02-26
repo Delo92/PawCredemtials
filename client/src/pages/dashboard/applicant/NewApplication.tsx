@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Package } from "@shared/schema";
-import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User, CreditCard, Lock } from "lucide-react";
 
 const applicationSchema = z.object({
   packageId: z.string().min(1, "Please select a registration type"),
@@ -57,6 +57,17 @@ function isProfileComplete(profile: any): boolean {
   return requiredFields.every((f) => !!f) && requiredConsents.every((c) => !!c);
 }
 
+declare global {
+  interface Window {
+    Accept?: {
+      dispatchData: (
+        secureData: any,
+        callback: (response: any) => void
+      ) => void;
+    };
+  }
+}
+
 export default function NewApplication() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -68,6 +79,14 @@ export default function NewApplication() {
   const [step, setStep] = useState(1);
   const totalSteps = 3;
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  const [cardNumber, setCardNumber] = useState("");
+  const [expMonth, setExpMonth] = useState("");
+  const [expYear, setExpYear] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [acceptJsLoaded, setAcceptJsLoaded] = useState(false);
+  const draftLoaded = useRef(false);
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: profile, isLoading: profileLoading } = useQuery<any>({
     queryKey: ["/api/profile"],
@@ -75,6 +94,14 @@ export default function NewApplication() {
 
   const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
     queryKey: ["/api/packages"],
+  });
+
+  const { data: draftData } = useQuery<any>({
+    queryKey: ["/api/profile/draft-form"],
+  });
+
+  const { data: paymentConfig } = useQuery<any>({
+    queryKey: ["/api/payment/config"],
   });
 
   const profileComplete = isProfileComplete(profile);
@@ -87,58 +114,175 @@ export default function NewApplication() {
     },
   });
 
-  const selectedPackage = packages?.find((p) => p.id === form.watch("packageId"));
+  useEffect(() => {
+    if (draftData?.draftFormData && !draftLoaded.current && !preselectedPackage) {
+      const draft = draftData.draftFormData;
+      if (draft.packageId) {
+        form.setValue("packageId", draft.packageId);
+      }
+      if (draft.reason) {
+        form.setValue("reason", draft.reason);
+      }
+      if (draft.customFields) {
+        setCustomFields(draft.customFields);
+      }
+      if (draft.step && draft.step >= 1 && draft.step <= totalSteps) {
+        setStep(draft.step);
+      }
+      draftLoaded.current = true;
+    }
+  }, [draftData, form, preselectedPackage]);
+
+  useEffect(() => {
+    if (paymentConfig?.acceptJsUrl && !acceptJsLoaded) {
+      const existing = document.querySelector(`script[src="${paymentConfig.acceptJsUrl}"]`);
+      if (existing) {
+        setAcceptJsLoaded(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = paymentConfig.acceptJsUrl;
+      script.async = true;
+      script.onload = () => setAcceptJsLoaded(true);
+      script.onerror = () => console.error("Failed to load Accept.js");
+      document.head.appendChild(script);
+    }
+  }, [paymentConfig, acceptJsLoaded]);
+
+  const saveDraft = useCallback((packageId: string, reason: string, fields: Record<string, string>, currentStep: number) => {
+    if (draftSaveTimer.current) {
+      clearTimeout(draftSaveTimer.current);
+    }
+    draftSaveTimer.current = setTimeout(() => {
+      apiRequest("PUT", "/api/profile/draft-form", {
+        draftFormData: { packageId, reason, customFields: fields, step: currentStep },
+      }).catch(() => {});
+    }, 1000);
+  }, []);
+
+  const watchedPackageId = form.watch("packageId");
+  const watchedReason = form.watch("reason");
+
+  useEffect(() => {
+    if (draftLoaded.current || watchedPackageId || watchedReason || Object.keys(customFields).length > 0) {
+      saveDraft(watchedPackageId, watchedReason, customFields, step);
+    }
+  }, [watchedPackageId, watchedReason, customFields, step, saveDraft]);
+
+  const selectedPackage = packages?.find((p) => p.id === watchedPackageId);
 
   const fullName = [profile?.firstName, profile?.middleName, profile?.lastName]
     .filter(Boolean)
     .join(" ");
 
-  const createApplication = useMutation({
-    mutationFn: async (data: ApplicationFormData) => {
-      const formData = {
-        ...data,
-        ...customFields,
-        fullName,
-        firstName: profile?.firstName,
-        middleName: profile?.middleName,
-        lastName: profile?.lastName,
-        email: profile?.email,
-        phone: profile?.phone,
-        dateOfBirth: profile?.dateOfBirth,
-        address: profile?.address,
-        city: profile?.city,
-        state: profile?.state,
-        zipCode: profile?.zipCode,
-        driverLicenseNumber: profile?.driverLicenseNumber,
-        medicalCondition: profile?.medicalCondition,
-        ssn: profile?.ssn,
-        hasMedicare: profile?.hasMedicare,
-        isVeteran: profile?.isVeteran,
+  const buildFormData = useCallback(() => {
+    return {
+      ...form.getValues(),
+      ...customFields,
+      fullName,
+      firstName: profile?.firstName,
+      middleName: profile?.middleName,
+      lastName: profile?.lastName,
+      email: profile?.email,
+      phone: profile?.phone,
+      dateOfBirth: profile?.dateOfBirth,
+      address: profile?.address,
+      city: profile?.city,
+      state: profile?.state,
+      zipCode: profile?.zipCode,
+      driverLicenseNumber: profile?.driverLicenseNumber,
+      medicalCondition: profile?.medicalCondition,
+      ssn: profile?.ssn,
+      hasMedicare: profile?.hasMedicare,
+      isVeteran: profile?.isVeteran,
+    };
+  }, [form, customFields, fullName, profile]);
+
+  const processPayment = useCallback(async () => {
+    if (!selectedPackage) return;
+
+    if (paymentConfig?.configured && acceptJsLoaded && window.Accept) {
+      if (!cardNumber || !expMonth || !expYear || !cvv) {
+        toast({ title: "Missing Card Details", description: "Please fill in all credit card fields", variant: "destructive" });
+        return;
+      }
+
+      setPaymentProcessing(true);
+
+      const secureData = {
+        authData: {
+          clientKey: paymentConfig.clientKey,
+          apiLoginID: paymentConfig.apiLoginId,
+        },
+        cardData: {
+          cardNumber: cardNumber.replace(/\s/g, ""),
+          month: expMonth.padStart(2, "0"),
+          year: expYear.length === 2 ? `20${expYear}` : expYear,
+          cardCode: cvv,
+        },
       };
-      const response = await apiRequest("POST", "/api/applications", {
-        packageId: data.packageId,
-        formData,
-        autoSendToDoctor: true,
-        paymentStatus: "paid",
+
+      window.Accept.dispatchData(secureData, async (response: any) => {
+        if (response.messages.resultCode === "Error") {
+          setPaymentProcessing(false);
+          toast({
+            title: "Payment Error",
+            description: response.messages.message[0]?.text || "Card validation failed",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        try {
+          const chargeRes = await apiRequest("POST", "/api/payment/charge", {
+            opaqueDataDescriptor: response.opaqueData.dataDescriptor,
+            opaqueDataValue: response.opaqueData.dataValue,
+            packageId: selectedPackage.id,
+            formData: buildFormData(),
+          });
+          const result = await chargeRes.json();
+
+          await apiRequest("PUT", "/api/profile/draft-form", { draftFormData: {} }).catch(() => {});
+
+          queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/profile/draft-form"] });
+          toast({
+            title: "Order Submitted!",
+            description: "Payment processed and application submitted successfully.",
+          });
+          setLocation(`/dashboard/applicant/applications/${result.application?.id || ""}`);
+        } catch (error: any) {
+          toast({ title: "Payment Failed", description: error.message || "Payment processing failed", variant: "destructive" });
+        } finally {
+          setPaymentProcessing(false);
+        }
       });
-      return response.json();
-    },
-    onSuccess: (application) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
-      toast({
-        title: "Order Submitted!",
-        description: "Your ESA letter application has been submitted successfully.",
-      });
-      setLocation(`/dashboard/applicant/applications/${application.id}`);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Submission Failed",
-        description: error.message || "Something went wrong",
-        variant: "destructive",
-      });
-    },
-  });
+    } else {
+      setPaymentProcessing(true);
+      try {
+        const response = await apiRequest("POST", "/api/applications", {
+          packageId: selectedPackage.id,
+          formData: buildFormData(),
+          autoSendToDoctor: true,
+          paymentStatus: "paid",
+        });
+        const application = await response.json();
+        await apiRequest("PUT", "/api/profile/draft-form", { draftFormData: {} }).catch(() => {});
+
+        queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/profile/draft-form"] });
+        toast({
+          title: "Order Submitted!",
+          description: "Your ESA letter application has been submitted successfully.",
+        });
+        setLocation(`/dashboard/applicant/applications/${application.id}`);
+      } catch (error: any) {
+        toast({ title: "Submission Failed", description: error.message || "Something went wrong", variant: "destructive" });
+      } finally {
+        setPaymentProcessing(false);
+      }
+    }
+  }, [selectedPackage, paymentConfig, acceptJsLoaded, cardNumber, expMonth, expYear, cvv, buildFormData, toast, setLocation]);
 
   const nextStep = () => {
     if (step === 1 && !form.getValues("packageId")) {
@@ -156,8 +300,8 @@ export default function NewApplication() {
     }
   };
 
-  const onSubmit = (data: ApplicationFormData) => {
-    createApplication.mutate(data);
+  const onSubmit = async (data: ApplicationFormData) => {
+    await processPayment();
   };
 
   if (profileLoading) {
@@ -217,7 +361,8 @@ export default function NewApplication() {
               Apply for ESA Letter
             </h1>
             <p className="text-muted-foreground">
-              Step {step} of {totalSteps}
+              Step {step} of {totalSteps}:{" "}
+              {step === 1 ? "Select Package" : step === 2 ? "Your Information" : "Review & Pay"}
             </p>
           </div>
         </div>
@@ -397,6 +542,30 @@ export default function NewApplication() {
                                 }
                                 data-testid={`input-custom-${field.name}`}
                               />
+                            ) : field.type === "radio" && Array.isArray(field.radioOptions) ? (
+                              <RadioGroup
+                                value={customFields[field.name] || ""}
+                                onValueChange={(value) =>
+                                  setCustomFields({ ...customFields, [field.name]: value })
+                                }
+                                className="space-y-2 mt-2"
+                              >
+                                {field.radioOptions.map((opt: any) => (
+                                  <div key={opt.radioId} className="flex items-center gap-3">
+                                    <RadioGroupItem
+                                      value={opt.radioId}
+                                      id={`${field.name}-${opt.radioId}`}
+                                      data-testid={`radio-custom-${field.name}-${opt.radioId}`}
+                                    />
+                                    <Label
+                                      htmlFor={`${field.name}-${opt.radioId}`}
+                                      className="cursor-pointer font-normal"
+                                    >
+                                      {opt.statement}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
                             ) : field.type === "select" ? (
                               <Select
                                 value={customFields[field.name] || ""}
@@ -434,55 +603,127 @@ export default function NewApplication() {
             )}
 
             {step === 3 && (
-              <Card data-testid="step-final-review">
-                <CardHeader>
-                  <CardTitle>Review & Submit</CardTitle>
-                  <CardDescription>
-                    Please review your application details before submitting
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedPackage && (
-                    <div className="p-4 rounded-md border bg-muted/30">
-                      <p className="text-sm font-medium mb-1">Selected Registration Type</p>
-                      <p className="text-lg font-bold" data-testid="text-selected-package">
-                        {selectedPackage.name}
-                      </p>
-                      <p className="text-2xl font-bold text-primary mt-2" data-testid="text-selected-price">
-                        ${(Number(selectedPackage.price) / 100).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
+              <div className="space-y-6">
+                <Card data-testid="step-final-review">
+                  <CardHeader>
+                    <CardTitle>Review & Pay</CardTitle>
+                    <CardDescription>
+                      Please review your order details and complete payment
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {selectedPackage && (
+                      <div className="p-4 rounded-md border bg-muted/30">
+                        <p className="text-sm font-medium mb-1">Selected Registration Type</p>
+                        <p className="text-lg font-bold" data-testid="text-selected-package">
+                          {selectedPackage.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">{selectedPackage.description}</p>
+                        <p className="text-2xl font-bold text-primary" data-testid="text-selected-price">
+                          ${(Number(selectedPackage.price) / 100).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
 
-                  <div className="p-4 rounded-md border bg-muted/30">
-                    <p className="text-sm font-medium mb-1">Applicant</p>
-                    <p className="font-bold">{fullName}</p>
-                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
-                    <p className="text-sm text-muted-foreground">{profile?.phone}</p>
-                  </div>
-
-                  {form.getValues("reason") && (
                     <div className="p-4 rounded-md border bg-muted/30">
-                      <p className="text-sm font-medium mb-1">Reason</p>
-                      <p className="text-sm">{form.getValues("reason")}</p>
+                      <p className="text-sm font-medium mb-1">Applicant</p>
+                      <p className="font-bold">{fullName}</p>
+                      <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                      <p className="text-sm text-muted-foreground">{profile?.phone}</p>
                     </div>
-                  )}
 
-                  {Object.keys(customFields).length > 0 && (
-                    <div className="p-4 rounded-md border bg-muted/30">
-                      <p className="text-sm font-medium mb-2">Additional Details</p>
-                      {Object.entries(customFields).map(([key, value]) => (
-                        value && (
-                          <div key={key} className="mb-1">
-                            <span className="text-sm text-muted-foreground capitalize">{key.replace(/_/g, " ")}: </span>
-                            <span className="text-sm">{value}</span>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {form.getValues("reason") && (
+                      <div className="p-4 rounded-md border bg-muted/30">
+                        <p className="text-sm font-medium mb-1">Reason</p>
+                        <p className="text-sm">{form.getValues("reason")}</p>
+                      </div>
+                    )}
+
+                    {Object.keys(customFields).length > 0 && (
+                      <div className="p-4 rounded-md border bg-muted/30">
+                        <p className="text-sm font-medium mb-2">Additional Details</p>
+                        {Object.entries(customFields).map(([key, value]) => (
+                          value && (
+                            <div key={key} className="mb-1">
+                              <span className="text-sm text-muted-foreground capitalize">{key.replace(/_/g, " ")}: </span>
+                              <span className="text-sm">{value}</span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {paymentConfig?.configured && (
+                  <Card data-testid="card-payment">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5" />
+                        Payment Information
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-1">
+                        <Lock className="h-3 w-3" />
+                        Your payment details are securely processed
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="cardNumber">Card Number</Label>
+                        <Input
+                          id="cardNumber"
+                          placeholder="4111 1111 1111 1111"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                          maxLength={19}
+                          data-testid="input-card-number"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="expMonth">Month</Label>
+                          <Select value={expMonth} onValueChange={setExpMonth}>
+                            <SelectTrigger data-testid="select-exp-month">
+                              <SelectValue placeholder="MM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => {
+                                const m = String(i + 1).padStart(2, "0");
+                                return <SelectItem key={m} value={m}>{m}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="expYear">Year</Label>
+                          <Select value={expYear} onValueChange={setExpYear}>
+                            <SelectTrigger data-testid="select-exp-year">
+                              <SelectValue placeholder="YYYY" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 10 }, (_, i) => {
+                                const y = String(new Date().getFullYear() + i);
+                                return <SelectItem key={y} value={y}>{y}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="cvv">CVV</Label>
+                          <Input
+                            id="cvv"
+                            placeholder="123"
+                            value={cvv}
+                            onChange={(e) => setCvv(e.target.value)}
+                            maxLength={4}
+                            data-testid="input-cvv"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             <div className="flex justify-between gap-4 mt-6">
@@ -505,18 +746,27 @@ export default function NewApplication() {
               ) : (
                 <Button
                   type="submit"
-                  disabled={createApplication.isPending}
+                  disabled={paymentProcessing}
                   data-testid="button-submit-application"
                 >
-                  {createApplication.isPending ? (
+                  {paymentProcessing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
+                      Processing...
                     </>
                   ) : (
                     <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Submit Order
+                      {paymentConfig?.configured ? (
+                        <>
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Pay ${selectedPackage ? (Number(selectedPackage.price) / 100).toFixed(2) : "0.00"} & Submit
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-2 h-4 w-4" />
+                          Submit Order
+                        </>
+                      )}
                     </>
                   )}
                 </Button>

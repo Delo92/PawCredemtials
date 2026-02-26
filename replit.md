@@ -42,17 +42,22 @@ A 4-tier role-based system:
 Role names are configurable per deployment.
 
 ### Key Features and Workflow
-- **Application Workflow**: A multi-step wizard for creating applications, with a profile completeness gate.
+- **Application Workflow**: A 3-step wizard (Select Package → Your Information → Review & Pay) with profile completeness gate and draft save/restore.
 - **Doctor Review System**: Secure, token-based review links for doctors, supporting round-robin assignment.
 - **Automated Document Generation**: Certificates are auto-generated upon doctor approval, incorporating doctor credentials.
 - **Auto-Message Triggers**: Automated notifications based on application status changes.
 - **Owner Configuration**: Comprehensive white-label settings for branding and site content.
 - **Admin Management**: Tools for user and application management, including manual payment processing.
-- **Gizmo Form System**: Browser-side PDF auto-fill using `pdf-lib` and `pdfjs-dist` for both AcroForm and placeholder PDFs, with PDF template upload and management.
+- **Gizmo Form System**: Browser-side PDF auto-fill using `pdf-lib` and `pdfjs-dist` for both AcroForm and placeholder PDFs, with PDF template upload and management. Supports `selectedRadioIds` from patient answers and radio position offsets for IDs 6-16.
 - **Application Processing**: Automated workflow from applicant submission to doctor review (or auto-completion based on settings) and final certification, with comprehensive email integrations via SendGrid.
+- **Per-Doctor State PDFs**: Doctors can have state-specific PDF forms (`stateForms` on doctor profile). The form data endpoint resolves `doctorProfile.stateForms[patientState]` first, then falls back to `doctorProfile.gizmoFormUrl`.
+- **Package Radio Button Fields**: Packages support radio-type form fields with `radioOptions` (radioId + statement pairs). Patient sees statement text, stores radioId as value.
+- **Authorize.Net Payment Integration**: `server/authorizenet.ts` handles `chargeCard`, Accept.js client-side tokenization. Payment config endpoint provides Accept.js URL and API credentials. Falls back to direct submission when Authorize.Net is not configured.
+- **Draft Save/Restore**: Applicant form data auto-saves to `/api/profile/draft-form` with 1s debounce. Restores packageId, reason, customFields, and step on page load.
+- **Awaiting Payment Status**: Applications can have `awaiting_payment` status. Admin can process payment via `POST /api/admin/applications/:id/process-payment`.
 
 ### API Endpoints
-Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, and form data handling.
+Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), and admin payment processing (`/api/admin/applications/:id/process-payment`).
 
 ## External Dependencies
 

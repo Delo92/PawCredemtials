@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   FileText, Search, Clock, CheckCircle, XCircle, Stethoscope, Send,
-  Loader2, Copy, ExternalLink,
+  Loader2, Copy, ExternalLink, CreditCard,
 } from "lucide-react";
 
 function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" {
@@ -43,6 +43,7 @@ export default function ApplicationsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sendingAppId, setSendingAppId] = useState<string | null>(null);
+  const [processingPaymentId, setProcessingPaymentId] = useState<string | null>(null);
   const [reviewLinkDialog, setReviewLinkDialog] = useState<{ url: string; doctorName: string } | null>(null);
 
   const { data: applications, isLoading } = useQuery<any[]>({
@@ -73,6 +74,29 @@ export default function ApplicationsListPage() {
     },
   });
 
+  const processPaymentMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const res = await apiRequest("POST", `/api/admin/applications/${applicationId}/process-payment`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Payment Processed",
+        description: "Payment has been processed successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/applications"] });
+      setProcessingPaymentId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process payment",
+        variant: "destructive",
+      });
+      setProcessingPaymentId(null);
+    },
+  });
+
   if (!user) return null;
 
   const filteredApps = applications?.filter(app => {
@@ -89,6 +113,7 @@ export default function ApplicationsListPage() {
   }) || [];
 
   const pendingCount = applications?.filter(a => a.status === "pending" || a.status === "level3_work").length || 0;
+  const awaitingPaymentCount = applications?.filter(a => a.status === "awaiting_payment").length || 0;
   const doctorReviewCount = applications?.filter(a => a.status === "doctor_review").length || 0;
   const approvedCount = applications?.filter(a => a.status === "completed" || a.status === "doctor_approved").length || 0;
   const deniedCount = applications?.filter(a => a.status === "rejected" || a.status === "doctor_denied").length || 0;
@@ -111,14 +136,14 @@ export default function ApplicationsListPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{applications?.length || 0}</div>
+              <div className="text-2xl font-bold" data-testid="text-total-count">{applications?.length || 0}</div>
               <p className="text-xs text-muted-foreground">All orders</p>
             </CardContent>
           </Card>
@@ -128,8 +153,18 @@ export default function ApplicationsListPage() {
               <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{pendingCount}</div>
+              <div className="text-2xl font-bold" data-testid="text-pending-count">{pendingCount}</div>
               <p className="text-xs text-muted-foreground">Ready to send</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">Awaiting Payment</CardTitle>
+              <CreditCard className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-awaiting-payment-count">{awaitingPaymentCount}</div>
+              <p className="text-xs text-muted-foreground">Payment pending</p>
             </CardContent>
           </Card>
           <Card>
@@ -138,7 +173,7 @@ export default function ApplicationsListPage() {
               <Stethoscope className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{doctorReviewCount}</div>
+              <div className="text-2xl font-bold" data-testid="text-doctor-review-count">{doctorReviewCount}</div>
               <p className="text-xs text-muted-foreground">Awaiting approval</p>
             </CardContent>
           </Card>
@@ -148,7 +183,7 @@ export default function ApplicationsListPage() {
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{approvedCount}</div>
+              <div className="text-2xl font-bold" data-testid="text-approved-count">{approvedCount}</div>
               <p className="text-xs text-muted-foreground">Approved</p>
             </CardContent>
           </Card>
@@ -178,6 +213,7 @@ export default function ApplicationsListPage() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
                   <SelectItem value="doctor_review">With Doctor</SelectItem>
                   <SelectItem value="doctor_approved">Approved</SelectItem>
                   <SelectItem value="doctor_denied">Denied</SelectItem>
@@ -238,6 +274,24 @@ export default function ApplicationsListPage() {
                           <Send className="h-4 w-4 mr-1" />
                         )}
                         Send to Doctor
+                      </Button>
+                    )}
+                    {app.status === "awaiting_payment" && user.userLevel >= 3 && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setProcessingPaymentId(app.id);
+                          processPaymentMutation.mutate(app.id);
+                        }}
+                        disabled={processPaymentMutation.isPending && processingPaymentId === app.id}
+                        data-testid={`button-process-payment-${app.id}`}
+                      >
+                        {processPaymentMutation.isPending && processingPaymentId === app.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <CreditCard className="h-4 w-4 mr-1" />
+                        )}
+                        Process Payment
                       </Button>
                     )}
                     {app.status === "doctor_review" && (
