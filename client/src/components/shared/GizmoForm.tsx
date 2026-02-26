@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import * as pdfjsLib from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Printer, RefreshCw, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, Download, Printer, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export interface GizmoFormData {
   success: boolean;
@@ -28,7 +29,7 @@ interface PlaceholderField {
   x: number;
   y: number;
   width: number;
-  page: number;
+  pageIndex: number;
   value: string;
 }
 
@@ -38,9 +39,14 @@ interface RadioField {
   option: string;
   x: number;
   y: number;
-  page: number;
+  pageIndex: number;
   selected: boolean;
   fontSize: number;
+}
+
+interface GizmoFormProps {
+  data: GizmoFormData;
+  onClose?: () => void;
 }
 
 const FIELD_NAME_MAP: Record<string, { source: "patient" | "doctor" | "meta"; key: string }> = {
@@ -112,6 +118,10 @@ const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; k
   "{doctorNpiNumber}": { source: "doctor", key: "npiNumber" },
 };
 
+function normalizeFieldName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function getRadioGroup(option: string): string {
   const num = parseInt(option, 10);
   if (num >= 1 && num <= 3) return "placardtype";
@@ -140,52 +150,49 @@ const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<st
   },
 };
 
-const DOCTOR_FORM_OFFSETS: Record<string, { x: number; y: number }> = {
-  fore: { x: 3, y: -4 },
-  foshee: { x: 0, y: -3 },
-};
-
-function formatDOB(val: string): string {
-  if (!val) return "";
-  const match = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (match) return `${match[2]}/${match[3]}/${match[1]}`;
-  return val;
-}
+const DOCTOR_FORM_OFFSETS: Record<string, { x: number; y: number }> = {};
 
 function resolveValue(
   source: "patient" | "doctor" | "meta",
   key: string,
   data: GizmoFormData
 ): string {
-  let val = "";
-  if (source === "patient") val = data.patientData[key] || "";
-  else if (source === "doctor") val = data.doctorData[key] || "";
-  else if (source === "meta") val = (data as any)[key] || "";
-  if (key === "dateOfBirth") val = formatDOB(val);
+  if (source === "meta") {
+    if (key === "generatedDate") return data.generatedDate || "";
+    return "";
+  }
+  const sourceObj = source === "patient" ? data.patientData : data.doctorData;
+  let val = sourceObj[key] || "";
+  if (key === "dateOfBirth" && val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const [y, m, d] = val.split("-");
+    val = `${m}/${d}/${y}`;
+  }
   return val;
 }
 
-interface GizmoFormProps {
-  data: GizmoFormData;
-  onClose?: () => void;
+function sanitizeFilename(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 export function GizmoForm({ data, onClose }: GizmoFormProps) {
+  const { toast } = useToast();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"acroform" | "placeholder" | null>(null);
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
-  const [fields, setFields] = useState<PlaceholderField[]>([]);
-  const [radioFields, setRadioFields] = useState<RadioField[]>([]);
-  const [acroFormValues, setAcroFormValues] = useState<Record<string, string>>({});
-  const [acroFormFieldNames, setAcroFormFieldNames] = useState<string[]>([]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pageCount, setPageCount] = useState(0);
+  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
-  const [scale] = useState(1.5);
+  const [totalPages, setTotalPages] = useState(1);
+  const [scale, setScale] = useState(1.0);
+  const [placeholderFields, setPlaceholderFields] = useState<PlaceholderField[]>([]);
+  const [radioFields, setRadioFields] = useState<RadioField[]>([]);
+  const [acroFormFields, setAcroFormFields] = useState<{ name: string; normalizedName: string; value: string; matched: boolean }[]>([]);
+  const [downloading, setDownloading] = useState(false);
 
-  const doctorLastName = (data.doctorData.lastName || "").toLowerCase();
+  const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
 
   const loadPdf = useCallback(async () => {
@@ -199,551 +206,645 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       setLoading(true);
       setError(null);
 
-      const proxyUrl = `/api/forms/proxy-pdf?url=${encodeURIComponent(data.gizmoFormUrl)}`;
-      const response = await fetch(proxyUrl);
+      const fetchUrl = data.gizmoFormUrl.startsWith("/")
+        ? data.gizmoFormUrl
+        : `/api/forms/proxy-pdf?url=${encodeURIComponent(data.gizmoFormUrl)}`;
+      const response = await fetch(fetchUrl);
       if (!response.ok) throw new Error("Failed to fetch PDF template");
+
       const originalBytes = await response.arrayBuffer();
-      setPdfBytes(originalBytes);
+      const bytes = originalBytes.slice(0);
+      setPdfBytes(bytes);
 
-      const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0), { ignoreEncryption: true });
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+
+      const { PDFDocument } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0));
       const form = pdfLibDoc.getForm();
-      const pdfFields = form.getFields();
+      const fields = form.getFields();
 
-      let acroMatches = 0;
-      const acroValues: Record<string, string> = {};
-      const fieldNames: string[] = [];
+      if (fields.length > 0) {
+        let matchCount = 0;
+        const acroFields = fields.map((f) => {
+          const name = f.getName();
+          const normalized = normalizeFieldName(name);
+          const mapping = FIELD_NAME_MAP[normalized];
+          let value = "";
+          let matched = false;
 
-      for (const field of pdfFields) {
-        const name = field.getName();
-        fieldNames.push(name);
-        const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const mapping = FIELD_NAME_MAP[normalized];
-        if (mapping) {
-          acroMatches++;
-          const val = resolveValue(mapping.source, mapping.key, data);
-          acroValues[name] = val;
-        } else {
-          acroValues[name] = "";
+          if (mapping) {
+            value = resolveValue(mapping.source, mapping.key, data);
+            matched = true;
+            matchCount++;
+          }
+
+          return { name, normalizedName: normalized, value, matched };
+        });
+
+        if (matchCount > 0) {
+          setMode("acroform");
+          setAcroFormFields(acroFields);
+
+          for (const af of acroFields) {
+            if (af.matched && af.value) {
+              try {
+                const field = form.getTextField(af.name);
+                field.setText(af.value);
+                field.setFontSize(10);
+                field.updateAppearances();
+              } catch {}
+            }
+          }
+
+          const previewDoc = await PDFDocument.load(originalBytes.slice(0));
+          const previewForm = previewDoc.getForm();
+          for (const af of acroFields) {
+            if (af.matched && af.value) {
+              try {
+                const pf = previewForm.getTextField(af.name);
+                pf.setText(af.value);
+                pf.setFontSize(10);
+                pf.updateAppearances();
+              } catch {}
+            }
+          }
+          previewForm.flatten();
+          const previewBytes = await previewDoc.save();
+          const previewBuffer = previewBytes.buffer as ArrayBuffer;
+
+          const editableBytes = await pdfLibDoc.save();
+          const editableBuffer = editableBytes.buffer as ArrayBuffer;
+          setPdfBytes(editableBuffer.slice(0));
+
+          const filledPdf = await pdfjsLib.getDocument({ data: new Uint8Array(previewBuffer.slice(0)) }).promise;
+          setPdfDoc(filledPdf);
+          setLoading(false);
+          return;
         }
       }
 
-      if (acroMatches > 0) {
-        setMode("acroform");
-        setAcroFormValues(acroValues);
-        setAcroFormFieldNames(fieldNames);
-
-        const flatDoc = await PDFDocument.load(originalBytes.slice(0), { ignoreEncryption: true });
-        const flatForm = flatDoc.getForm();
-        for (const fieldName of fieldNames) {
-          const val = acroValues[fieldName] || "";
-          try {
-            const f = flatForm.getTextField(fieldName);
-            f.setText(val);
-            f.updateAppearances();
-          } catch {}
-        }
-        flatForm.flatten();
-        const flatBytes = await flatDoc.save();
-
-        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(flatBytes) });
-        const doc = await loadingTask.promise;
-        setPdfDoc(doc);
-        setPageCount(doc.numPages);
-        setCurrentPage(1);
-      } else {
-        setMode("placeholder");
-        await extractPlaceholders(originalBytes);
-
-        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) });
-        const doc = await loadingTask.promise;
-        setPdfDoc(doc);
-        setPageCount(doc.numPages);
-        setCurrentPage(1);
-      }
+      setMode("placeholder");
+      await extractPlaceholdersFromPdf(pdf);
+      setLoading(false);
     } catch (err: any) {
+      console.error("GizmoForm load error:", err);
       setError(err.message || "Failed to load PDF");
-    } finally {
       setLoading(false);
     }
   }, [data]);
 
-  interface TextItem {
-    str: string;
-    transform: number[];
-    width: number;
-    height: number;
-  }
+  useEffect(() => {
+    loadPdf();
+  }, [loadPdf]);
 
-  async function extractPlaceholders(bytes: ArrayBuffer) {
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(bytes.slice(0)) });
-    const doc = await loadingTask.promise;
-    const detectedFields: PlaceholderField[] = [];
-    const detectedRadios: RadioField[] = [];
+  const renderPage = useCallback(async () => {
+    if (!pdfDoc) return;
 
-    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-      const page = await doc.getPage(pageNum);
+    const tryRender = async (retries = 5): Promise<void> => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 100));
+          return tryRender(retries - 1);
+        }
+        return;
+      }
+
+      const page = await pdfDoc.getPage(currentPage);
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext("2d")!;
+
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+    };
+
+    await tryRender();
+  }, [pdfDoc, currentPage, scale]);
+
+  useEffect(() => {
+    renderPage();
+  }, [renderPage]);
+
+  const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
+    const fields: PlaceholderField[] = [];
+    const radios: RadioField[] = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1 });
 
-      const items: TextItem[] = textContent.items
-        .filter((item: any) => "str" in item)
-        .map((item: any) => ({
-          str: item.str,
-          transform: item.transform,
-          width: item.width,
-          height: item.height,
-        }));
+      interface TextItem {
+        str: string;
+        transform: number[];
+        width: number;
+        height: number;
+      }
+
+      const items = textContent.items.filter((item): item is TextItem => "str" in item && item.str.length > 0);
 
       const lines: TextItem[][] = [];
       for (const item of items) {
         const y = item.transform[5];
         let foundLine = false;
         for (const line of lines) {
-          if (Math.abs(line[0].transform[5] - y) < 3) {
+          const lineY = line[0].transform[5];
+          if (Math.abs(y - lineY) < 3) {
             line.push(item);
             foundLine = true;
             break;
           }
         }
-        if (!foundLine) lines.push([item]);
+        if (!foundLine) {
+          lines.push([item]);
+        }
       }
 
       for (const line of lines) {
         line.sort((a, b) => a.transform[4] - b.transform[4]);
         const fullText = line.map((i) => i.str).join("");
 
-        const placeholderRegex = /\{(\w+)\}/g;
+        const placeholderRegex = /\{([a-zA-Z]+)\}/g;
         let match;
         while ((match = placeholderRegex.exec(fullText)) !== null) {
           const token = match[0];
+          const mapping = PLACEHOLDER_MAP[token];
 
-          const radioMatch = token.match(/^\{radio_(\w+?)_(\w+)\}$/);
-          if (radioMatch) {
-            const [, _groupPart, option] = radioMatch;
-            const group = getRadioGroup(option);
-            const pos = getTokenPosition(line, match.index!, viewport);
+          if (mapping) {
+            let charPos = 0;
+            let anchorItem: TextItem | null = null;
+            let anchorOffset = 0;
 
-            const autoFillConfig = RADIO_AUTO_FILL[group];
-            let selected = false;
-            if (autoFillConfig) {
-              const patientVal = data.patientData[autoFillConfig.sourceField] || "";
-              const expectedOption = autoFillConfig.valueMap[patientVal];
-              if (expectedOption === option.toLowerCase() || expectedOption === option) selected = true;
+            for (const item of line) {
+              if (charPos + item.str.length > match.index) {
+                anchorItem = item;
+                anchorOffset = match.index - charPos;
+                break;
+              }
+              charPos += item.str.length;
             }
 
-            detectedRadios.push({
-              token, group, option,
-              x: pos.x + offsets.x, y: pos.y + offsets.y,
-              page: pageNum, selected,
-              fontSize: pos.fontSize,
+            if (anchorItem) {
+              const x = anchorItem.transform[4] + (anchorOffset * (anchorItem.width / Math.max(anchorItem.str.length, 1)));
+              const y = anchorItem.transform[5];
+
+              let labelItem: TextItem | null = null;
+              for (let li = line.indexOf(anchorItem) - 1; li >= 0; li--) {
+                const candidate = line[li];
+                if (anchorItem.transform[4] - (candidate.transform[4] + candidate.width) < 15) {
+                  labelItem = candidate;
+                  break;
+                }
+              }
+
+              const anchorX = labelItem ? labelItem.transform[4] : x;
+              const nextFieldOnLine = fields.filter(
+                (f) => f.pageIndex === pageNum - 1 && Math.abs(f.y - y) < 3 && f.x > anchorX
+              );
+              const nextX = nextFieldOnLine.length > 0 ? Math.min(...nextFieldOnLine.map((f) => f.x)) : null;
+              const fieldWidth = nextX ? nextX - anchorX - 8 : viewport.width - anchorX - 20;
+
+              fields.push({
+                token,
+                key: mapping.key,
+                source: mapping.source,
+                dataKey: mapping.key,
+                x: anchorX + offsets.x,
+                y: viewport.height - y + offsets.y,
+                width: Math.max(fieldWidth, 60),
+                pageIndex: pageNum - 1,
+                value: resolveValue(mapping.source, mapping.key, data),
+              });
+            }
+          }
+        }
+
+        const radioRegex = /\{radio_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}/g;
+        let radioMatch;
+        while ((radioMatch = radioRegex.exec(fullText)) !== null) {
+          const rawGroup = radioMatch[1].toLowerCase();
+          const option = radioMatch[2].toLowerCase();
+          const group = rawGroup === "id" ? getRadioGroup(option) : rawGroup;
+
+          let charPos = 0;
+          let anchorItem: TextItem | null = null;
+
+          for (const item of line) {
+            if (charPos + item.str.length > radioMatch.index) {
+              anchorItem = item;
+              break;
+            }
+            charPos += item.str.length;
+          }
+
+          if (anchorItem) {
+            const x = anchorItem.transform[4] + offsets.x;
+            const y = viewport.height - anchorItem.transform[5] + offsets.y;
+            const fontSize = anchorItem.height || 12;
+
+            let selected = false;
+            const autoFill = RADIO_AUTO_FILL[group];
+            if (autoFill) {
+              const patientVal = data.patientData[autoFill.sourceField] || "";
+              const expectedOption = autoFill.valueMap[patientVal];
+              if (expectedOption === option) {
+                selected = true;
+              }
+            }
+
+            radios.push({
+              token: radioMatch[0],
+              group,
+              option,
+              x,
+              y,
+              pageIndex: pageNum - 1,
+              selected,
+              fontSize,
             });
-            continue;
           }
-
-          const mapping = PLACEHOLDER_MAP[token];
-          if (!mapping) continue;
-
-          const pos = getTokenPosition(line, match.index!, viewport);
-          const val = resolveValue(mapping.source, mapping.key, data);
-          const fieldsOnLine = detectedFields.filter(
-            (f) => f.page === pageNum && Math.abs(f.y - (viewport.height - line[0].transform[5])) < 3
-          );
-          const width = fieldsOnLine.length > 0 ? 150 : 200;
-
-          detectedFields.push({
-            token,
-            key: `${pageNum}-${match.index}`,
-            source: mapping.source,
-            dataKey: mapping.key,
-            x: pos.x + offsets.x,
-            y: pos.y + offsets.y,
-            width, page: pageNum, value: val,
-          });
         }
       }
 
-      detectSplitRadios(items, viewport, pageNum, detectedRadios);
-    }
+      const radioItemRegex = /^[{\s]*radio\s*$/i;
+      const idItemRegex = /^[_\s]*id[_\s]*(\d{1,2})\s*\}?\s*$/i;
+      const combinedRadioRegex = /\{?\s*radio\s*_?\s*id\s*_?\s*(\d{1,2})\s*\}?/i;
+      const seenRadioOptions = new Set(radios.filter(r => r.pageIndex === pageNum - 1).map(r => r.option));
 
-    setFields(detectedFields);
-    setRadioFields(detectedRadios);
-  }
+      const addRadioFromItem = (option: string, itemX: number, itemY: number, itemHeight: number) => {
+        if (seenRadioOptions.has(option)) return;
+        seenRadioOptions.add(option);
 
-  function getTokenPosition(line: TextItem[], matchIndex: number, viewport: any) {
-    let charPos = 0;
-    let x = 0;
-    let y = 0;
-    let fontSize = 12;
-    for (const item of line) {
-      if (charPos + item.str.length > matchIndex) {
-        const offset = matchIndex - charPos;
-        x = item.transform[4] + (offset / Math.max(item.str.length, 1)) * item.width;
-        y = viewport.height - item.transform[5];
-        fontSize = item.height || 12;
-        break;
-      }
-      charPos += item.str.length;
-    }
-    return { x, y, fontSize };
-  }
-
-  function detectSplitRadios(items: TextItem[], viewport: any, pageNum: number, detectedRadios: RadioField[]) {
-    for (const item of items) {
-      const singleMatch = item.str.match(/\{?radio[_\s]*id[_\s]*(\d+)\}?/i);
-      if (singleMatch) {
-        const option = singleMatch[1];
         const group = getRadioGroup(option);
-        const key = `${pageNum}-radio-${group}-${option}`;
-        if (detectedRadios.some((r) => r.page === pageNum && r.option === option && r.group === group)) continue;
+        const x = itemX + offsets.x;
+        const y = viewport.height - itemY + offsets.y;
+        const fontSize = itemHeight || 12;
 
-        const autoFillConfig = RADIO_AUTO_FILL[group];
         let selected = false;
-        if (autoFillConfig) {
-          const patientVal = data.patientData[autoFillConfig.sourceField] || "";
-          const expectedOption = autoFillConfig.valueMap[patientVal];
-          if (expectedOption === option) selected = true;
+        const autoFill = RADIO_AUTO_FILL[group];
+        if (autoFill) {
+          const patientVal = data.patientData[autoFill.sourceField] || "";
+          const expectedOption = autoFill.valueMap[patientVal];
+          if (expectedOption === option) {
+            selected = true;
+          }
         }
 
-        detectedRadios.push({
-          token: `{radio_id_${option}}`, group, option,
-          x: item.transform[4] + offsets.x,
-          y: viewport.height - item.transform[5] + offsets.y,
-          page: pageNum, selected,
-          fontSize: item.height || 12,
+        radios.push({
+          token: `{radio_id_${option}}`,
+          group,
+          option,
+          x,
+          y,
+          pageIndex: pageNum - 1,
+          selected,
+          fontSize,
         });
-        continue;
+      };
+
+      for (const item of items) {
+        const trimmed = item.str.trim();
+        const combined = combinedRadioRegex.exec(trimmed);
+        if (combined) {
+          addRadioFromItem(combined[1], item.transform[4], item.transform[5], item.height);
+          continue;
+        }
+
+        const idMatch = idItemRegex.exec(trimmed);
+        if (idMatch) {
+          addRadioFromItem(idMatch[1], item.transform[4], item.transform[5], item.height);
+        }
       }
 
-      if (/\{?radio/i.test(item.str)) {
-        for (const nearby of items) {
-          if (nearby === item) continue;
-          const dx = Math.abs(nearby.transform[4] - (item.transform[4] + item.width));
-          const dy = Math.abs(nearby.transform[5] - item.transform[5]);
+      const radioOnlyRegex = /^\{?\s*radio\s*$/i;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!radioOnlyRegex.test(item.str.trim())) continue;
+
+        for (let j = 0; j < items.length; j++) {
+          if (j === i) continue;
+          const other = items[j];
+          const dx = Math.abs(other.transform[4] - item.transform[4]);
+          const dy = Math.abs(other.transform[5] - item.transform[5]);
           if (dx > 60 || dy > 20) continue;
-          const idMatch = nearby.str.match(/_?id[_\s]*(\d+)/i);
-          if (!idMatch) continue;
-          const option = idMatch[1];
-          const group = getRadioGroup(option);
-          if (detectedRadios.some((r) => r.page === pageNum && r.option === option && r.group === group)) continue;
 
-          const autoFillConfig = RADIO_AUTO_FILL[group];
-          let selected = false;
-          if (autoFillConfig) {
-            const patientVal = data.patientData[autoFillConfig.sourceField] || "";
-            const expectedOption = autoFillConfig.valueMap[patientVal];
-            if (expectedOption === option) selected = true;
-          }
+          const otherMatch = idItemRegex.exec(other.str.trim());
+          if (!otherMatch) continue;
 
-          detectedRadios.push({
-            token: `{radio_id_${option}}`, group, option,
-            x: item.transform[4] + offsets.x,
-            y: viewport.height - item.transform[5] + offsets.y,
-            page: pageNum, selected,
-            fontSize: item.height || 12,
-          });
+          const option = otherMatch[1];
+          const anchorX = Math.min(item.transform[4], other.transform[4]);
+          const anchorY = Math.max(item.transform[5], other.transform[5]);
+          addRadioFromItem(option, anchorX, anchorY, other.height || item.height);
         }
       }
     }
-  }
 
-  useEffect(() => {
-    loadPdf();
-  }, [loadPdf]);
+    setPlaceholderFields(fields);
+    setRadioFields(radios);
+  };
 
-  useEffect(() => {
-    if (!pdfDoc || !canvasRef.current) return;
-    renderPage(currentPage);
-  }, [pdfDoc, currentPage, scale]);
+  const updateFieldValue = (index: number, value: string) => {
+    setPlaceholderFields((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], value };
+      return updated;
+    });
+  };
 
-  async function renderPage(pageNum: number) {
-    if (!pdfDoc || !canvasRef.current) return;
-    const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale });
-    const canvas = canvasRef.current;
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext("2d")!;
-    await page.render({ canvasContext: ctx, viewport }).promise;
-  }
-
-  function updateFieldValue(key: string, value: string) {
-    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, value } : f)));
-  }
-
-  function updateAcroValue(name: string, value: string) {
-    setAcroFormValues((prev) => ({ ...prev, [name]: value }));
-  }
-
-  function toggleRadio(group: string, option: string) {
-    setRadioFields((prev) =>
-      prev.map((r) => {
-        if (r.group === group) {
-          return { ...r, selected: r.option === option };
+  const toggleRadio = (index: number) => {
+    setRadioFields((prev) => {
+      const updated = [...prev];
+      const clicked = updated[index];
+      for (let i = 0; i < updated.length; i++) {
+        if (updated[i].group === clicked.group) {
+          updated[i] = { ...updated[i], selected: i === index };
         }
-        return r;
-      })
-    );
-  }
-
-  async function buildFilledPdf(): Promise<Uint8Array | null> {
-    if (!pdfBytes) return null;
-
-    const pdfDoc = await PDFDocument.load(pdfBytes.slice(0), { ignoreEncryption: true });
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    if (mode === "acroform") {
-      const form = pdfDoc.getForm();
-      for (const fieldName of acroFormFieldNames) {
-        const val = acroFormValues[fieldName] || "";
-        try {
-          const field = form.getTextField(fieldName);
-          field.setText(val);
-        } catch {}
       }
-      form.flatten();
-    } else {
-      const pages = pdfDoc.getPages();
-      for (const field of fields) {
-        if (field.page <= pages.length && field.value) {
-          const page = pages[field.page - 1];
-          const { height } = page.getSize();
+      return updated;
+    });
+  };
+
+  const updateAcroFieldValue = (index: number, value: string) => {
+    setAcroFormFields((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], value };
+      return updated;
+    });
+  };
+
+  const handleDownload = async () => {
+    if (!pdfBytes) return;
+
+    try {
+      setDownloading(true);
+      const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(pdfBytes.slice(0));
+      const font = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+
+      if (mode === "acroform") {
+        const form = pdfLibDoc.getForm();
+        for (const af of acroFormFields) {
+          if (af.value) {
+            try {
+              const field = form.getTextField(af.name);
+              field.setText(af.value);
+            } catch {}
+          }
+        }
+        form.flatten();
+      } else if (mode === "placeholder") {
+        const pages = pdfLibDoc.getPages();
+
+        for (const field of placeholderFields) {
+          if (!field.value) continue;
+          const page = pages[field.pageIndex];
+          if (!page) continue;
+
+          const pageHeight = page.getHeight();
           page.drawText(field.value, {
             x: field.x,
-            y: height - field.y - 12,
+            y: pageHeight - field.y,
             size: 10,
             font,
             color: rgb(0, 0, 0),
           });
         }
-      }
 
-      for (const radio of radioFields) {
-        if (radio.selected && radio.page <= pages.length) {
-          const page = pages[radio.page - 1];
-          const { height } = page.getSize();
-          const size = Math.max(radio.fontSize * 0.6, 6);
+        for (const radio of radioFields) {
+          if (!radio.selected) continue;
+          const page = pages[radio.pageIndex];
+          if (!page) continue;
+
+          const pageHeight = page.getHeight();
+          const sz = 8;
           page.drawRectangle({
             x: radio.x,
-            y: height - radio.y - size,
-            width: size,
-            height: size,
+            y: pageHeight - radio.y - sz + 2,
+            width: sz,
+            height: sz,
             color: rgb(0, 0, 0),
           });
         }
       }
-    }
 
-    return await pdfDoc.save();
-  }
-
-  function getFilename(): string {
-    const firstName = (data.patientData.firstName || "Patient").replace(/[^a-zA-Z0-9]/g, "_");
-    const lastName = (data.patientData.lastName || "").replace(/[^a-zA-Z0-9]/g, "_");
-    const today = new Date();
-    const dateStr = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}-${today.getFullYear()}`;
-    return `${firstName}_${lastName}_Physician_Recommendation_${dateStr}.pdf`;
-  }
-
-  async function downloadPdf() {
-    try {
-      const filledBytes = await buildFilledPdf();
-      if (!filledBytes) return;
-      const blob = new Blob([filledBytes], { type: "application/pdf" });
+      const finalBytes = await pdfLibDoc.save();
+      const blob = new Blob([finalBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const dateStr = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-${now.getFullYear()}`;
+      const firstName = sanitizeFilename(data.patientData.firstName || "Patient");
+      const lastName = sanitizeFilename(data.patientData.lastName || "");
+      const filename = `${firstName}_${lastName}_Physician_Recommendation_${dateStr}.pdf`;
+
       const a = document.createElement("a");
       a.href = url;
-      a.download = getFilename();
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      console.error("PDF download failed:", err);
-    }
-  }
 
-  async function printPdf() {
+      toast({ title: "Downloaded", description: `${filename} saved successfully.` });
+    } catch (err: any) {
+      console.error("Download error:", err);
+      toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!pdfBytes) return;
     try {
-      const filledBytes = await buildFilledPdf();
-      if (!filledBytes) return;
-      const blob = new Blob([filledBytes], { type: "application/pdf" });
+      const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(pdfBytes.slice(0));
+      const font = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+
+      if (mode === "acroform") {
+        const form = pdfLibDoc.getForm();
+        for (const af of acroFormFields) {
+          if (af.value) {
+            try { form.getTextField(af.name).setText(af.value); } catch {}
+          }
+        }
+        form.flatten();
+      } else if (mode === "placeholder") {
+        const pages = pdfLibDoc.getPages();
+        for (const field of placeholderFields) {
+          if (!field.value) continue;
+          const page = pages[field.pageIndex];
+          if (!page) continue;
+          page.drawText(field.value, { x: field.x, y: page.getHeight() - field.y, size: 10, font, color: rgb(0, 0, 0) });
+        }
+        for (const radio of radioFields) {
+          if (!radio.selected) continue;
+          const page = pages[radio.pageIndex];
+          if (!page) continue;
+          const sz = 8;
+          page.drawRectangle({ x: radio.x, y: page.getHeight() - radio.y - sz + 2, width: sz, height: sz, color: rgb(0, 0, 0) });
+        }
+      }
+
+      const finalBytes = await pdfLibDoc.save();
+      const blob = new Blob([finalBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url);
+      const printWindow = window.open(url, "_blank");
       if (printWindow) {
-        printWindow.addEventListener("load", () => {
-          printWindow.print();
-        });
+        printWindow.addEventListener("load", () => printWindow.print());
       }
     } catch (err: any) {
-      console.error("PDF print failed:", err);
+      toast({ title: "Print Failed", description: err.message, variant: "destructive" });
     }
-  }
+  };
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Loading Form...
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-[600px] w-full" />
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center h-full p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-3 text-muted-foreground">Loading PDF...</span>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            Form Error
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">{error}</p>
-          <Button variant="outline" onClick={loadPdf} data-testid="button-retry-pdf">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-4">
+        <p className="text-destructive text-sm">{error}</p>
+        <Button variant="outline" onClick={loadPdf} data-testid="button-retry-pdf">
+          Retry
+        </Button>
+      </div>
     );
   }
 
+  const pageFields = placeholderFields.filter((f) => f.pageIndex === currentPage - 1);
+  const pageRadios = radioFields.filter((r) => r.pageIndex === currentPage - 1);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Physician Recommendation Form
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {mode === "acroform" ? "Interactive Form" : "Template Form"}
-            </Badge>
-            <Badge variant="outline" className="text-green-600 border-green-300">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Auto-filled
-            </Badge>
-          </div>
+    <div className="flex flex-col h-full p-4 gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2" data-testid="gizmo-toolbar">
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <Button variant="outline" size="sm" onClick={onClose} data-testid="button-close-form">
+              <ChevronLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          )}
+          <Badge variant="secondary" data-testid="badge-form-mode">
+            {mode === "acroform" ? "AcroForm Mode" : "Placeholder Mode"}
+          </Badge>
+          <Badge variant="outline">
+            {mode === "acroform"
+              ? `${acroFormFields.filter((f) => f.matched).length} fields matched`
+              : `${placeholderFields.length} fields, ${radioFields.length} radios`}
+          </Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Patient: <span className="font-medium text-foreground">{data.patientName}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            {pageCount > 1 && (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                  data-testid="button-prev-page"
-                >
-                  Prev
-                </Button>
-                <span className="text-sm px-2">
-                  {currentPage} / {pageCount}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= pageCount}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  data-testid="button-next-page"
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setScale((s) => Math.max(0.5, s - 0.25))} data-testid="button-zoom-out">
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground w-12 text-center">{Math.round(scale * 100)}%</span>
+          <Button variant="outline" size="sm" onClick={() => setScale((s) => Math.min(3, s + 0.25))} data-testid="button-zoom-in">
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          {totalPages > 1 && (
+            <>
+              <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)} data-testid="button-prev-page">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} data-testid="button-next-page">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-pdf">
+            <Printer className="h-4 w-4 mr-1" /> Print
+          </Button>
+          <Button size="sm" onClick={handleDownload} disabled={downloading} data-testid="button-download-pdf">
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+            Download PDF
+          </Button>
         </div>
+      </div>
 
-        <div className="relative border rounded-lg overflow-auto bg-gray-100 dark:bg-gray-900" style={{ maxHeight: "600px" }}>
-          <canvas ref={canvasRef} className="mx-auto" />
+      <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex-1 overflow-auto border rounded-lg bg-white" ref={containerRef}>
+          <div className="relative inline-block" style={{ minWidth: "fit-content" }}>
+            <canvas ref={canvasRef} className="block" />
 
-          {mode === "placeholder" &&
-            fields
-              .filter((f) => f.page === currentPage)
-              .map((field) => (
+            {mode === "placeholder" && pageFields.map((field, idx) => {
+              const globalIdx = placeholderFields.indexOf(field);
+              return (
                 <Input
-                  key={field.key}
+                  key={`field-${globalIdx}`}
                   value={field.value}
-                  onChange={(e) => updateFieldValue(field.key, e.target.value)}
-                  className="absolute bg-white/80 dark:bg-gray-800/80 text-xs h-6 px-1 border-blue-300"
+                  onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
+                  className="absolute bg-yellow-50/80 border-yellow-400 text-xs h-6 px-1 text-black"
                   style={{
                     left: field.x * scale,
                     top: field.y * scale,
                     width: field.width * scale,
-                    fontSize: "10px",
+                    fontSize: 10 * scale,
+                    height: 16 * scale,
                   }}
                   data-testid={`input-field-${field.dataKey}`}
                 />
-              ))}
+              );
+            })}
 
-          {mode === "placeholder" &&
-            radioFields
-              .filter((r) => r.page === currentPage)
-              .map((radio) => (
+            {mode === "placeholder" && pageRadios.map((radio, idx) => {
+              const globalIdx = radioFields.indexOf(radio);
+              const size = 10 * scale;
+              return (
                 <button
-                  key={`${radio.group}-${radio.option}`}
-                  onClick={() => toggleRadio(radio.group, radio.option)}
-                  className={`absolute w-4 h-4 rounded-sm border-2 ${
-                    radio.selected
-                      ? "bg-black border-black dark:bg-white dark:border-white"
-                      : "bg-white border-gray-400 dark:bg-gray-700 dark:border-gray-500"
-                  }`}
+                  key={`radio-${globalIdx}`}
+                  onClick={() => toggleRadio(globalIdx)}
+                  className="absolute rounded-sm flex items-center justify-center transition-colors"
                   style={{
                     left: radio.x * scale,
-                    top: radio.y * scale,
+                    top: (radio.y - 2) * scale,
+                    width: size,
+                    height: size,
+                    backgroundColor: radio.selected ? "#000" : "#fff",
+                    border: `${Math.max(1, 1.5 * scale)}px solid ${radio.selected ? "#000" : "#999"}`,
+                    zIndex: 10,
                   }}
                   data-testid={`radio-${radio.group}-${radio.option}`}
-                />
-              ))}
+                >
+                  {radio.selected && <Check className="text-white" style={{ width: 7 * scale, height: 7 * scale }} />}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {mode === "acroform" && (
-          <div className="grid grid-cols-2 gap-3 p-4 border rounded-lg bg-muted/30">
-            <h4 className="col-span-2 text-sm font-semibold mb-1">Form Fields</h4>
-            {acroFormFieldNames.map((name) => (
-              <div key={name} className="space-y-1">
-                <label className="text-xs text-muted-foreground">{name}</label>
-                <Input
-                  value={acroFormValues[name] || ""}
-                  onChange={(e) => updateAcroValue(name, e.target.value)}
-                  className="h-8 text-sm"
-                  data-testid={`input-acro-${name}`}
-                />
-              </div>
-            ))}
-          </div>
+          <Card className="w-72 flex-shrink-0">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm">Form Fields</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 py-2 space-y-2 max-h-[600px] overflow-y-auto">
+              {acroFormFields.map((af, idx) => (
+                <div key={af.name} className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    {af.matched && <Check className="h-3 w-3 text-green-500" />}
+                    {af.name}
+                  </label>
+                  <Input
+                    value={af.value}
+                    onChange={(e) => updateAcroFieldValue(idx, e.target.value)}
+                    className="h-7 text-xs"
+                    data-testid={`input-acro-${af.name}`}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
-
-        <div className="flex justify-between pt-2">
-          {onClose && (
-            <Button variant="outline" onClick={onClose} data-testid="button-close-form">
-              Close
-            </Button>
-          )}
-          <div className="flex gap-2 ml-auto">
-            <Button variant="outline" onClick={printPdf} data-testid="button-print-pdf">
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button onClick={downloadPdf} data-testid="button-download-pdf">
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
