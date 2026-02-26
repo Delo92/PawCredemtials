@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, RefreshCw, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { Download, Printer, RefreshCw, FileText, AlertCircle, CheckCircle } from "lucide-react";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export interface GizmoFormData {
   success: boolean;
@@ -59,6 +60,14 @@ const FIELD_NAME_MAP: Record<string, { source: "patient" | "doctor" | "meta"; ke
   phone: { source: "patient", key: "phone" },
   email: { source: "patient", key: "email" },
   medicalcondition: { source: "patient", key: "medicalCondition" },
+  idnumber: { source: "patient", key: "idNumber" },
+  driverlicensenumber: { source: "patient", key: "driverLicenseNumber" },
+  driverlicense: { source: "patient", key: "driverLicenseNumber" },
+  dlnumber: { source: "patient", key: "driverLicenseNumber" },
+  driverslicense: { source: "patient", key: "driverLicenseNumber" },
+  driverslicensenumber: { source: "patient", key: "driverLicenseNumber" },
+  driverlicensestateidentificationcardnumber: { source: "patient", key: "driverLicenseNumber" },
+  idexpirationdate: { source: "patient", key: "idExpirationDate" },
   date: { source: "meta", key: "generatedDate" },
   doctorfirstname: { source: "doctor", key: "firstName" },
   doctormiddlename: { source: "doctor", key: "middleName" },
@@ -88,6 +97,8 @@ const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; k
   "{email}": { source: "patient", key: "email" },
   "{medicalCondition}": { source: "patient", key: "medicalCondition" },
   "{idNumber}": { source: "patient", key: "idNumber" },
+  "{driverLicenseNumber}": { source: "patient", key: "driverLicenseNumber" },
+  "{dlNumber}": { source: "patient", key: "driverLicenseNumber" },
   "{idExpirationDate}": { source: "patient", key: "idExpirationDate" },
   "{date}": { source: "meta", key: "generatedDate" },
   "{doctorFirstName}": { source: "doctor", key: "firstName" },
@@ -102,6 +113,15 @@ const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; k
   "{doctorNpiNumber}": { source: "doctor", key: "npiNumber" },
 };
 
+function getRadioGroup(option: string): string {
+  const num = parseInt(option, 10);
+  if (num >= 1 && num <= 3) return "placardtype";
+  if (num >= 4 && num <= 5) return "placardcount";
+  if (num >= 7 && num <= 14) return "condition";
+  if (num >= 15 && num <= 16) return "duration";
+  return "other";
+}
+
 const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<string, string> }> = {
   idtype: {
     sourceField: "idType",
@@ -110,6 +130,13 @@ const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<st
       us_passport_photo_id: "passport",
       id_card: "idcard",
       tribal_id_card: "tribal",
+    },
+  },
+  condition: {
+    sourceField: "disabilityCondition",
+    valueMap: {
+      A: "7", B: "8", C: "9", D: "10",
+      E: "11", F: "12", G: "13", H: "14",
     },
   },
 };
@@ -148,7 +175,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"acroform" | "placeholder" | null>(null);
-  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
+  const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
   const [fields, setFields] = useState<PlaceholderField[]>([]);
   const [radioFields, setRadioFields] = useState<RadioField[]>([]);
   const [acroFormValues, setAcroFormValues] = useState<Record<string, string>>({});
@@ -176,11 +203,10 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       const proxyUrl = `/api/forms/proxy-pdf?url=${encodeURIComponent(data.gizmoFormUrl)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error("Failed to fetch PDF template");
-      const arrayBuffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      setPdfBytes(bytes);
+      const originalBytes = await response.arrayBuffer();
+      setPdfBytes(originalBytes);
 
-      const pdfLibDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0), { ignoreEncryption: true });
       const form = pdfLibDoc.getForm();
       const pdfFields = form.getFields();
 
@@ -206,16 +232,35 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         setMode("acroform");
         setAcroFormValues(acroValues);
         setAcroFormFieldNames(fieldNames);
+
+        const flatDoc = await PDFDocument.load(originalBytes.slice(0), { ignoreEncryption: true });
+        const flatForm = flatDoc.getForm();
+        for (const fieldName of fieldNames) {
+          const val = acroValues[fieldName] || "";
+          try {
+            const f = flatForm.getTextField(fieldName);
+            f.setText(val);
+            f.updateAppearances();
+          } catch {}
+        }
+        flatForm.flatten();
+        const flatBytes = await flatDoc.save();
+
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(flatBytes) });
+        const doc = await loadingTask.promise;
+        setPdfDoc(doc);
+        setPageCount(doc.numPages);
+        setCurrentPage(1);
       } else {
         setMode("placeholder");
-        await extractPlaceholders(bytes);
-      }
+        await extractPlaceholders(originalBytes);
 
-      const loadingTask = pdfjsLib.getDocument({ data: bytes });
-      const doc = await loadingTask.promise;
-      setPdfDoc(doc);
-      setPageCount(doc.numPages);
-      setCurrentPage(1);
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) });
+        const doc = await loadingTask.promise;
+        setPdfDoc(doc);
+        setPageCount(doc.numPages);
+        setCurrentPage(1);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load PDF");
     } finally {
@@ -223,8 +268,15 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     }
   }, [data]);
 
-  async function extractPlaceholders(bytes: Uint8Array) {
-    const loadingTask = pdfjsLib.getDocument({ data: bytes });
+  interface TextItem {
+    str: string;
+    transform: number[];
+    width: number;
+    height: number;
+  }
+
+  async function extractPlaceholders(bytes: ArrayBuffer) {
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(bytes.slice(0)) });
     const doc = await loadingTask.promise;
     const detectedFields: PlaceholderField[] = [];
     const detectedRadios: RadioField[] = [];
@@ -233,13 +285,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       const page = await doc.getPage(pageNum);
       const textContent = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1 });
-
-      interface TextItem {
-        str: string;
-        transform: number[];
-        width: number;
-        height: number;
-      }
 
       const items: TextItem[] = textContent.items
         .filter((item: any) => "str" in item)
@@ -273,41 +318,25 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         while ((match = placeholderRegex.exec(fullText)) !== null) {
           const token = match[0];
 
-          const radioMatch = token.match(/^\{radio_(\w+)_(\w+)\}$/);
+          const radioMatch = token.match(/^\{radio_(\w+?)_(\w+)\}$/);
           if (radioMatch) {
-            const [, group, option] = radioMatch;
-            let charPos = 0;
-            let tokenX = 0;
-            let tokenY = 0;
-            let fontSize = 12;
-            for (const item of line) {
-              if (charPos + item.str.length > match.index!) {
-                const offset = match.index! - charPos;
-                tokenX = item.transform[4] + (offset / Math.max(item.str.length, 1)) * item.width;
-                tokenY = viewport.height - item.transform[5];
-                fontSize = item.height || 12;
-                break;
-              }
-              charPos += item.str.length;
-            }
+            const [, _groupPart, option] = radioMatch;
+            const group = getRadioGroup(option);
+            const pos = getTokenPosition(line, match.index!, viewport);
 
-            const autoFillConfig = RADIO_AUTO_FILL[group.toLowerCase()];
+            const autoFillConfig = RADIO_AUTO_FILL[group];
             let selected = false;
             if (autoFillConfig) {
               const patientVal = data.patientData[autoFillConfig.sourceField] || "";
               const expectedOption = autoFillConfig.valueMap[patientVal];
-              if (expectedOption === option.toLowerCase()) selected = true;
+              if (expectedOption === option.toLowerCase() || expectedOption === option) selected = true;
             }
 
             detectedRadios.push({
-              token,
-              group,
-              option,
-              x: tokenX + offsets.x,
-              y: tokenY + offsets.y,
-              page: pageNum,
-              selected,
-              fontSize,
+              token, group, option,
+              x: pos.x + offsets.x, y: pos.y + offsets.y,
+              page: pageNum, selected,
+              fontSize: pos.fontSize,
             });
             continue;
           }
@@ -315,19 +344,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           const mapping = PLACEHOLDER_MAP[token];
           if (!mapping) continue;
 
-          let charPos = 0;
-          let tokenX = 0;
-          let tokenY = 0;
-          for (const item of line) {
-            if (charPos + item.str.length > match.index!) {
-              const offset = match.index! - charPos;
-              tokenX = item.transform[4] + (offset / Math.max(item.str.length, 1)) * item.width;
-              tokenY = viewport.height - item.transform[5];
-              break;
-            }
-            charPos += item.str.length;
-          }
-
+          const pos = getTokenPosition(line, match.index!, viewport);
           const val = resolveValue(mapping.source, mapping.key, data);
           const fieldsOnLine = detectedFields.filter(
             (f) => f.page === pageNum && Math.abs(f.y - (viewport.height - line[0].transform[5])) < 3
@@ -339,18 +356,95 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             key: `${pageNum}-${match.index}`,
             source: mapping.source,
             dataKey: mapping.key,
-            x: tokenX + offsets.x,
-            y: tokenY + offsets.y,
-            width,
-            page: pageNum,
-            value: val,
+            x: pos.x + offsets.x,
+            y: pos.y + offsets.y,
+            width, page: pageNum, value: val,
           });
         }
       }
+
+      detectSplitRadios(items, viewport, pageNum, detectedRadios);
     }
 
     setFields(detectedFields);
     setRadioFields(detectedRadios);
+  }
+
+  function getTokenPosition(line: TextItem[], matchIndex: number, viewport: any) {
+    let charPos = 0;
+    let x = 0;
+    let y = 0;
+    let fontSize = 12;
+    for (const item of line) {
+      if (charPos + item.str.length > matchIndex) {
+        const offset = matchIndex - charPos;
+        x = item.transform[4] + (offset / Math.max(item.str.length, 1)) * item.width;
+        y = viewport.height - item.transform[5];
+        fontSize = item.height || 12;
+        break;
+      }
+      charPos += item.str.length;
+    }
+    return { x, y, fontSize };
+  }
+
+  function detectSplitRadios(items: TextItem[], viewport: any, pageNum: number, detectedRadios: RadioField[]) {
+    for (const item of items) {
+      const singleMatch = item.str.match(/\{?radio[_\s]*id[_\s]*(\d+)\}?/i);
+      if (singleMatch) {
+        const option = singleMatch[1];
+        const group = getRadioGroup(option);
+        const key = `${pageNum}-radio-${group}-${option}`;
+        if (detectedRadios.some((r) => r.page === pageNum && r.option === option && r.group === group)) continue;
+
+        const autoFillConfig = RADIO_AUTO_FILL[group];
+        let selected = false;
+        if (autoFillConfig) {
+          const patientVal = data.patientData[autoFillConfig.sourceField] || "";
+          const expectedOption = autoFillConfig.valueMap[patientVal];
+          if (expectedOption === option) selected = true;
+        }
+
+        detectedRadios.push({
+          token: `{radio_id_${option}}`, group, option,
+          x: item.transform[4] + offsets.x,
+          y: viewport.height - item.transform[5] + offsets.y,
+          page: pageNum, selected,
+          fontSize: item.height || 12,
+        });
+        continue;
+      }
+
+      if (/\{?radio/i.test(item.str)) {
+        for (const nearby of items) {
+          if (nearby === item) continue;
+          const dx = Math.abs(nearby.transform[4] - (item.transform[4] + item.width));
+          const dy = Math.abs(nearby.transform[5] - item.transform[5]);
+          if (dx > 60 || dy > 20) continue;
+          const idMatch = nearby.str.match(/_?id[_\s]*(\d+)/i);
+          if (!idMatch) continue;
+          const option = idMatch[1];
+          const group = getRadioGroup(option);
+          if (detectedRadios.some((r) => r.page === pageNum && r.option === option && r.group === group)) continue;
+
+          const autoFillConfig = RADIO_AUTO_FILL[group];
+          let selected = false;
+          if (autoFillConfig) {
+            const patientVal = data.patientData[autoFillConfig.sourceField] || "";
+            const expectedOption = autoFillConfig.valueMap[patientVal];
+            if (expectedOption === option) selected = true;
+          }
+
+          detectedRadios.push({
+            token: `{radio_id_${option}}`, group, option,
+            x: item.transform[4] + offsets.x,
+            y: viewport.height - item.transform[5] + offsets.y,
+            page: pageNum, selected,
+            fontSize: item.height || 12,
+          });
+        }
+      }
+    }
   }
 
   useEffect(() => {
@@ -392,71 +486,95 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     );
   }
 
-  async function downloadPdf() {
-    if (!pdfBytes) return;
+  async function buildFilledPdf(): Promise<Uint8Array | null> {
+    if (!pdfBytes) return null;
 
-    try {
-      const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const pdfDoc = await PDFDocument.load(pdfBytes.slice(0), { ignoreEncryption: true });
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-      if (mode === "acroform") {
-        const form = pdfDoc.getForm();
-        for (const fieldName of acroFormFieldNames) {
-          const val = acroFormValues[fieldName] || "";
-          try {
-            const field = form.getTextField(fieldName);
-            field.setText(val);
-          } catch {}
-        }
-        form.flatten();
-      } else {
-        const pages = pdfDoc.getPages();
-        for (const field of fields) {
-          if (field.page <= pages.length && field.value) {
-            const page = pages[field.page - 1];
-            const { height } = page.getSize();
-            page.drawText(field.value, {
-              x: field.x,
-              y: height - field.y - 12,
-              size: 10,
-              font,
-              color: rgb(0, 0, 0),
-            });
-          }
-        }
-
-        for (const radio of radioFields) {
-          if (radio.selected && radio.page <= pages.length) {
-            const page = pages[radio.page - 1];
-            const { height } = page.getSize();
-            const radius = Math.max(radio.fontSize * 0.3, 4);
-            page.drawCircle({
-              x: radio.x + radius,
-              y: height - radio.y - radius,
-              size: radius,
-              color: rgb(0, 0, 0),
-            });
-          }
+    if (mode === "acroform") {
+      const form = pdfDoc.getForm();
+      for (const fieldName of acroFormFieldNames) {
+        const val = acroFormValues[fieldName] || "";
+        try {
+          const field = form.getTextField(fieldName);
+          field.setText(val);
+        } catch {}
+      }
+      form.flatten();
+    } else {
+      const pages = pdfDoc.getPages();
+      for (const field of fields) {
+        if (field.page <= pages.length && field.value) {
+          const page = pages[field.page - 1];
+          const { height } = page.getSize();
+          page.drawText(field.value, {
+            x: field.x,
+            y: height - field.y - 12,
+            size: 10,
+            font,
+            color: rgb(0, 0, 0),
+          });
         }
       }
 
-      const filledBytes = await pdfDoc.save();
+      for (const radio of radioFields) {
+        if (radio.selected && radio.page <= pages.length) {
+          const page = pages[radio.page - 1];
+          const { height } = page.getSize();
+          const size = Math.max(radio.fontSize * 0.6, 6);
+          page.drawRectangle({
+            x: radio.x,
+            y: height - radio.y - size,
+            width: size,
+            height: size,
+            color: rgb(0, 0, 0),
+          });
+        }
+      }
+    }
+
+    return await pdfDoc.save();
+  }
+
+  function getFilename(): string {
+    const firstName = (data.patientData.firstName || "Patient").replace(/[^a-zA-Z0-9]/g, "_");
+    const lastName = (data.patientData.lastName || "").replace(/[^a-zA-Z0-9]/g, "_");
+    const today = new Date();
+    const dateStr = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}-${today.getFullYear()}`;
+    return `${firstName}_${lastName}_Physician_Recommendation_${dateStr}.pdf`;
+  }
+
+  async function downloadPdf() {
+    try {
+      const filledBytes = await buildFilledPdf();
+      if (!filledBytes) return;
       const blob = new Blob([filledBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-
-      const firstName = (data.patientData.firstName || "Patient").replace(/[^a-zA-Z0-9]/g, "_");
-      const lastName = (data.patientData.lastName || "").replace(/[^a-zA-Z0-9]/g, "_");
-      const today = new Date();
-      const dateStr = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}-${today.getFullYear()}`;
-      const filename = `${firstName}_${lastName}_Physician_Recommendation_${dateStr}.pdf`;
-
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = getFilename();
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error("PDF download failed:", err);
+    }
+  }
+
+  async function printPdf() {
+    try {
+      const filledBytes = await buildFilledPdf();
+      if (!filledBytes) return;
+      const blob = new Blob([filledBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url);
+      if (printWindow) {
+        printWindow.addEventListener("load", () => {
+          printWindow.print();
+        });
+      }
+    } catch (err: any) {
+      console.error("PDF print failed:", err);
     }
   }
 
@@ -578,7 +696,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                 <button
                   key={`${radio.group}-${radio.option}`}
                   onClick={() => toggleRadio(radio.group, radio.option)}
-                  className={`absolute w-4 h-4 rounded-full border-2 ${
+                  className={`absolute w-4 h-4 rounded-sm border-2 ${
                     radio.selected
                       ? "bg-black border-black dark:bg-white dark:border-white"
                       : "bg-white border-gray-400 dark:bg-gray-700 dark:border-gray-500"
@@ -615,10 +733,16 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
               Close
             </Button>
           )}
-          <Button onClick={downloadPdf} className="ml-auto" data-testid="button-download-pdf">
-            <Download className="h-4 w-4 mr-2" />
-            Download Filled PDF
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={printPdf} data-testid="button-print-pdf">
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+            <Button onClick={downloadPdf} data-testid="button-download-pdf">
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
