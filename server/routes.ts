@@ -1173,6 +1173,37 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/doctor-profiles", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const profiles = await storage.getAllDoctorProfiles();
+      res.json(profiles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/doctor-profiles", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const profile = await storage.createDoctorProfile(req.body);
+      res.status(201).json(profile);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/doctor-profiles/:id", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const profile = await storage.updateDoctorProfile(req.params.id, req.body);
+      if (!profile) {
+        res.status(404).json({ message: "Doctor profile not found" });
+        return;
+      }
+      res.json(profile);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/admin/applications/:id/send-to-doctor", requireAuth, requireLevel(3), async (req, res) => {
     try {
       const applicationId = req.params.id as string;

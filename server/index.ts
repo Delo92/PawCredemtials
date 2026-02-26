@@ -4,14 +4,6 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
 
-process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err);
-});
-process.on("unhandledRejection", (reason) => {
-  console.error("UNHANDLED REJECTION:", reason);
-});
-process.on("SIGHUP", () => {});
-
 const app = express();
 const httpServer = createServer(app);
 
