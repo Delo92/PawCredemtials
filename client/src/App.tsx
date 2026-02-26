@@ -34,6 +34,7 @@ const SiteSettings = lazy(() => import("@/pages/dashboard/owner/SiteSettings"));
 const RegistrationPage = lazy(() => import("@/pages/dashboard/applicant/RegistrationPage"));
 const DocumentsPage = lazy(() => import("@/pages/dashboard/applicant/DocumentsPage"));
 const PaymentsPage = lazy(() => import("@/pages/dashboard/applicant/PaymentsPage"));
+const FormViewerPage = lazy(() => import("@/pages/dashboard/applicant/FormViewerPage"));
 
 // Shared pages (used across multiple levels)
 const SharedSettingsPage = lazy(() => import("@/pages/dashboard/shared/SettingsPage"));
@@ -95,6 +96,11 @@ function App() {
                   <Route path="/dashboard/applicant/registration">
                     <ProtectedRoute minLevel={1}>
                       <RegistrationPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/applicant/documents/:applicationId/form">
+                    <ProtectedRoute minLevel={1}>
+                      <FormViewerPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/applicant/documents">

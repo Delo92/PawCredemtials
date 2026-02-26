@@ -138,8 +138,11 @@ Component: `client/src/components/MediaRenderer.tsx` - detects type from URL and
 - **Doctor Profile Creation**: When creating a Level 2 (Doctor) user, admin can fill in professional credentials (license, NPI, DEA, specialty) inline
 - **Doctor Profile Tabs**: Tabbed Add User dialog (Account/Credentials/Form Template) and Doctor tab in UserProfileModal for editing doctor credentials and HTML form templates with placeholder reference
 - **Gizmo Form System**: Browser-side PDF auto-fill using pdf-lib + pdfjs-dist. Supports AcroForm (interactive fields) and Placeholder (token-based) PDFs. Component: `client/src/components/shared/GizmoForm.tsx`
+- **PDF Template Upload**: `POST /api/admin/doctor-templates/:doctorProfileId/gizmo-form` uploads PDF to Firebase Storage, stores URL on doctor profile `gizmoFormUrl`
 - **PDF Proxy**: `GET /api/forms/proxy-pdf?url=...` proxies external PDF fetches to avoid CORS
-- **Form Data API**: `GET /api/forms/data/:applicationId` assembles patient + doctor data for PDF filling
+- **Form Data API**: `GET /api/forms/data/:applicationId` assembles patient + doctor data for PDF filling (ownership/role verified)
+- **Doctor PDF Management UI**: UserProfileModal Doctor tab has PDF upload, preview (GizmoForm in full-screen dialog), and remove functionality
+- **FormViewerPage**: Applicant-facing page at `/dashboard/applicant/documents/:applicationId/form` renders GizmoForm with auto-filled data
 
 ### Application Processing Workflow
 
@@ -200,6 +203,9 @@ The complete automated workflow:
 - `PUT /api/admin/users/:id` - Update user (Level 3+)
 - `GET /api/admin/applications` - List all applications (Level 3+)
 - `PUT /api/owner/config` - Update site config (Level 4)
+- `POST /api/admin/doctor-templates/:doctorProfileId/gizmo-form` - Upload PDF template for doctor (Level 3+)
+- `GET /api/forms/proxy-pdf?url=...` - Proxy external PDF fetches (public)
+- `GET /api/forms/data/:applicationId` - Get assembled form data for PDF auto-fill (authenticated, ownership/role verified)
 
 ### Key Routes
 - `/` - Landing page
@@ -208,6 +214,7 @@ The complete automated workflow:
 - `/review/:token` - Public doctor review portal (no auth required)
 - `/dashboard/applicant` - Applicant dashboard
 - `/dashboard/applicant/applications/new` - New application wizard
+- `/dashboard/applicant/documents/:applicationId/form` - PDF auto-fill form viewer
 - `/dashboard/doctor` - Doctor dashboard with review history
 - `/dashboard/doctor/reviews` - Doctor's completed reviews
 - `/dashboard/admin` - Admin dashboard

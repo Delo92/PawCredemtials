@@ -2112,8 +2112,70 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
-  // GIZMO FORM SYSTEM — PDF proxy + form data
+  // GIZMO FORM SYSTEM — PDF upload, proxy + form data
   // ===========================================================================
+
+  const pdfUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") {
+        cb(null, true);
+      } else {
+        cb(new Error("Only PDF files are allowed"));
+      }
+    },
+  });
+
+  app.post("/api/admin/doctor-templates/:doctorProfileId/gizmo-form", requireAuth, requireLevel(3), (req, res, next) => {
+    pdfUpload.single("file")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ message: "File size must be under 20MB" });
+          return;
+        }
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+
+      try {
+        const { doctorProfileId } = req.params;
+        const profile = await storage.getDoctorProfile(doctorProfileId);
+        if (!profile) {
+          res.status(404).json({ message: "Doctor profile not found" });
+          return;
+        }
+
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const ext = ".pdf";
+        const fileName = `doctor-templates/${doctorProfileId}-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: { contentType: "application/pdf" },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+        await storage.updateDoctorProfile(doctorProfileId, { gizmoFormUrl: url });
+
+        res.json({ url });
+      } catch (error: any) {
+        console.error("PDF template upload error:", error);
+        res.status(500).json({ message: "Failed to upload PDF template" });
+      }
+    });
+  });
 
   app.get("/api/forms/proxy-pdf", async (req, res) => {
     try {
@@ -2136,11 +2198,20 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/forms/data/:applicationId", requireAuth, requireLevel(2), async (req, res) => {
+  app.get("/api/forms/data/:applicationId", requireAuth, async (req, res) => {
     try {
       const application = await storage.getApplication(req.params.applicationId);
       if (!application) {
         res.status(404).json({ message: "Application not found" });
+        return;
+      }
+
+      const requestingUser = req.user!;
+      const isOwnerOrAdmin = requestingUser.userLevel >= 3;
+      const isApplicant = application.userId === requestingUser.id;
+      const isAssignedDoctor = application.assignedDoctorId === requestingUser.id;
+      if (!isOwnerOrAdmin && !isApplicant && !isAssignedDoctor) {
+        res.status(403).json({ message: "Not authorized to view this form data" });
         return;
       }
 
@@ -2199,9 +2270,7 @@ export async function registerRoutes(
             licenseNumber: "", npiNumber: "",
           };
 
-      const gizmoFormUrl = doctorProfile?.formTemplate
-        ? null
-        : (formData.gizmoFormUrl || null);
+      const gizmoFormUrl = doctorProfile?.gizmoFormUrl || formData.gizmoFormUrl || null;
 
       const today = new Date();
       const generatedDate = today.toLocaleDateString("en-US", {
