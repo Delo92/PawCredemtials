@@ -314,6 +314,10 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         updates.isActive = newStatus === "active";
       }
       updateUser.mutate({ id: selectedUser.id, updates });
+
+      if (selectedUser.userLevel === 2 || (canEditLevel && parseInt(newLevel) === 2)) {
+        handleSaveDoctorProfile();
+      }
     }
   };
 
