@@ -145,7 +145,9 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     enabled: !!selectedUser,
     queryFn: async () => {
       if (!selectedUser) return [];
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`/api/users/${selectedUser.id}/applications`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
       if (!response.ok) return [];
@@ -158,7 +160,9 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     enabled: !!selectedUser,
     queryFn: async () => {
       if (!selectedUser) return [];
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`/api/users/${selectedUser.id}/notes`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
       if (!response.ok) return [];
@@ -171,7 +175,9 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     enabled: !!selectedUser?.lastEditedBy,
     queryFn: async () => {
       if (!selectedUser?.lastEditedBy) return null;
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`/api/users/${selectedUser.lastEditedBy}/info`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
       if (!response.ok) return null;
