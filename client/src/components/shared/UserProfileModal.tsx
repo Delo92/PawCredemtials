@@ -56,34 +56,6 @@ import {
 
 const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
 
-const PLACEHOLDERS_REFERENCE = [
-  { tag: "{{doctorName}}", desc: "Doctor's full name" },
-  { tag: "{{doctorLicense}}", desc: "License number" },
-  { tag: "{{doctorNPI}}", desc: "NPI number" },
-  { tag: "{{doctorDEA}}", desc: "DEA number" },
-  { tag: "{{doctorPhone}}", desc: "Doctor phone" },
-  { tag: "{{doctorFax}}", desc: "Doctor fax" },
-  { tag: "{{doctorAddress}}", desc: "Doctor address" },
-  { tag: "{{doctorSpecialty}}", desc: "Specialty" },
-  { tag: "{{doctorState}}", desc: "Doctor state" },
-  { tag: "{{patientName}}", desc: "Patient full name" },
-  { tag: "{{patientFirstName}}", desc: "First name" },
-  { tag: "{{patientLastName}}", desc: "Last name" },
-  { tag: "{{patientDOB}}", desc: "Date of birth" },
-  { tag: "{{patientPhone}}", desc: "Patient phone" },
-  { tag: "{{patientEmail}}", desc: "Patient email" },
-  { tag: "{{patientAddress}}", desc: "Patient street" },
-  { tag: "{{patientCity}}", desc: "Patient city" },
-  { tag: "{{patientState}}", desc: "Patient state" },
-  { tag: "{{patientZipCode}}", desc: "Patient zip" },
-  { tag: "{{patientSSN}}", desc: "Patient SSN" },
-  { tag: "{{patientDriverLicense}}", desc: "Driver license #" },
-  { tag: "{{patientMedicalCondition}}", desc: "Medical condition" },
-  { tag: "{{reason}}", desc: "Reason for note" },
-  { tag: "{{packageName}}", desc: "Note type name" },
-  { tag: "{{date}}", desc: "Today (long format)" },
-  { tag: "{{dateShort}}", desc: "Today (short)" },
-];
 
 type ApplicationWithPackage = Application & {
   package?: { name: string; price: number };
@@ -103,7 +75,6 @@ interface DoctorProfileData {
   address: string;
   specialty: string;
   state: string;
-  formTemplate: string;
   gizmoFormUrl: string;
 }
 
@@ -122,7 +93,6 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
   const [newLevel, setNewLevel] = useState<string>("");
   const [newStatus, setNewStatus] = useState<string>("");
   const [newNote, setNewNote] = useState("");
-  const [showPlaceholders, setShowPlaceholders] = useState(false);
   const [pdfUploading, setPdfUploading] = useState(false);
   const [showGizmoPreview, setShowGizmoPreview] = useState(false);
   const [doctorProfileData, setDoctorProfileData] = useState<DoctorProfileData>({
@@ -135,7 +105,6 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     address: "",
     specialty: "",
     state: "",
-    formTemplate: "",
     gizmoFormUrl: "",
   });
 
@@ -208,7 +177,6 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         address: doctorProfile.address || "",
         specialty: doctorProfile.specialty || "",
         state: doctorProfile.state || "",
-        formTemplate: doctorProfile.formTemplate || "",
         gizmoFormUrl: doctorProfile.gizmoFormUrl || "",
       });
     } else if (selectedUser && isUserDoctor) {
@@ -222,7 +190,6 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         address: "",
         specialty: "",
         state: "",
-        formTemplate: "",
         gizmoFormUrl: "",
       });
     }
@@ -965,59 +932,6 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                     </div>
 
                     <Separator className="my-4" />
-
-                    <div className="space-y-1 mb-2">
-                      <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                        <FileText className="h-4 w-4" />
-                        Form Template
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        HTML template used to generate documents when this doctor approves an application.
-                      </p>
-                    </div>
-
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-md border border-amber-200 dark:border-amber-800">
-                      <Info className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Use <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded text-xs">{"{{placeholder}}"}</code> syntax to insert dynamic values.
-                      </p>
-                    </div>
-
-                    <div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPlaceholders(!showPlaceholders)}
-                        data-testid="button-toggle-placeholders-modal"
-                      >
-                        {showPlaceholders ? "Hide" : "Show"} Available Placeholders
-                      </Button>
-
-                      {showPlaceholders && (
-                        <div className="mt-3 p-3 border rounded-md bg-muted/50">
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                            {PLACEHOLDERS_REFERENCE.map((p) => (
-                              <div key={p.tag} className="flex items-center gap-2 text-xs py-0.5">
-                                <code className="bg-background px-1.5 py-0.5 rounded border font-mono text-xs whitespace-nowrap">{p.tag}</code>
-                                <span className="text-muted-foreground truncate">{p.desc}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">HTML Template</Label>
-                      <Textarea
-                        value={doctorProfileData.formTemplate}
-                        onChange={(e) => setDoctorProfileData({ ...doctorProfileData, formTemplate: e.target.value })}
-                        placeholder="<html>&#10;<body>&#10;  <h1>ESA Letter</h1>&#10;  <p>Doctor: {{doctorName}}</p>&#10;  <p>Patient: {{patientName}}</p>&#10;  ..."
-                        className="font-mono text-sm min-h-[200px]"
-                        data-testid="textarea-doctor-form-template"
-                      />
-                    </div>
 
                     <Button
                       onClick={handleSaveDoctorProfile}
