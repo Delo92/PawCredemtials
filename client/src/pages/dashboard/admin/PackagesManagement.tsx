@@ -334,7 +334,7 @@ export default function PackagesManagement() {
 
         {/* Create/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingPackage ? "Edit Registration Type" : "Create Registration Type"}
