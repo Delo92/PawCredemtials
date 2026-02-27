@@ -325,7 +325,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           if (anchorItem) {
             const optNum = parseInt(option, 10);
             const radioOffsetX = (optNum >= 6 && optNum <= 16) ? 1 : 0;
-            const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -5 : 0;
+            const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -2 : 0;
             const x = anchorItem.transform[4] + offsets.x + radioOffsetX;
             const y = viewport.height - anchorItem.transform[5] + offsets.y + radioOffsetY;
             const fontSize = anchorItem.height || 12;
@@ -394,7 +394,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         const group = getRadioGroup(option);
         const optNum = parseInt(option, 10);
         const radioOffsetX = (optNum >= 6 && optNum <= 16) ? 1 : 0;
-        const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -5 : 0;
+        const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -2 : 0;
         const x = itemX + offsets.x + radioOffsetX;
         const y = viewport.height - itemY + offsets.y + radioOffsetY;
         const fontSize = itemHeight || 12;
