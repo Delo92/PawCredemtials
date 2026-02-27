@@ -581,8 +581,17 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     loadPdf();
   }, [loadPdf]);
 
+  const renderTaskRef = useRef<any>(null);
+
   const renderPage = useCallback(async () => {
     if (!pdfDoc) return;
+
+    if (renderTaskRef.current) {
+      try {
+        renderTaskRef.current.cancel();
+      } catch (_) {}
+      renderTaskRef.current = null;
+    }
 
     const tryRender = async (retries = 5): Promise<void> => {
       const canvas = canvasRef.current;
@@ -601,7 +610,15 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const task = page.render({ canvasContext: ctx, viewport });
+      renderTaskRef.current = task;
+      try {
+        await task.promise;
+      } catch (err: any) {
+        if (err?.name === "RenderingCancelledException") return;
+        throw err;
+      }
+      renderTaskRef.current = null;
     };
 
     await tryRender();
