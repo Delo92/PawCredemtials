@@ -40,13 +40,35 @@ interface PatientApprovalEmailData {
   dashboardUrl: string;
 }
 
-function formatFormData(formData: Record<string, any>): string {
+const SUMMARY_KEYS = [
+  "disabilityCondition", "disability_condition",
+  "medicalCondition", "medical_condition",
+  "state", "duration", "duration_requested", "durationRequested",
+  "permitType", "permit_type", "reason",
+  "is_your_animal_for_support_or_service", "which_of_these_apply_to_you",
+];
+
+function formatFormDataSummary(formData: Record<string, any>): string {
+  if (!formData || Object.keys(formData).length === 0) return "";
+  const lowerSummaryKeys = SUMMARY_KEYS.map(k => k.toLowerCase());
+  const rows = Object.entries(formData)
+    .filter(([key]) => lowerSummaryKeys.includes(key.toLowerCase()))
+    .map(([key, value]) => {
+      const label = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/^./, s => s.toUpperCase());
+      return `<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;color:#374151;">${label}</td><td style="padding:8px;border:1px solid #e5e7eb;color:#4b5563;">${value || "N/A"}</td></tr>`;
+    })
+    .join("");
+  if (!rows) return "";
+  return `<table style="width:100%;border-collapse:collapse;margin:16px 0;">${rows}</table>`;
+}
+
+function formatFormDataFull(formData: Record<string, any>): string {
   if (!formData || Object.keys(formData).length === 0) return "<p>No additional form data provided.</p>";
   const rows = Object.entries(formData)
     .filter(([key]) => !["packageId", "password", "confirmPassword", "ssn"].includes(key))
     .map(([key, value]) => {
-      const label = key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase());
-      return `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${label}</td><td style="padding:8px;border:1px solid #ddd;">${value || "N/A"}</td></tr>`;
+      const label = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/^./, s => s.toUpperCase());
+      return `<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold;color:#374151;">${label}</td><td style="padding:8px;border:1px solid #e5e7eb;color:#4b5563;">${value || "N/A"}</td></tr>`;
     })
     .join("");
   return `<table style="width:100%;border-collapse:collapse;margin:16px 0;">${rows}</table>`;
@@ -70,8 +92,7 @@ export async function sendDoctorApprovalEmail(data: DoctorEmailData): Promise<bo
           <p><strong>Package:</strong> ${data.packageName}</p>
           <p><strong>Application ID:</strong> ${data.applicationId}</p>
         </div>
-        <h3>Submitted Details</h3>
-        ${formatFormData(data.formData)}
+        ${formatFormDataSummary(data.formData) ? `<h3>Application Details</h3>${formatFormDataSummary(data.formData)}` : ""}
         <div style="text-align:center;margin:30px 0;">
           <a href="${data.reviewUrl}" style="background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:bold;">
             Review &amp; Approve
@@ -120,8 +141,7 @@ export async function sendAdminNotificationEmail(data: AdminEmailData): Promise<
           <p><strong>Package:</strong> ${data.packageName}</p>
           <p><strong>Application ID:</strong> ${data.applicationId}</p>
         </div>
-        <h3>Submitted Details</h3>
-        ${formatFormData(data.formData)}
+        ${formatFormDataSummary(data.formData) ? `<h3>Application Details</h3>${formatFormDataSummary(data.formData)}` : ""}
         <div style="text-align:center;margin:30px 0;">
           <a href="${data.reviewUrl}" style="background:#059669;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:bold;">
             Review &amp; Approve
@@ -245,10 +265,7 @@ export async function sendDoctorCompletionCopyEmail(data: DoctorCompletionCopyDa
           <p style="margin:4px 0;color:#4b5563;"><strong>Package:</strong> ${data.packageName}</p>
           <p style="margin:4px 0;color:#4b5563;"><strong>Application ID:</strong> ${data.applicationId}</p>
         </div>
-        <div style="margin:20px 0;">
-          <h3 style="color:#0d9488;margin:0 0 12px;font-size:16px;">Application Details</h3>
-          ${formatFormData(data.formData)}
-        </div>
+        ${formatFormDataSummary(data.formData) ? `<div style="margin:20px 0;"><h3 style="color:#0d9488;margin:0 0 12px;font-size:16px;">Application Details</h3>${formatFormDataSummary(data.formData)}</div>` : ""}
         <p style="color:#6b7280;font-size:13px;text-align:center;">
           No action is required from you. This is a copy for your records.
         </p>
