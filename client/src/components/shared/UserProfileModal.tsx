@@ -87,6 +87,7 @@ interface DoctorProfileData {
   state: string;
   gizmoFormUrl: string;
   stateForms: Record<string, string>;
+  excludeFromRotation: boolean;
 }
 
 interface UserProfileModalProps {
@@ -120,6 +121,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     state: "",
     gizmoFormUrl: "",
     stateForms: {},
+    excludeFromRotation: false,
   });
 
   const isUserDoctor = selectedUser?.userLevel === 2;
@@ -193,6 +195,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         state: doctorProfile.state || "",
         gizmoFormUrl: doctorProfile.gizmoFormUrl || "",
         stateForms: doctorProfile.stateForms || {},
+        excludeFromRotation: doctorProfile.excludeFromRotation || false,
       });
     } else if (selectedUser && isUserDoctor) {
       setDoctorProfileData({
@@ -207,6 +210,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         state: "",
         gizmoFormUrl: "",
         stateForms: {},
+        excludeFromRotation: false,
       });
     }
   }, [doctorProfile, selectedUser, isUserDoctor]);

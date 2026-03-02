@@ -715,7 +715,7 @@ export class FirestoreStorage implements IStorage {
   async getActiveDoctors(): Promise<Record<string, any>[]> {
     const snap = await this.col("doctorProfiles").get();
     const profiles = docsToRecords(snap);
-    const active = profiles.filter(p => !p._isPlaceholder && p.isActive !== false);
+    const active = profiles.filter(p => !p._isPlaceholder && p.isActive !== false && !p.excludeFromRotation);
     return active.sort((a, b) => {
       const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
