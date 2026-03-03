@@ -236,6 +236,19 @@ export async function registerRoutes(
     console.log("[config] Config migration skipped:", e.message);
   }
 
+  try {
+    const testUser = await storage.getUserByEmail("level2@test.com");
+    if (testUser) {
+      const testProfile = await storage.getDoctorProfileByUserId(testUser.id);
+      if (testProfile && !testProfile.excludeFromRotation) {
+        await storage.updateDoctorProfile(testProfile.id, { excludeFromRotation: true });
+        console.log("[migration] Excluded test doctor (level2@test.com) from rotation");
+      }
+    }
+  } catch (e: any) {
+    console.log("[migration] Test doctor exclusion skipped:", e.message);
+  }
+
   // ===========================================================================
   // FILE UPLOAD ROUTES (Firestore)
   // ===========================================================================
