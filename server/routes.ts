@@ -3007,6 +3007,8 @@ export async function registerRoutes(
         year: "numeric",
       });
 
+      const petIdCardUrl = "/uploads/templates/pet-id-card-template.pdf";
+
       res.json({
         success: true,
         patientData,
@@ -3017,6 +3019,7 @@ export async function registerRoutes(
         packageName: pkg?.name || "",
         selectedRadioIds,
         petPhotoUrl: formData.petPhotoUrl || "",
+        petIdCardUrl,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

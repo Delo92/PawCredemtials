@@ -1,18 +1,25 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { GizmoForm, type GizmoFormData } from "@/components/shared/GizmoForm";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, FileText, CreditCard } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface FormDataWithIdCard extends GizmoFormData {
+  petIdCardUrl?: string;
+}
 
 export default function FormViewerPage() {
   const params = useParams<{ applicationId: string }>();
   const applicationId = params.applicationId;
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"letter" | "idcard">("letter");
 
-  const { data, isLoading, error } = useQuery<GizmoFormData>({
+  const { data, isLoading, error } = useQuery<FormDataWithIdCard>({
     queryKey: ["/api/forms/data", applicationId],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/forms/data/${applicationId}`);
@@ -20,6 +27,13 @@ export default function FormViewerPage() {
     },
     enabled: !!applicationId && !!user,
   });
+
+  const hasIdCard = !!data?.petIdCardUrl && !!data?.patientData?.petName;
+
+  const idCardData: GizmoFormData | null = data && hasIdCard ? {
+    ...data,
+    gizmoFormUrl: data.petIdCardUrl!,
+  } : null;
 
   return (
     <DashboardLayout>
@@ -40,18 +54,49 @@ export default function FormViewerPage() {
         </div>
       )}
 
-      {data && data.gizmoFormUrl && (
-        <GizmoForm data={data} onClose={() => window.history.back()} />
-      )}
+      {data && (
+        <>
+          {hasIdCard && (
+            <div className="flex gap-2 mb-4" data-testid="form-viewer-tabs">
+              <Button
+                variant={activeTab === "letter" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("letter")}
+                data-testid="button-tab-letter"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                ESA Letter
+              </Button>
+              <Button
+                variant={activeTab === "idcard" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveTab("idcard")}
+                data-testid="button-tab-idcard"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Pet ID Card
+              </Button>
+            </div>
+          )}
 
-      {data && !data.gizmoFormUrl && (
-        <div className="p-6 border rounded-lg text-center space-y-3">
-          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
-          <p className="font-medium">No PDF Form Available</p>
-          <p className="text-sm text-muted-foreground">
-            A PDF template has not been assigned for this application yet. Please check back later.
-          </p>
-        </div>
+          {activeTab === "letter" && data.gizmoFormUrl && (
+            <GizmoForm data={data} onClose={() => window.history.back()} />
+          )}
+
+          {activeTab === "letter" && !data.gizmoFormUrl && (
+            <div className="p-6 border rounded-lg text-center space-y-3">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
+              <p className="font-medium">No PDF Form Available</p>
+              <p className="text-sm text-muted-foreground">
+                A PDF template has not been assigned for this application yet. Please check back later.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "idcard" && idCardData && (
+            <GizmoForm data={idCardData} onClose={() => setActiveTab("letter")} />
+          )}
+        </>
       )}
     </DashboardLayout>
   );
