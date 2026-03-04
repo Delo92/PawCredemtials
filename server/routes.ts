@@ -2959,7 +2959,11 @@ export async function registerRoutes(
         petBreed: formData.petBreed || "",
         petType: formData.petType || "",
         petWeight: formData.petWeight || "",
-        registrationId: formData.registrationId || (application as any).registrationId || "",
+        registrationId: formData.registrationId || (application as any).registrationId || (() => {
+          const newRegId = generateRegistrationId();
+          storage.updateApplication(application.id, { formData: { ...formData, registrationId: newRegId } } as any).catch(() => {});
+          return newRegId;
+        })(),
       };
 
       const nameParts = (doctorProfile?.fullName || "").split(" ").filter(Boolean);

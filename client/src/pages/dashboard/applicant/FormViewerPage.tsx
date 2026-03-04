@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useSearch } from "wouter";
 import { GizmoForm, type GizmoFormData } from "@/components/shared/GizmoForm";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +17,10 @@ export default function FormViewerPage() {
   const params = useParams<{ applicationId: string }>();
   const applicationId = params.applicationId;
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"letter" | "idcard">("letter");
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const initialTab = searchParams.get("tab") === "idcard" ? "idcard" : "letter";
+  const [activeTab, setActiveTab] = useState<"letter" | "idcard">(initialTab);
 
   const { data, isLoading, error } = useQuery<FormDataWithIdCard>({
     queryKey: ["/api/forms/data", applicationId],

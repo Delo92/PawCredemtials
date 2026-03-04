@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   FileText, Search, Clock, CheckCircle, XCircle, Stethoscope, Send,
-  Loader2, Copy, ExternalLink, CreditCard,
+  Loader2, Copy, ExternalLink, CreditCard, PawPrint,
 } from "lucide-react";
 
 function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" {
@@ -299,6 +300,22 @@ export default function ApplicationsListPage() {
                         <Stethoscope className="h-3 w-3 mr-1" />
                         Awaiting Doctor
                       </Badge>
+                    )}
+                    {(app.status === "doctor_approved" || app.status === "completed") && (
+                      <div className="flex gap-2">
+                        <Link href={`/dashboard/applicant/documents/${app.id}/form`}>
+                          <Button size="sm" variant="outline" data-testid={`button-view-letter-${app.id}`}>
+                            <FileText className="h-4 w-4 mr-1" />
+                            ESA Letter
+                          </Button>
+                        </Link>
+                        <Link href={`/dashboard/applicant/documents/${app.id}/form?tab=idcard`}>
+                          <Button size="sm" variant="outline" data-testid={`button-view-idcard-${app.id}`}>
+                            <PawPrint className="h-4 w-4 mr-1" />
+                            Pet ID Card
+                          </Button>
+                        </Link>
+                      </div>
                     )}
                   </div>
                 ))}
