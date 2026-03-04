@@ -338,8 +338,12 @@ export default function NewApplication() {
       return;
     }
     if (step === 2) {
-      if (!petType || !petName) {
-        toast({ title: "Pet Details Required", description: "Please provide your pet's type and name", variant: "destructive" });
+      if (!petType || !petName || !petBreed || !petWeight) {
+        toast({ title: "Pet Details Required", description: "Please fill in all pet details: type, name, breed, and weight", variant: "destructive" });
+        return;
+      }
+      if (!petPhotoUrl) {
+        toast({ title: "Pet Photo Required", description: "Please upload a photo of your pet for your ID card", variant: "destructive" });
         return;
       }
     }
@@ -541,7 +545,7 @@ export default function NewApplication() {
                         />
                       </div>
                       <div>
-                        <Label>Breed</Label>
+                        <Label>Breed <span className="text-destructive">*</span></Label>
                         <Input
                           value={petBreed}
                           onChange={(e) => setPetBreed(e.target.value)}
@@ -550,7 +554,7 @@ export default function NewApplication() {
                         />
                       </div>
                       <div>
-                        <Label>Weight (lbs)</Label>
+                        <Label>Weight (lbs) <span className="text-destructive">*</span></Label>
                         <Input
                           type="number"
                           value={petWeight}
@@ -561,7 +565,7 @@ export default function NewApplication() {
                       </div>
                     </div>
                     <div className="pt-2">
-                      <Label>Pet Photo</Label>
+                      <Label>Pet Photo <span className="text-destructive">*</span></Label>
                       <p className="text-xs text-muted-foreground mb-2">Upload a clear photo of your pet for your ID card</p>
                       <div className="flex items-center gap-4">
                         {petPhotoUrl && (
@@ -874,22 +878,18 @@ export default function NewApplication() {
                       </div>
                     )}
 
-                    {petName && (
-                      <div className="p-4 rounded-md border bg-muted/30">
-                        <p className="text-sm font-medium mb-2">Pet Details</p>
-                        <div className="flex items-start gap-4">
-                          {petPhotoUrl && (
-                            <img src={petPhotoUrl} alt="Pet" className="w-16 h-16 rounded-lg object-cover border" data-testid="img-pet-photo-review" />
-                          )}
-                          <div className="grid grid-cols-2 gap-1">
-                            {petType && <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>}
-                            <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
-                            {petBreed && <div className="mb-1"><span className="text-sm text-muted-foreground">Breed: </span><span className="text-sm">{petBreed}</span></div>}
-                            {petWeight && <div className="mb-1"><span className="text-sm text-muted-foreground">Weight: </span><span className="text-sm">{petWeight} lbs</span></div>}
-                          </div>
+                    <div className="p-4 rounded-md border bg-muted/30">
+                      <p className="text-sm font-medium mb-2">Pet Details</p>
+                      <div className="flex items-start gap-4">
+                        <img src={petPhotoUrl} alt="Pet" className="w-16 h-16 rounded-lg object-cover border" data-testid="img-pet-photo-review" />
+                        <div className="grid grid-cols-2 gap-1">
+                          <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>
+                          <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
+                          <div className="mb-1"><span className="text-sm text-muted-foreground">Breed: </span><span className="text-sm">{petBreed}</span></div>
+                          <div className="mb-1"><span className="text-sm text-muted-foreground">Weight: </span><span className="text-sm">{petWeight} lbs</span></div>
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     {Object.keys(customFields).length > 0 && (
                       <div className="p-4 rounded-md border bg-muted/30">
