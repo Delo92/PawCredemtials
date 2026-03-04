@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Package } from "@shared/schema";
-import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User, CreditCard, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User, CreditCard, Lock, Home, Plane, PawPrint, Info } from "lucide-react";
 
 const applicationSchema = z.object({
   packageId: z.string().min(1, "Please select a registration type"),
@@ -79,6 +79,12 @@ export default function NewApplication() {
   const [step, setStep] = useState(1);
   const totalSteps = 3;
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  const [petName, setPetName] = useState("");
+  const [petBreed, setPetBreed] = useState("");
+  const [petWeight, setPetWeight] = useState("");
+  const [petType, setPetType] = useState("");
+  const [movingSoon, setMovingSoon] = useState("");
+  const [travelPlanned, setTravelPlanned] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expMonth, setExpMonth] = useState("");
   const [expYear, setExpYear] = useState("");
@@ -126,6 +132,12 @@ export default function NewApplication() {
       if (draft.customFields) {
         setCustomFields(draft.customFields);
       }
+      if (draft.petName) setPetName(draft.petName);
+      if (draft.petBreed) setPetBreed(draft.petBreed);
+      if (draft.petWeight) setPetWeight(draft.petWeight);
+      if (draft.petType) setPetType(draft.petType);
+      if (draft.movingSoon) setMovingSoon(draft.movingSoon);
+      if (draft.travelPlanned) setTravelPlanned(draft.travelPlanned);
       if (draft.step && draft.step >= 1 && draft.step <= totalSteps) {
         setStep(draft.step);
       }
@@ -155,10 +167,10 @@ export default function NewApplication() {
     }
     draftSaveTimer.current = setTimeout(() => {
       apiRequest("PUT", "/api/profile/draft-form", {
-        draftFormData: { packageId, reason, customFields: fields, step: currentStep },
+        draftFormData: { packageId, reason, customFields: fields, step: currentStep, petName, petBreed, petWeight, petType, movingSoon, travelPlanned },
       }).catch(() => {});
     }, 1000);
-  }, []);
+  }, [petName, petBreed, petWeight, petType, movingSoon, travelPlanned]);
 
   const watchedPackageId = form.watch("packageId");
   const watchedReason = form.watch("reason");
@@ -195,8 +207,14 @@ export default function NewApplication() {
       ssn: profile?.ssn,
       hasMedicare: profile?.hasMedicare,
       isVeteran: profile?.isVeteran,
+      petName,
+      petBreed,
+      petWeight,
+      petType,
+      movingSoon,
+      travelPlanned,
     };
-  }, [form, customFields, fullName, profile]);
+  }, [form, customFields, fullName, profile, petName, petBreed, petWeight, petType, movingSoon, travelPlanned]);
 
   const processPayment = useCallback(async () => {
     if (!selectedPackage) return;
@@ -289,6 +307,12 @@ export default function NewApplication() {
       form.setError("packageId", { message: "Please select a registration type" });
       return;
     }
+    if (step === 2) {
+      if (!petType || !petName) {
+        toast({ title: "Pet Details Required", description: "Please provide your pet's type and name", variant: "destructive" });
+        return;
+      }
+    }
     if (step < totalSteps) {
       setStep(step + 1);
     }
@@ -372,6 +396,14 @@ export default function NewApplication() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             {step === 1 && (
+              <>
+              <div className="flex items-start gap-3 p-4 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30" data-testid="benefit-highlight-1">
+                <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Did you know?</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400">Pets with ESA approval can live in pet-restricted properties without security deposits or monthly pet fees under the Fair Housing Act.</p>
+                </div>
+              </div>
               <Card data-testid="step-package-selection">
                 <CardHeader>
                   <CardTitle>Select Registration Type</CardTitle>
@@ -431,10 +463,76 @@ export default function NewApplication() {
                   )}
                 </CardContent>
               </Card>
+              </>
             )}
 
             {step === 2 && (
               <div className="space-y-6">
+                <div className="flex items-start gap-3 p-4 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30" data-testid="benefit-highlight-2">
+                  <Info className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Good to know</p>
+                    <p className="text-sm text-green-700 dark:text-green-400">Many restaurants, stores, hotels, and ride-share services are more welcoming to ESA-approved pets. Your ESA letter is reviewed by a licensed mental health professional.</p>
+                  </div>
+                </div>
+
+                <Card data-testid="card-pet-details">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <PawPrint className="h-5 w-5" />
+                      Pet Details
+                    </CardTitle>
+                    <CardDescription>
+                      Tell us about the pet you'd like to register as an ESA
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label>Pet Type <span className="text-destructive">*</span></Label>
+                      <Select value={petType} onValueChange={setPetType}>
+                        <SelectTrigger data-testid="select-pet-type">
+                          <SelectValue placeholder="Select pet type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Dog">Dog</SelectItem>
+                          <SelectItem value="Cat">Cat</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label>Pet Name <span className="text-destructive">*</span></Label>
+                        <Input
+                          value={petName}
+                          onChange={(e) => setPetName(e.target.value)}
+                          placeholder="e.g., Buddy"
+                          data-testid="input-pet-name"
+                        />
+                      </div>
+                      <div>
+                        <Label>Breed</Label>
+                        <Input
+                          value={petBreed}
+                          onChange={(e) => setPetBreed(e.target.value)}
+                          placeholder="e.g., Golden Retriever"
+                          data-testid="input-pet-breed"
+                        />
+                      </div>
+                      <div>
+                        <Label>Weight (lbs)</Label>
+                        <Input
+                          type="number"
+                          value={petWeight}
+                          onChange={(e) => setPetWeight(e.target.value)}
+                          placeholder="e.g., 55"
+                          data-testid="input-pet-weight"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card data-testid="step-review-info">
                   <CardHeader>
                     <CardTitle>Your Information</CardTitle>
@@ -599,11 +697,84 @@ export default function NewApplication() {
                       </CardContent>
                     </Card>
                   )}
+
+                <Card data-testid="card-urgency">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Home className="h-5 w-5" />
+                      Your Situation
+                    </CardTitle>
+                    <CardDescription>
+                      Help us understand your timeline so we can prioritize your application
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="flex items-center gap-2 mb-2">
+                        <Home className="h-4 w-4" />
+                        Are you moving in the next 2 months?
+                      </Label>
+                      <div className="flex gap-3">
+                        <Button
+                          type="button"
+                          variant={movingSoon === "yes" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setMovingSoon("yes")}
+                          data-testid="button-moving-yes"
+                        >
+                          Yes
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={movingSoon === "no" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setMovingSoon("no")}
+                          data-testid="button-moving-no"
+                        >
+                          No
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="flex items-center gap-2 mb-2">
+                        <Plane className="h-4 w-4" />
+                        Do you have any trips planned in the next 2 months?
+                      </Label>
+                      <div className="flex gap-3">
+                        <Button
+                          type="button"
+                          variant={travelPlanned === "yes" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTravelPlanned("yes")}
+                          data-testid="button-travel-yes"
+                        >
+                          Yes
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={travelPlanned === "no" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTravelPlanned("no")}
+                          data-testid="button-travel-no"
+                        >
+                          No
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
 
             {step === 3 && (
               <div className="space-y-6">
+                <div className="flex items-start gap-3 p-4 rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30" data-testid="benefit-highlight-3">
+                  <Info className="h-5 w-5 text-purple-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-purple-800 dark:text-purple-300">Almost there!</p>
+                    <p className="text-sm text-purple-700 dark:text-purple-400">If you're currently paying a monthly pet fee where you live, an ESA letter can eliminate that fee. Your letter is legally recognized under the Fair Housing Act.</p>
+                  </div>
+                </div>
                 <Card data-testid="step-final-review">
                   <CardHeader>
                     <CardTitle>Review & Pay</CardTitle>
@@ -639,6 +810,18 @@ export default function NewApplication() {
                       </div>
                     )}
 
+                    {petName && (
+                      <div className="p-4 rounded-md border bg-muted/30">
+                        <p className="text-sm font-medium mb-2">Pet Details</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          {petType && <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>}
+                          <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
+                          {petBreed && <div className="mb-1"><span className="text-sm text-muted-foreground">Breed: </span><span className="text-sm">{petBreed}</span></div>}
+                          {petWeight && <div className="mb-1"><span className="text-sm text-muted-foreground">Weight: </span><span className="text-sm">{petWeight} lbs</span></div>}
+                        </div>
+                      </div>
+                    )}
+
                     {Object.keys(customFields).length > 0 && (
                       <div className="p-4 rounded-md border bg-muted/30">
                         <p className="text-sm font-medium mb-2">Additional Details</p>
@@ -650,6 +833,14 @@ export default function NewApplication() {
                             </div>
                           )
                         ))}
+                      </div>
+                    )}
+
+                    {(movingSoon || travelPlanned) && (
+                      <div className="p-4 rounded-md border bg-muted/30">
+                        <p className="text-sm font-medium mb-2">Your Situation</p>
+                        {movingSoon && <div className="mb-1"><span className="text-sm text-muted-foreground">Moving soon: </span><span className="text-sm capitalize">{movingSoon}</span></div>}
+                        {travelPlanned && <div className="mb-1"><span className="text-sm text-muted-foreground">Travel planned: </span><span className="text-sm capitalize">{travelPlanned}</span></div>}
                       </div>
                     )}
                   </CardContent>

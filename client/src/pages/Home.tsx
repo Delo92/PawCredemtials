@@ -20,6 +20,7 @@ import deptTravel from "@assets/dept-travel.png";
 import deptHousing from "@assets/dept-housing.png";
 import deptPriority from "@assets/dept-priority.png";
 import deptService from "@assets/dept-service.png";
+import QualificationQuiz from "@/components/QualificationQuiz";
 import {
   ArrowRight,
   Users,
@@ -293,6 +294,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Qualification Quiz */}
+      <QualificationQuiz />
 
       {/* CTA / Order Section */}
       <section className="relative py-20 md:py-24 overflow-hidden">

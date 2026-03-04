@@ -46,6 +46,8 @@ const SUMMARY_KEYS = [
   "state", "duration", "duration_requested", "durationRequested",
   "permitType", "permit_type", "reason",
   "is_your_animal_for_support_or_service", "which_of_these_apply_to_you",
+  "petName", "petType", "petBreed", "petWeight",
+  "movingSoon", "travelPlanned",
 ];
 
 function formatFormDataSummary(formData: Record<string, any>): string {
