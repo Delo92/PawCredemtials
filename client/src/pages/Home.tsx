@@ -14,6 +14,12 @@ import gallery5 from "@assets/gallery-5.png";
 import gallery6 from "@assets/gallery-6.png";
 import gallery7 from "@assets/gallery-7.png";
 import gallery8 from "@assets/gallery-8.png";
+import deptEsa from "@assets/dept-esa.png";
+import deptPsd from "@assets/dept-psd.png";
+import deptTravel from "@assets/dept-travel.png";
+import deptHousing from "@assets/dept-housing.png";
+import deptPriority from "@assets/dept-priority.png";
+import deptService from "@assets/dept-service.png";
 import {
   ArrowRight,
   Users,
@@ -72,13 +78,7 @@ export default function Home() {
     { icon: Award, value: "4.9/5", label: "Customer Rating" },
   ];
 
-  const defaultDeptImages = [
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-1.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-2.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-3.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-4.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-5.jpg",
-  ];
+  const defaultDeptImages = [deptEsa, deptPsd, deptTravel, deptHousing, deptPriority, deptService];
   const deptMedia = config.departmentMediaUrls || [];
 
   const departments = [
@@ -87,6 +87,7 @@ export default function Home() {
     { name: "Travel Certificates", img: deptMedia[2] || defaultDeptImages[2], desc: "Support animal travel certification accepted by major airlines and transportation providers for hassle-free travel with your companion." },
     { name: "Housing Verification", img: deptMedia[3] || defaultDeptImages[3], desc: "Comprehensive landlord verification letters ensuring your rights under the Fair Housing Act are protected for you and your support animal." },
     { name: "Priority Registration", img: deptMedia[4] || defaultDeptImages[4], desc: "Expedited processing for time-sensitive registration needs. Get your verified support animal certification within hours." },
+    { name: "Service Animals", img: deptMedia[5] || defaultDeptImages[5], desc: "Official service animal documentation for individuals with disabilities. Provides legal recognition for public access rights under the ADA for trained service animals." },
   ];
 
   const faqs = [
@@ -526,7 +527,7 @@ export default function Home() {
       {/* Contact / Final CTA Section */}
       <section id="contact" className="relative py-20 md:py-24 overflow-hidden">
         <MediaRenderer
-          url={config.contactMediaUrl || "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/departments-3.jpg"}
+          url={config.contactMediaUrl || deptTravel}
           alt=""
           overlay
           data-testid="media-contact-bg"
