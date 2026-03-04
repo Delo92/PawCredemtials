@@ -6,6 +6,14 @@ import { useConfig } from "@/contexts/ConfigContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimateOnScroll } from "@/hooks/use-scroll-animation";
 import { MediaRenderer } from "@/components/MediaRenderer";
+import gallery1 from "@assets/gallery-1.png";
+import gallery2 from "@assets/gallery-2.png";
+import gallery3 from "@assets/gallery-3.png";
+import gallery4 from "@assets/gallery-4.png";
+import gallery5 from "@assets/gallery-5.png";
+import gallery6 from "@assets/gallery-6.png";
+import gallery7 from "@assets/gallery-7.png";
+import gallery8 from "@assets/gallery-8.png";
 import {
   ArrowRight,
   Users,
@@ -108,14 +116,8 @@ export default function Home() {
   ];
 
   const defaultGalleryImages = [
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-1.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-2.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-3.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-4.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-5.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-6.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-7.jpg",
-    "https://storage.googleapis.com/paw-credentials.firebasestorage.app/defaults/gallery/gallery-8.jpg",
+    gallery1, gallery2, gallery3, gallery4,
+    gallery5, gallery6, gallery7, gallery8,
   ];
   const galleryImages = config.galleryImages && config.galleryImages.length > 0
     ? config.galleryImages
