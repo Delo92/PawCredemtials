@@ -69,7 +69,7 @@ declare global {
 }
 
 export default function NewApplication() {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
@@ -83,6 +83,8 @@ export default function NewApplication() {
   const [petBreed, setPetBreed] = useState("");
   const [petWeight, setPetWeight] = useState("");
   const [petType, setPetType] = useState("");
+  const [petPhotoUrl, setPetPhotoUrl] = useState("");
+  const [petPhotoUploading, setPetPhotoUploading] = useState(false);
   const [movingSoon, setMovingSoon] = useState("");
   const [travelPlanned, setTravelPlanned] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -136,6 +138,7 @@ export default function NewApplication() {
       if (draft.petBreed) setPetBreed(draft.petBreed);
       if (draft.petWeight) setPetWeight(draft.petWeight);
       if (draft.petType) setPetType(draft.petType);
+      if (draft.petPhotoUrl) setPetPhotoUrl(draft.petPhotoUrl);
       if (draft.movingSoon) setMovingSoon(draft.movingSoon);
       if (draft.travelPlanned) setTravelPlanned(draft.travelPlanned);
       if (draft.step && draft.step >= 1 && draft.step <= totalSteps) {
@@ -167,10 +170,10 @@ export default function NewApplication() {
     }
     draftSaveTimer.current = setTimeout(() => {
       apiRequest("PUT", "/api/profile/draft-form", {
-        draftFormData: { packageId, reason, customFields: fields, step: currentStep, petName, petBreed, petWeight, petType, movingSoon, travelPlanned },
+        draftFormData: { packageId, reason, customFields: fields, step: currentStep, petName, petBreed, petWeight, petType, petPhotoUrl, movingSoon, travelPlanned },
       }).catch(() => {});
     }, 1000);
-  }, [petName, petBreed, petWeight, petType, movingSoon, travelPlanned]);
+  }, [petName, petBreed, petWeight, petType, petPhotoUrl, movingSoon, travelPlanned]);
 
   const watchedPackageId = form.watch("packageId");
   const watchedReason = form.watch("reason");
@@ -211,10 +214,11 @@ export default function NewApplication() {
       petBreed,
       petWeight,
       petType,
+      petPhotoUrl,
       movingSoon,
       travelPlanned,
     };
-  }, [form, customFields, fullName, profile, petName, petBreed, petWeight, petType, movingSoon, travelPlanned]);
+  }, [form, customFields, fullName, profile, petName, petBreed, petWeight, petType, petPhotoUrl, movingSoon, travelPlanned]);
 
   const processPayment = useCallback(async () => {
     if (!selectedPackage) return;
@@ -301,6 +305,32 @@ export default function NewApplication() {
       }
     }
   }, [selectedPackage, paymentConfig, acceptJsLoaded, cardNumber, expMonth, expYear, cvv, buildFormData, toast, setLocation]);
+
+  const handlePetPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPetPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("petPhoto", file);
+      const response = await fetch("/api/upload/pet-photo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await getIdToken()}` },
+        body: formData,
+      });
+      const result = await response.json();
+      if (result.success && result.url) {
+        setPetPhotoUrl(result.url);
+        toast({ title: "Photo Uploaded", description: "Your pet's photo has been uploaded successfully." });
+      } else {
+        toast({ title: "Upload Failed", description: result.message || "Failed to upload photo", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message || "Failed to upload photo", variant: "destructive" });
+    } finally {
+      setPetPhotoUploading(false);
+    }
+  };
 
   const nextStep = () => {
     if (step === 1 && !form.getValues("packageId")) {
@@ -528,6 +558,40 @@ export default function NewApplication() {
                           placeholder="e.g., 55"
                           data-testid="input-pet-weight"
                         />
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      <Label>Pet Photo</Label>
+                      <p className="text-xs text-muted-foreground mb-2">Upload a clear photo of your pet for your ID card</p>
+                      <div className="flex items-center gap-4">
+                        {petPhotoUrl && (
+                          <img
+                            src={petPhotoUrl}
+                            alt="Pet"
+                            className="w-20 h-20 rounded-lg object-cover border"
+                            data-testid="img-pet-photo-preview"
+                          />
+                        )}
+                        <div>
+                          <Label htmlFor="pet-photo-input" className="cursor-pointer">
+                            <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors text-sm">
+                              {petPhotoUploading ? (
+                                <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
+                              ) : (
+                                <><PawPrint className="h-4 w-4" /> {petPhotoUrl ? "Change Photo" : "Upload Photo"}</>
+                              )}
+                            </div>
+                          </Label>
+                          <Input
+                            id="pet-photo-input"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handlePetPhotoUpload}
+                            disabled={petPhotoUploading}
+                            data-testid="input-pet-photo"
+                          />
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -813,11 +877,16 @@ export default function NewApplication() {
                     {petName && (
                       <div className="p-4 rounded-md border bg-muted/30">
                         <p className="text-sm font-medium mb-2">Pet Details</p>
-                        <div className="grid grid-cols-2 gap-1">
-                          {petType && <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>}
-                          <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
-                          {petBreed && <div className="mb-1"><span className="text-sm text-muted-foreground">Breed: </span><span className="text-sm">{petBreed}</span></div>}
-                          {petWeight && <div className="mb-1"><span className="text-sm text-muted-foreground">Weight: </span><span className="text-sm">{petWeight} lbs</span></div>}
+                        <div className="flex items-start gap-4">
+                          {petPhotoUrl && (
+                            <img src={petPhotoUrl} alt="Pet" className="w-16 h-16 rounded-lg object-cover border" data-testid="img-pet-photo-review" />
+                          )}
+                          <div className="grid grid-cols-2 gap-1">
+                            {petType && <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>}
+                            <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
+                            {petBreed && <div className="mb-1"><span className="text-sm text-muted-foreground">Breed: </span><span className="text-sm">{petBreed}</span></div>}
+                            {petWeight && <div className="mb-1"><span className="text-sm text-muted-foreground">Weight: </span><span className="text-sm">{petWeight} lbs</span></div>}
+                          </div>
                         </div>
                       </div>
                     )}

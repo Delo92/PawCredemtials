@@ -20,6 +20,7 @@ export interface GizmoFormData {
   generatedDate: string;
   patientName: string;
   selectedRadioIds?: string[];
+  petPhotoUrl?: string;
 }
 
 interface PlaceholderField {
@@ -85,6 +86,11 @@ const FIELD_NAME_MAP: Record<string, { source: "patient" | "doctor" | "meta"; ke
   doctorzipcode: { source: "doctor", key: "zipCode" },
   doctorlicensenumber: { source: "doctor", key: "licenseNumber" },
   doctornpinumber: { source: "doctor", key: "npiNumber" },
+  petname: { source: "patient", key: "petName" },
+  petbreed: { source: "patient", key: "petBreed" },
+  pettype: { source: "patient", key: "petType" },
+  petweight: { source: "patient", key: "petWeight" },
+  registrationid: { source: "patient", key: "registrationId" },
 };
 
 const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; key: string }> = {
@@ -117,6 +123,11 @@ const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; k
   "{doctorZipCode}": { source: "doctor", key: "zipCode" },
   "{doctorLicenseNumber}": { source: "doctor", key: "licenseNumber" },
   "{doctorNpiNumber}": { source: "doctor", key: "npiNumber" },
+  "{petName}": { source: "patient", key: "petName" },
+  "{petBreed}": { source: "patient", key: "petBreed" },
+  "{petType}": { source: "patient", key: "petType" },
+  "{petWeight}": { source: "patient", key: "petWeight" },
+  "{registrationId}": { source: "patient", key: "registrationId" },
 };
 
 function normalizeFieldName(name: string): string {
@@ -185,7 +196,7 @@ async function checkForPlaceholderTokens(pdf: pdfjsLib.PDFDocumentProxy): Promis
       .map((item) => item.str)
       .join("");
 
-    if (/\{(firstName|lastName|middleName|dateOfBirth|address|city|state|zipCode|zip|phone|email|date|driverLicenseNumber|medicalCondition|idNumber|suffix|apt)\}?/i.test(allText)) {
+    if (/\{(firstName|lastName|middleName|dateOfBirth|address|city|state|zipCode|zip|phone|email|date|driverLicenseNumber|medicalCondition|idNumber|suffix|apt|petName|petBreed|petType|petWeight|registrationId)\}?/i.test(allText)) {
       return true;
     }
     if (/\{radio[_\s]/i.test(allText) || /radio\s*_?\s*id/i.test(allText)) {
@@ -212,6 +223,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [radioFields, setRadioFields] = useState<RadioField[]>([]);
   const [acroFormFields, setAcroFormFields] = useState<{ name: string; normalizedName: string; value: string; matched: boolean }[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const [petPhotoMarker, setPetPhotoMarker] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number } | null>(null);
 
   const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
@@ -251,6 +263,26 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         }
         if (!foundLine) {
           lines.push([item]);
+        }
+      }
+
+      const allPageText = items.map(i => i.str.trim().toLowerCase()).join(" ");
+      if (/pet\s*photo\s*here/i.test(allPageText)) {
+        const photoItems = items.filter(i => /^(pet|photo|here)$/i.test(i.str.trim()));
+        if (photoItems.length >= 1) {
+          const xs = photoItems.map(i => i.transform[4]);
+          const ys = photoItems.map(i => i.transform[5]);
+          const minX = Math.min(...xs);
+          const maxY = Math.max(...ys);
+          const photoWidth = 120;
+          const photoHeight = 120;
+          setPetPhotoMarker({
+            x: minX,
+            y: viewport.height - maxY - 5,
+            width: photoWidth,
+            height: photoHeight,
+            pageIndex: pageNum - 1,
+          });
         }
       }
 
@@ -657,6 +689,38 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     });
   };
 
+  const embedPetPhoto = async (pdfLibDoc: any) => {
+    if (!petPhotoMarker || !data.petPhotoUrl) return;
+    try {
+      const fetchUrl = data.petPhotoUrl.startsWith("/")
+        ? data.petPhotoUrl
+        : `/api/forms/proxy-image?url=${encodeURIComponent(data.petPhotoUrl)}`;
+      const photoResponse = await fetch(fetchUrl);
+      if (!photoResponse.ok) return;
+      const photoBytes = await photoResponse.arrayBuffer();
+      const contentType = photoResponse.headers.get("content-type") || "";
+      let image;
+      if (contentType.includes("png")) {
+        image = await pdfLibDoc.embedPng(photoBytes);
+      } else {
+        image = await pdfLibDoc.embedJpg(photoBytes);
+      }
+      const pages = pdfLibDoc.getPages();
+      const page = pages[petPhotoMarker.pageIndex];
+      if (!page) return;
+      const pageHeight = page.getHeight();
+      const imgDims = image.scaleToFit(petPhotoMarker.width, petPhotoMarker.height);
+      page.drawImage(image, {
+        x: petPhotoMarker.x,
+        y: pageHeight - petPhotoMarker.y - imgDims.height,
+        width: imgDims.width,
+        height: imgDims.height,
+      });
+    } catch (err) {
+      console.error("Failed to embed pet photo:", err);
+    }
+  };
+
   const handleDownload = async () => {
     if (!pdfBytes) return;
 
@@ -711,6 +775,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           });
         }
       }
+
+      await embedPetPhoto(pdfLibDoc);
 
       const finalBytes = await pdfLibDoc.save();
       const blob = new Blob([finalBytes], { type: "application/pdf" });
@@ -768,6 +834,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           page.drawRectangle({ x: radio.x, y: page.getHeight() - radio.y - sz + 2, width: sz, height: sz, color: rgb(0, 0, 0) });
         }
       }
+
+      await embedPetPhoto(pdfLibDoc);
 
       const finalBytes = await pdfLibDoc.save();
       const blob = new Blob([finalBytes], { type: "application/pdf" });

@@ -53,7 +53,8 @@ Role names are configurable per deployment.
 - **Per-Doctor State PDFs**: Doctors can have state-specific PDF forms (`stateForms` on doctor profile). The form data endpoint resolves `doctorProfile.stateForms[patientState]` first, then falls back to `doctorProfile.gizmoFormUrl`.
 - **Package Radio Button Fields**: Packages support radio-type form fields with `radioOptions` (radioId + statement pairs). Patient sees statement text, stores radioId as value.
 - **Authorize.Net Payment Integration**: `server/authorizenet.ts` handles `chargeCard`, Accept.js client-side tokenization. Payment config endpoint provides Accept.js URL and API credentials. Falls back to direct submission when Authorize.Net is not configured.
-- **Draft Save/Restore**: Applicant form data auto-saves to `/api/profile/draft-form` with 1s debounce. Restores packageId, reason, customFields, petName, petBreed, petWeight, petType, movingSoon, travelPlanned, and step on page load.
+- **Pet ID Card System**: PDF-based ID card generation using the GizmoForm system. Template PDF uses `{petName}`, `{petBreed}`, `{firstName} {lastName}`, `{registrationId}` placeholders and "Pet Photo Here" text marker for image placement. Pet photos uploaded via `POST /api/upload/pet-photo` to Firebase Storage. Registration IDs auto-generated (format: XXXX-XXXX) on application creation. Image proxy at `/api/forms/proxy-image` handles CORS for pdf-lib embedding.
+- **Draft Save/Restore**: Applicant form data auto-saves to `/api/profile/draft-form` with 1s debounce. Restores packageId, reason, customFields, petName, petBreed, petWeight, petType, petPhotoUrl, movingSoon, travelPlanned, and step on page load.
 - **Awaiting Payment Status**: Applications can have `awaiting_payment` status. Admin can process payment via `POST /api/admin/applications/:id/process-payment`.
 - **Qualification Quiz**: Interactive 5-question pre-screening quiz on the homepage (`QualificationQuiz.tsx`) that helps visitors determine ESA eligibility before registering.
 - **Pet Details Collection**: Application step 2 collects pet type, name, breed, and weight. Included in form data, draft saves, and email summaries.
@@ -62,7 +63,7 @@ Role names are configurable per deployment.
 - **Doctor Rotation Exclusion**: Test doctor profiles (level2@test.com) are excluded from round-robin assignment via `excludeFromRotation` flag on doctor profiles. `getActiveDoctors()` filters these out.
 
 ### API Endpoints
-Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), and admin payment processing (`/api/admin/applications/:id/process-payment`).
+Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), admin payment processing (`/api/admin/applications/:id/process-payment`), pet photo upload (`/api/upload/pet-photo`), and image proxy (`/api/forms/proxy-image`).
 
 ## External Dependencies
 
