@@ -56,6 +56,7 @@ const packageSchema = z.object({
   features: z.string().optional(),
   processingTime: z.string().optional(),
   requiresLevel2Interaction: z.boolean().default(false),
+  requiresPetDetails: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
 
@@ -206,6 +207,7 @@ export default function PackagesManagement() {
       features: "",
       processingTime: "",
       requiresLevel2Interaction: false,
+      requiresPetDetails: false,
       isActive: true,
     });
     setIsDialogOpen(true);
@@ -221,6 +223,7 @@ export default function PackagesManagement() {
       features: Array.isArray(pkg.features) ? pkg.features.join("\n") : "",
       processingTime: pkg.processingTime || "",
       requiresLevel2Interaction: pkg.requiresLevel2Interaction || false,
+      requiresPetDetails: pkg.requiresPetDetails || false,
       isActive: pkg.isActive,
     });
     setIsDialogOpen(true);
@@ -290,9 +293,16 @@ export default function PackagesManagement() {
                           </TableCell>
                           <TableCell>${(Number(pkg.price) / 100).toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant={pkg.isActive ? "default" : "secondary"}>
-                              {pkg.isActive ? "Active" : "Inactive"}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant={pkg.isActive ? "default" : "secondary"}>
+                                {pkg.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                              {pkg.requiresPetDetails && (
+                                <Badge variant="outline" className="text-xs">
+                                  Pet Details
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
@@ -572,6 +582,28 @@ export default function PackagesManagement() {
                           checked={field.value}
                           onCheckedChange={field.onChange}
                           data-testid="switch-package-level2"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="requiresPetDetails"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Requires Pet Details</FormLabel>
+                        <FormDescription>
+                          Applicants must provide pet type, name, breed, weight, and photo
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-package-pet-details"
                         />
                       </FormControl>
                     </FormItem>

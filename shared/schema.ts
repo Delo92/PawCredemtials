@@ -126,6 +126,7 @@ export const packages = pgTable("packages", {
     "Completed"
   ]),
   requiresLevel2Interaction: boolean("requires_level2_interaction").notNull().default(false),
+  requiresPetDetails: boolean("requires_pet_details").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -223,6 +223,17 @@ export default function NewApplication() {
   const processPayment = useCallback(async () => {
     if (!selectedPackage) return;
 
+    if (selectedPackage.requiresPetDetails) {
+      if (!petType || !petName || !petBreed || !petWeight) {
+        toast({ title: "Pet Details Required", description: "Please fill in all pet details before completing your order", variant: "destructive" });
+        return;
+      }
+      if (!petPhotoUrl) {
+        toast({ title: "Pet Photo Required", description: "Please upload a photo of your pet before completing your order", variant: "destructive" });
+        return;
+      }
+    }
+
     if (paymentConfig?.configured && acceptJsLoaded && window.Accept) {
       if (!cardNumber || !expMonth || !expYear || !cvv) {
         toast({ title: "Missing Card Details", description: "Please fill in all credit card fields", variant: "destructive" });
@@ -304,7 +315,7 @@ export default function NewApplication() {
         setPaymentProcessing(false);
       }
     }
-  }, [selectedPackage, paymentConfig, acceptJsLoaded, cardNumber, expMonth, expYear, cvv, buildFormData, toast, setLocation]);
+  }, [selectedPackage, paymentConfig, acceptJsLoaded, cardNumber, expMonth, expYear, cvv, buildFormData, toast, setLocation, petType, petName, petBreed, petWeight, petPhotoUrl]);
 
   const handlePetPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -337,7 +348,7 @@ export default function NewApplication() {
       form.setError("packageId", { message: "Please select a registration type" });
       return;
     }
-    if (step === 2) {
+    if (step === 2 && selectedPackage?.requiresPetDetails) {
       if (!petType || !petName || !petBreed || !petWeight) {
         toast({ title: "Pet Details Required", description: "Please fill in all pet details: type, name, breed, and weight", variant: "destructive" });
         return;
@@ -510,6 +521,7 @@ export default function NewApplication() {
                   </div>
                 </div>
 
+                {selectedPackage?.requiresPetDetails && (
                 <Card data-testid="card-pet-details">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -600,6 +612,7 @@ export default function NewApplication() {
                     </div>
                   </CardContent>
                 </Card>
+                )}
 
                 <Card data-testid="step-review-info">
                   <CardHeader>
@@ -878,10 +891,13 @@ export default function NewApplication() {
                       </div>
                     )}
 
+                    {selectedPackage?.requiresPetDetails && petName && (
                     <div className="p-4 rounded-md border bg-muted/30">
                       <p className="text-sm font-medium mb-2">Pet Details</p>
                       <div className="flex items-start gap-4">
-                        <img src={petPhotoUrl} alt="Pet" className="w-16 h-16 rounded-lg object-cover border" data-testid="img-pet-photo-review" />
+                        {petPhotoUrl && (
+                          <img src={petPhotoUrl} alt="Pet" className="w-16 h-16 rounded-lg object-cover border" data-testid="img-pet-photo-review" />
+                        )}
                         <div className="grid grid-cols-2 gap-1">
                           <div className="mb-1"><span className="text-sm text-muted-foreground">Type: </span><span className="text-sm">{petType}</span></div>
                           <div className="mb-1"><span className="text-sm text-muted-foreground">Name: </span><span className="text-sm">{petName}</span></div>
@@ -890,6 +906,7 @@ export default function NewApplication() {
                         </div>
                       </div>
                     </div>
+                    )}
 
                     {Object.keys(customFields).length > 0 && (
                       <div className="p-4 rounded-md border bg-muted/30">
