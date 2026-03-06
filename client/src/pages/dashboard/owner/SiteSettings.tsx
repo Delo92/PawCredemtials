@@ -21,7 +21,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload, Film, Video, PawPrint, FileText, Eye, RefreshCw } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, ImagePlus, GripVertical, Upload, Film, Video, PawPrint, FileText, Eye, RefreshCw, X } from "lucide-react";
 import { MediaPreview } from "@/components/MediaRenderer";
 
 function MediaUploadInput({
@@ -1419,6 +1419,8 @@ function PetCertificatesTab() {
   const [uploading, setUploading] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const testPhotoRef = useRef<HTMLInputElement>(null);
+  const [testPhotoUrl, setTestPhotoUrl] = useState("");
 
   const { data: adminSettings, isLoading } = useQuery<any>({
     queryKey: ["/api/admin/settings"],
@@ -1552,7 +1554,46 @@ function PetCertificatesTab() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex justify-end mb-3">
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={testPhotoRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const url = URL.createObjectURL(file);
+                      setTestPhotoUrl(url);
+                      setPreviewKey((k) => k + 1);
+                    }
+                  }}
+                  data-testid="input-test-photo"
+                />
+                <Button
+                  type="button"
+                  variant={testPhotoUrl ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => testPhotoRef.current?.click()}
+                  data-testid="button-upload-test-photo"
+                >
+                  <ImagePlus className="h-4 w-4 mr-1" />
+                  {testPhotoUrl ? "Change Test Photo" : "Upload Test Photo"}
+                </Button>
+                {testPhotoUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setTestPhotoUrl(""); setPreviewKey((k) => k + 1); }}
+                    data-testid="button-remove-test-photo"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
               <Button
                 type="button"
                 variant="outline"
@@ -1564,7 +1605,7 @@ function PetCertificatesTab() {
                 Refresh Preview
               </Button>
             </div>
-            <PetIdCardPreview key={previewKey} templateUrl={petIdCardTemplateUrl} />
+            <PetIdCardPreview key={previewKey} templateUrl={petIdCardTemplateUrl} testPhotoUrl={testPhotoUrl} />
           </CardContent>
         </Card>
       )}
@@ -1572,7 +1613,7 @@ function PetCertificatesTab() {
   );
 }
 
-function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
+function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; testPhotoUrl?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1622,30 +1663,84 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
         for (const item of textContent.items) {
           if (!("str" in item)) continue;
           const text = item.str;
+
+          let replaced = text;
           for (const [key, value] of Object.entries(sampleData)) {
             const placeholder = `{${key}}`;
-            if (text.includes(placeholder)) {
-              const x = item.transform[4];
-              const y = item.transform[5];
-              const fontSize = Math.abs(item.transform[0]) || 12;
-              const itemWidth = (item as any).width || 200;
-              const itemHeight = fontSize + 4;
+            if (replaced.includes(placeholder)) {
+              replaced = replaced.replace(placeholder, value);
+            }
+          }
 
-              page.drawRectangle({
-                x: x - 1,
-                y: y - 2,
-                width: itemWidth + 10,
-                height: itemHeight,
-                color: rgb(0.96, 0.95, 0.91),
-              });
+          if (replaced !== text) {
+            const x = item.transform[4];
+            const y = item.transform[5];
+            const fontSize = Math.abs(item.transform[0]) || 12;
+            const itemWidth = (item as any).width || 200;
+            const itemHeight = fontSize + 4;
 
-              page.drawText(text.replace(placeholder, value), {
-                x,
-                y,
-                size: fontSize,
-                font,
-                color: rgb(0.1, 0.1, 0.1),
-              });
+            page.drawRectangle({
+              x: x - 1,
+              y: y - 2,
+              width: itemWidth + 10,
+              height: itemHeight,
+              color: rgb(0.96, 0.95, 0.91),
+            });
+
+            page.drawText(replaced, {
+              x,
+              y,
+              size: fontSize,
+              font,
+              color: rgb(0.1, 0.1, 0.1),
+            });
+          }
+        }
+
+        if (testPhotoUrl) {
+          const allItems = textContent.items.filter((i: any) => "str" in i && i.str.trim());
+          const allText = allItems.map((i: any) => i.str.trim().toLowerCase()).join(" ");
+          if (/pet\s*photo\s*here/i.test(allText)) {
+            const photoItems = allItems.filter((i: any) => /^(pet|photo|here)$/i.test(i.str.trim()));
+            if (photoItems.length >= 1) {
+              const xs = photoItems.map((i: any) => i.transform[4]);
+              const ys = photoItems.map((i: any) => i.transform[5]);
+              const minX = Math.min(...xs);
+              const maxY = Math.max(...ys);
+              const photoWidth = 120;
+              const photoHeight = 120;
+
+              try {
+                const photoResponse = await fetch(testPhotoUrl);
+                if (photoResponse.ok) {
+                  const photoBytes = await photoResponse.arrayBuffer();
+                  const contentType = photoResponse.headers.get("content-type") || "";
+                  let image;
+                  if (contentType.includes("png")) {
+                    image = await pdfLibDoc.embedPng(photoBytes);
+                  } else {
+                    image = await pdfLibDoc.embedJpg(photoBytes);
+                  }
+                  const imgDims = image.scaleToFit(photoWidth, photoHeight);
+
+                  page.drawRectangle({
+                    x: minX - 2,
+                    y: maxY - 5 - photoHeight,
+                    width: photoWidth + 4,
+                    height: photoHeight + 10,
+                    color: rgb(1, 1, 1),
+                  });
+
+                  page.drawImage(image, {
+                    x: minX + (photoWidth - imgDims.width) / 2,
+                    y: maxY - 5 - photoHeight + (photoHeight - imgDims.height) / 2,
+                    width: imgDims.width,
+                    height: imgDims.height,
+                  });
+                }
+              } catch (err) {
+                console.error("Failed to embed test photo:", err);
+              }
             }
           }
         }
@@ -1676,7 +1771,7 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
 
     renderPreview();
     return () => { cancelled = true; };
-  }, [templateUrl]);
+  }, [templateUrl, testPhotoUrl]);
 
   if (error) {
     return (
