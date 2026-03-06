@@ -1827,7 +1827,10 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
       setError(null);
 
       try {
-        const pdfUrl = templateUrl || "/uploads/templates/pet-id-card-template.pdf";
+        const rawUrl = templateUrl || "/uploads/templates/pet-id-card-template.pdf";
+        const pdfUrl = rawUrl.startsWith("http")
+          ? `/api/forms/proxy-pdf?url=${encodeURIComponent(rawUrl)}`
+          : rawUrl;
 
         const response = await fetch(pdfUrl);
         if (!response.ok) throw new Error("Failed to load template PDF");
