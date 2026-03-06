@@ -1711,8 +1711,11 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
               const maxRight = Math.max(...xs.map((x: number, idx: number) => x + widths[idx]));
               const minY = Math.min(...ys);
               const maxTop = Math.max(...ys.map((y: number, idx: number) => y + fontSizes[idx]));
-              const photoWidth = maxRight - minX;
-              const photoHeight = maxTop - minY;
+              const padding = 20;
+              const boxX = minX - padding;
+              const boxY = minY - padding;
+              const boxW = (maxRight - minX) + padding * 2;
+              const boxH = (maxTop - minY) + padding * 2;
 
               try {
                 const photoResponse = await fetch(testPhotoUrl);
@@ -1727,17 +1730,17 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
                   }
 
                   page.drawRectangle({
-                    x: minX - 4,
-                    y: minY - 4,
-                    width: photoWidth + 8,
-                    height: photoHeight + 8,
+                    x: boxX,
+                    y: boxY,
+                    width: boxW,
+                    height: boxH,
                     color: rgb(1, 1, 1),
                   });
 
-                  const imgDims = image.scaleToFit(photoWidth, photoHeight);
+                  const imgDims = image.scaleToFit(boxW, boxH);
                   page.drawImage(image, {
-                    x: minX + (photoWidth - imgDims.width) / 2,
-                    y: minY + (photoHeight - imgDims.height) / 2,
+                    x: boxX + (boxW - imgDims.width) / 2,
+                    y: boxY + (boxH - imgDims.height) / 2,
                     width: imgDims.width,
                     height: imgDims.height,
                   });
