@@ -1627,12 +1627,24 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
             if (text.includes(placeholder)) {
               const x = item.transform[4];
               const y = item.transform[5];
+              const fontSize = Math.abs(item.transform[0]) || 12;
+              const itemWidth = (item as any).width || 200;
+              const itemHeight = fontSize + 4;
+
+              page.drawRectangle({
+                x: x - 1,
+                y: y - 2,
+                width: itemWidth + 10,
+                height: itemHeight,
+                color: rgb(0.96, 0.95, 0.91),
+              });
+
               page.drawText(text.replace(placeholder, value), {
                 x,
                 y,
-                size: 10,
+                size: fontSize,
                 font,
-                color: rgb(0, 0, 0),
+                color: rgb(0.1, 0.1, 0.1),
               });
             }
           }
