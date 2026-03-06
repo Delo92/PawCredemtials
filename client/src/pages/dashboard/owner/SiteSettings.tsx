@@ -1714,7 +1714,7 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
               const padX = 35;
               const padY = 20;
               const boxX = minX - padX - 5;
-              const boxY = minY - padY - 6;
+              const boxY = minY - padY - 10;
               const boxW = (maxRight - minX) + padX * 2;
               const boxH = (maxTop - minY) + padY * 2;
 
