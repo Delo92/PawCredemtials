@@ -820,6 +820,52 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/pet-id-card-template", requireAuth, requireLevel(3), (req, res, next) => {
+    const pdfUploadMiddleware = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype === "application/pdf") {
+          cb(null, true);
+        } else {
+          cb(new Error("Only PDF files are allowed"));
+        }
+      },
+    }).single("file");
+
+    pdfUploadMiddleware(req, res, async (err) => {
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+
+      try {
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const fileName = `templates/pet-id-card-${uniqueSuffix}.pdf`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: { contentType: "application/pdf" },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+        await storage.updateAdminSettings({ petIdCardTemplateUrl: url });
+
+        res.json({ url });
+      } catch (error: any) {
+        console.error("Pet ID card template upload error:", error);
+        res.status(500).json({ message: "Failed to upload template" });
+      }
+    });
+  });
+
   // ===========================================================================
   // CONFIG ROUTES
   // ===========================================================================
@@ -3011,7 +3057,8 @@ export async function registerRoutes(
         year: "numeric",
       });
 
-      const petIdCardUrl = "/uploads/templates/pet-id-card-template.pdf";
+      const currentAdminSettings = await storage.getAdminSettings();
+      const petIdCardUrl = (currentAdminSettings as any)?.petIdCardTemplateUrl || "/uploads/templates/pet-id-card-template.pdf";
 
       res.json({
         success: true,

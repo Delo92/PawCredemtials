@@ -21,7 +21,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload, Film, Video } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, GripVertical, Upload, Film, Video, PawPrint, FileText, Eye, RefreshCw } from "lucide-react";
 import { MediaPreview } from "@/components/MediaRenderer";
 
 function MediaUploadInput({
@@ -375,6 +375,10 @@ export default function SiteSettings() {
                 <TabsTrigger value="contact" data-testid="tab-contact">
                   <Building2 className="mr-2 h-4 w-4" />
                   Contact Info
+                </TabsTrigger>
+                <TabsTrigger value="pet-certificates" data-testid="tab-pet-certificates">
+                  <PawPrint className="mr-2 h-4 w-4" />
+                  Pet Certificates
                 </TabsTrigger>
               </TabsList>
 
@@ -1398,10 +1402,269 @@ export default function SiteSettings() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="pet-certificates">
+                <PetCertificatesTab />
+              </TabsContent>
             </Tabs>
           </form>
         </Form>
       </div>
     </DashboardLayout>
+  );
+}
+
+function PetCertificatesTab() {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: adminSettings, isLoading } = useQuery<any>({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  const petIdCardTemplateUrl = adminSettings?.petIdCardTemplateUrl || "";
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast({ title: "Invalid file", description: "Please upload a PDF file", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/pet-id-card-template", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      setPreviewKey((k) => k + 1);
+      toast({ title: "Template Updated", description: "Pet ID card template has been uploaded successfully." });
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PawPrint className="h-5 w-5" />
+            Pet ID Card Template
+          </CardTitle>
+          <CardDescription>
+            Upload the PDF template used to generate pet ID cards. The template supports placeholders that get filled in automatically with each pet's details.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+            <p className="text-sm font-medium">Supported Placeholders</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-0.5 rounded text-xs">{"{petName}"}</code>
+                <span className="text-muted-foreground">Pet's name</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-0.5 rounded text-xs">{"{petBreed}"}</code>
+                <span className="text-muted-foreground">Pet's breed</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-0.5 rounded text-xs">{"{firstName} {lastName}"}</code>
+                <span className="text-muted-foreground">Owner's name</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted px-2 py-0.5 rounded text-xs">{"{registrationId}"}</code>
+                <span className="text-muted-foreground">Auto-generated ID (XXXX-XXXX)</span>
+              </div>
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <code className="bg-muted px-2 py-0.5 rounded text-xs">Pet Photo Here</code>
+                <span className="text-muted-foreground">Text marker in PDF where the pet's photo gets placed</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="flex-1 space-y-2">
+              <p className="text-sm font-medium">Current Template</p>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : petIdCardTemplateUrl ? (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-700 dark:text-green-400">Template uploaded</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-amber-700 dark:text-amber-400">No template uploaded — using default</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleUpload}
+                data-testid="input-pet-id-template"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                data-testid="button-upload-pet-id-template"
+              >
+                {uploading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading...</>
+                ) : (
+                  <><Upload className="h-4 w-4 mr-2" />{petIdCardTemplateUrl ? "Replace Template" : "Upload Template"}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {(petIdCardTemplateUrl || true) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Template Preview
+            </CardTitle>
+            <CardDescription>
+              Preview how the pet ID card looks with sample data filled in
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-end mb-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewKey((k) => k + 1)}
+                data-testid="button-refresh-preview"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh Preview
+              </Button>
+            </div>
+            <PetIdCardPreview key={previewKey} templateUrl={petIdCardTemplateUrl} />
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function renderPreview() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const pdfUrl = templateUrl || "/uploads/templates/pet-id-card-template.pdf";
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.5 });
+
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const sampleData: Record<string, string> = {
+          petName: "Buddy",
+          petBreed: "Golden Retriever",
+          firstName: "Jane",
+          lastName: "Smith",
+          registrationId: "A1B2-C3D4",
+        };
+
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "rgba(59, 130, 246, 0.8)";
+
+        const textItems = await page.getTextContent();
+        for (const item of textItems.items) {
+          if (!("str" in item)) continue;
+          const text = item.str;
+          for (const [key, value] of Object.entries(sampleData)) {
+            const placeholder = `{${key}}`;
+            if (text.includes(placeholder)) {
+              const tx = item.transform[4] * 1.5;
+              const ty = canvas.height - item.transform[5] * 1.5;
+              ctx.fillStyle = "white";
+              ctx.fillRect(tx - 2, ty - 12, ctx.measureText(text).width + 20, 16);
+              ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
+              ctx.fillText(text.replace(placeholder, value), tx, ty);
+            }
+          }
+        }
+
+        if (!cancelled) setLoading(false);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || "Failed to load preview");
+          setLoading(false);
+        }
+      }
+    }
+
+    renderPreview();
+    return () => { cancelled = true; };
+  }, [templateUrl]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8 border rounded-lg bg-muted/30" data-testid="preview-error">
+        <p className="text-sm text-destructive">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="w-full border rounded-lg"
+        style={{ maxHeight: "600px", objectFit: "contain" }}
+        data-testid="canvas-pet-id-preview"
+      />
+    </div>
   );
 }
