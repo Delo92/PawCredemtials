@@ -1705,10 +1705,14 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
             if (photoItems.length >= 1) {
               const xs = photoItems.map((i: any) => i.transform[4]);
               const ys = photoItems.map((i: any) => i.transform[5]);
+              const widths = photoItems.map((i: any) => (i as any).width || 100);
+              const fontSizes = photoItems.map((i: any) => Math.abs(i.transform[0]) || 40);
               const minX = Math.min(...xs);
-              const maxY = Math.max(...ys);
-              const photoWidth = 120;
-              const photoHeight = 120;
+              const maxRight = Math.max(...xs.map((x: number, idx: number) => x + widths[idx]));
+              const minY = Math.min(...ys);
+              const maxTop = Math.max(...ys.map((y: number, idx: number) => y + fontSizes[idx]));
+              const photoWidth = maxRight - minX;
+              const photoHeight = maxTop - minY;
 
               try {
                 const photoResponse = await fetch(testPhotoUrl);
@@ -1721,19 +1725,19 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
                   } else {
                     image = await pdfLibDoc.embedJpg(photoBytes);
                   }
-                  const imgDims = image.scaleToFit(photoWidth, photoHeight);
 
                   page.drawRectangle({
-                    x: minX - 2,
-                    y: maxY - 5 - photoHeight,
-                    width: photoWidth + 4,
-                    height: photoHeight + 10,
+                    x: minX - 4,
+                    y: minY - 4,
+                    width: photoWidth + 8,
+                    height: photoHeight + 8,
                     color: rgb(1, 1, 1),
                   });
 
+                  const imgDims = image.scaleToFit(photoWidth, photoHeight);
                   page.drawImage(image, {
                     x: minX + (photoWidth - imgDims.width) / 2,
-                    y: maxY - 5 - photoHeight + (photoHeight - imgDims.height) / 2,
+                    y: minY + (photoHeight - imgDims.height) / 2,
                     width: imgDims.width,
                     height: imgDims.height,
                   });

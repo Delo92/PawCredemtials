@@ -272,13 +272,17 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         if (photoItems.length >= 1) {
           const xs = photoItems.map(i => i.transform[4]);
           const ys = photoItems.map(i => i.transform[5]);
+          const widths = photoItems.map(i => (i as any).width || 100);
+          const fontSizes = photoItems.map(i => Math.abs(i.transform[0]) || 40);
           const minX = Math.min(...xs);
-          const maxY = Math.max(...ys);
-          const photoWidth = 120;
-          const photoHeight = 120;
+          const maxRight = Math.max(...xs.map((x, idx) => x + widths[idx]));
+          const minY = Math.min(...ys);
+          const maxTop = Math.max(...ys.map((y, idx) => y + fontSizes[idx]));
+          const photoWidth = maxRight - minX;
+          const photoHeight = maxTop - minY;
           setPetPhotoMarker({
             x: minX,
-            y: viewport.height - maxY - 5,
+            y: viewport.height - maxTop,
             width: photoWidth,
             height: photoHeight,
             pageIndex: pageNum - 1,
@@ -692,6 +696,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const embedPetPhoto = async (pdfLibDoc: any) => {
     if (!petPhotoMarker || !data.petPhotoUrl) return;
     try {
+      const { rgb } = await import("pdf-lib");
       const fetchUrl = data.petPhotoUrl.startsWith("/")
         ? data.petPhotoUrl
         : `/api/forms/proxy-image?url=${encodeURIComponent(data.petPhotoUrl)}`;
@@ -710,9 +715,17 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (!page) return;
       const pageHeight = page.getHeight();
       const imgDims = image.scaleToFit(petPhotoMarker.width, petPhotoMarker.height);
+      const boxBottomY = pageHeight - petPhotoMarker.y - petPhotoMarker.height;
+      page.drawRectangle({
+        x: petPhotoMarker.x - 2,
+        y: boxBottomY - 2,
+        width: petPhotoMarker.width + 4,
+        height: petPhotoMarker.height + 4,
+        color: rgb(1, 1, 1),
+      });
       page.drawImage(image, {
-        x: petPhotoMarker.x,
-        y: pageHeight - petPhotoMarker.y - imgDims.height,
+        x: petPhotoMarker.x + (petPhotoMarker.width - imgDims.width) / 2,
+        y: boxBottomY + (petPhotoMarker.height - imgDims.height) / 2,
         width: imgDims.width,
         height: imgDims.height,
       });
