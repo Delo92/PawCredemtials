@@ -866,6 +866,16 @@ export async function registerRoutes(
     });
   });
 
+  app.delete("/api/admin/pet-id-card-template", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      await storage.updateAdminSettings({ petIdCardTemplateUrl: "" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Pet ID card template remove error:", error);
+      res.status(500).json({ message: "Failed to remove template" });
+    }
+  });
+
   // ===========================================================================
   // CONFIG ROUTES
   // ===========================================================================

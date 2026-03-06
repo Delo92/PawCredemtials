@@ -1514,6 +1514,11 @@ function PetCertificatesTab() {
                   <span className="text-sm text-blue-700 dark:text-blue-400">Using default template — upload a new one to replace it</span>
                 </div>
               )}
+              <p className="text-xs text-muted-foreground">
+                {petIdCardTemplateUrl 
+                  ? "Upload a new PDF to replace this template, or remove it to go back to the default." 
+                  : "You can also set per-package templates in the Packages management page."}
+              </p>
             </div>
             <div className="flex gap-2">
               <input
@@ -1537,6 +1542,33 @@ function PetCertificatesTab() {
                   <><Upload className="h-4 w-4 mr-2" />{petIdCardTemplateUrl ? "Replace Template" : "Upload Template"}</>
                 )}
               </Button>
+              {petIdCardTemplateUrl && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="default"
+                  onClick={async () => {
+                    try {
+                      const token = await (window as any).__firebase_auth?.currentUser?.getIdToken();
+                      const res = await fetch("/api/admin/pet-id-card-template", {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (res.ok) {
+                        setPetIdCardTemplateUrl("");
+                        toast({ title: "Template removed", description: "Reverted to the default template." });
+                      } else {
+                        toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
+                      }
+                    } catch {
+                      toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
+                    }
+                  }}
+                  data-testid="button-remove-pet-id-template"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />Remove
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
