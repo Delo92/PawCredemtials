@@ -283,8 +283,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           const photoWidth = (maxRight - minX) + padX * 2;
           const photoHeight = (maxTop - minY) + padY * 2;
           setPetPhotoMarker({
-            x: minX - padX,
-            y: viewport.height - maxTop - padY,
+            x: minX - padX - 5,
+            y: viewport.height - maxTop - padY + 4,
             width: photoWidth,
             height: photoHeight,
             pageIndex: pageNum - 1,

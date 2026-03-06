@@ -1713,8 +1713,8 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
               const maxTop = Math.max(...ys.map((y: number, idx: number) => y + fontSizes[idx]));
               const padX = 35;
               const padY = 20;
-              const boxX = minX - padX;
-              const boxY = minY - padY - 2;
+              const boxX = minX - padX - 5;
+              const boxY = minY - padY - 4;
               const boxW = (maxRight - minX) + padX * 2;
               const boxH = (maxTop - minY) + padY * 2;
 
