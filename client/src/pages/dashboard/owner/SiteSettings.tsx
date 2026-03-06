@@ -1586,23 +1586,14 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
 
       try {
         const pdfUrl = templateUrl || "/uploads/templates/pet-id-card-template.pdf";
-        const pdfjsLib = await import("pdfjs-dist");
-        const workerModule = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
 
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
-        const pdf = await loadingTask.promise;
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const response = await fetch(pdfUrl);
+        if (!response.ok) throw new Error("Failed to load template PDF");
+        const originalBytes = new Uint8Array(await response.arrayBuffer());
 
-        const canvas = canvasRef.current;
-        if (!canvas || cancelled) return;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+        const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0));
+        const font = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
 
         const sampleData: Record<string, string> = {
           petName: "Buddy",
@@ -1610,27 +1601,57 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
           firstName: "Jane",
           lastName: "Smith",
           registrationId: "A1B2-C3D4",
+          petType: "Dog",
+          petWeight: "55 lbs",
         };
 
-        ctx.font = "10px Arial";
-        ctx.fillStyle = "rgba(59, 130, 246, 0.8)";
+        const pdfjsLib = await import("pdfjs-dist");
+        const workerModule = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
 
-        const textItems = await page.getTextContent();
-        for (const item of textItems.items) {
+        const readDoc = await pdfjsLib.getDocument({ data: originalBytes.slice(0) }).promise;
+        const page1 = await readDoc.getPage(1);
+        const textContent = await page1.getTextContent();
+        const viewport = page1.getViewport({ scale: 1 });
+
+        const pages = pdfLibDoc.getPages();
+        const page = pages[0];
+        if (!page) throw new Error("No pages in PDF");
+        const pageHeight = page.getHeight();
+
+        for (const item of textContent.items) {
           if (!("str" in item)) continue;
           const text = item.str;
           for (const [key, value] of Object.entries(sampleData)) {
             const placeholder = `{${key}}`;
             if (text.includes(placeholder)) {
-              const tx = item.transform[4] * 1.5;
-              const ty = canvas.height - item.transform[5] * 1.5;
-              ctx.fillStyle = "white";
-              ctx.fillRect(tx - 2, ty - 12, ctx.measureText(text).width + 20, 16);
-              ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
-              ctx.fillText(text.replace(placeholder, value), tx, ty);
+              const x = item.transform[4];
+              const y = item.transform[5];
+              page.drawText(text.replace(placeholder, value), {
+                x,
+                y,
+                size: 10,
+                font,
+                color: rgb(0, 0, 0),
+              });
             }
           }
         }
+
+        const filledBytes = await pdfLibDoc.save();
+
+        const filledDoc = await pdfjsLib.getDocument({ data: filledBytes }).promise;
+        const filledPage = await filledDoc.getPage(1);
+        const renderViewport = filledPage.getViewport({ scale: 2.0 });
+
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        canvas.width = renderViewport.width;
+        canvas.height = renderViewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        await filledPage.render({ canvasContext: ctx, viewport: renderViewport }).promise;
 
         if (!cancelled) setLoading(false);
       } catch (err: any) {

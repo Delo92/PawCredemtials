@@ -3058,7 +3058,9 @@ export async function registerRoutes(
       });
 
       const currentAdminSettings = await storage.getAdminSettings();
-      const petIdCardUrl = (currentAdminSettings as any)?.petIdCardTemplateUrl || "/uploads/templates/pet-id-card-template.pdf";
+      const packagePetIdTemplate = (pkg as any)?.petIdCardTemplateUrl || "";
+      const siteWideTemplate = (currentAdminSettings as any)?.petIdCardTemplateUrl || "";
+      const petIdCardUrl = packagePetIdTemplate || siteWideTemplate || "/uploads/templates/pet-id-card-template.pdf";
 
       res.json({
         success: true,
