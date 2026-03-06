@@ -1711,11 +1711,12 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
               const maxRight = Math.max(...xs.map((x: number, idx: number) => x + widths[idx]));
               const minY = Math.min(...ys);
               const maxTop = Math.max(...ys.map((y: number, idx: number) => y + fontSizes[idx]));
-              const padding = 20;
-              const boxX = minX - padding;
-              const boxY = minY - padding;
-              const boxW = (maxRight - minX) + padding * 2;
-              const boxH = (maxTop - minY) + padding * 2;
+              const padX = 35;
+              const padY = 20;
+              const boxX = minX - padX;
+              const boxY = minY - padY - 2;
+              const boxW = (maxRight - minX) + padX * 2;
+              const boxH = (maxTop - minY) + padY * 2;
 
               try {
                 const photoResponse = await fetch(testPhotoUrl);
