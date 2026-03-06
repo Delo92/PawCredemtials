@@ -1504,12 +1504,12 @@ function PetCertificatesTab() {
               ) : petIdCardTemplateUrl ? (
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-green-700 dark:text-green-400">Template uploaded</span>
+                  <span className="text-sm text-green-700 dark:text-green-400">Custom template uploaded</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm text-amber-700 dark:text-amber-400">No template uploaded — using default</span>
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm text-blue-700 dark:text-blue-400">Using default template — upload a new one to replace it</span>
                 </div>
               )}
             </div>
@@ -1587,7 +1587,8 @@ function PetIdCardPreview({ templateUrl }: { templateUrl: string }) {
       try {
         const pdfUrl = templateUrl || "/uploads/templates/pet-id-card-template.pdf";
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        const workerModule = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
 
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
