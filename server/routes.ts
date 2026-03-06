@@ -876,6 +876,126 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/pet-id-card-templates", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const templates = await storage.getAllPetIdCardTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      console.error("Error fetching pet ID card templates:", error);
+      res.status(500).json({ message: "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/admin/pet-id-card-templates", requireAuth, requireLevel(3), (req, res, next) => {
+    const pdfUploadMiddleware = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype === "application/pdf") {
+          cb(null, true);
+        } else {
+          cb(new Error("Only PDF files are allowed"));
+        }
+      },
+    }).single("file");
+
+    pdfUploadMiddleware(req, res, async (err) => {
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+
+      const name = req.body?.name?.trim();
+      if (!name) {
+        res.status(400).json({ message: "Template name is required" });
+        return;
+      }
+
+      try {
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const fileName = `templates/pet-id-card-${uniqueSuffix}.pdf`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: { contentType: "application/pdf" },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+        const template = await storage.createPetIdCardTemplate({ name, url });
+
+        res.json(template);
+      } catch (error: any) {
+        console.error("Pet ID card template upload error:", error);
+        res.status(500).json({ message: "Failed to upload template" });
+      }
+    });
+  });
+
+  app.delete("/api/admin/pet-id-card-templates/:id", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getPetIdCardTemplate(id);
+      if (!template) {
+        res.status(404).json({ message: "Template not found" });
+        return;
+      }
+
+      const adminSettings = await storage.getAdminSettings();
+      if (adminSettings?.defaultPetIdCardTemplateId === id) {
+        await storage.updateAdminSettings({ defaultPetIdCardTemplateId: "", petIdCardTemplateUrl: "" });
+      }
+
+      const allPackages = await storage.getAllPackages();
+      for (const pkg of allPackages) {
+        if ((pkg as any).petIdCardTemplateId === id) {
+          await storage.updatePackage(pkg.id, { petIdCardTemplateId: "", petIdCardTemplateUrl: "" } as any);
+        }
+      }
+
+      await storage.deletePetIdCardTemplate(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Pet ID card template delete error:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  app.post("/api/admin/pet-id-card-templates/:id/set-default", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getPetIdCardTemplate(id);
+      if (!template) {
+        res.status(404).json({ message: "Template not found" });
+        return;
+      }
+      await storage.updateAdminSettings({
+        defaultPetIdCardTemplateId: id,
+        petIdCardTemplateUrl: template.url,
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Set default template error:", error);
+      res.status(500).json({ message: "Failed to set default template" });
+    }
+  });
+
+  app.post("/api/admin/pet-id-card-templates/clear-default", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      await storage.updateAdminSettings({ defaultPetIdCardTemplateId: "", petIdCardTemplateUrl: "" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Clear default template error:", error);
+      res.status(500).json({ message: "Failed to clear default template" });
+    }
+  });
+
   // ===========================================================================
   // CONFIG ROUTES
   // ===========================================================================
@@ -3070,9 +3190,20 @@ export async function registerRoutes(
       });
 
       const currentAdminSettings = await storage.getAdminSettings();
-      const packagePetIdTemplate = (pkg as any)?.petIdCardTemplateUrl || "";
-      const siteWideTemplate = (currentAdminSettings as any)?.petIdCardTemplateUrl || "";
-      const petIdCardUrl = packagePetIdTemplate || siteWideTemplate || "/uploads/templates/pet-id-card-template.pdf";
+      const builtInDefault = "/uploads/templates/pet-id-card-template.pdf";
+      let petIdCardUrl = "";
+
+      const pkgTemplateId = (pkg as any)?.petIdCardTemplateId || "";
+      if (pkgTemplateId) {
+        const pkgTemplate = await storage.getPetIdCardTemplate(pkgTemplateId);
+        if (pkgTemplate?.url) petIdCardUrl = pkgTemplate.url;
+      }
+
+      if (!petIdCardUrl) {
+        const packagePetIdTemplate = (pkg as any)?.petIdCardTemplateUrl || "";
+        const siteWideTemplate = (currentAdminSettings as any)?.petIdCardTemplateUrl || "";
+        petIdCardUrl = packagePetIdTemplate || siteWideTemplate || builtInDefault;
+      }
 
       res.json({
         success: true,

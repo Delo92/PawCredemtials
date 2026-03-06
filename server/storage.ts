@@ -116,6 +116,11 @@ export interface IStorage {
   getAdminSettings(): Promise<Record<string, any> | undefined>;
   updateAdminSettings(data: Record<string, any>): Promise<Record<string, any>>;
 
+  getAllPetIdCardTemplates(): Promise<Record<string, any>[]>;
+  getPetIdCardTemplate(id: string): Promise<Record<string, any> | undefined>;
+  createPetIdCardTemplate(data: Record<string, any>): Promise<Record<string, any>>;
+  deletePetIdCardTemplate(id: string): Promise<boolean>;
+
   getApproval(id: string): Promise<Record<string, any> | undefined>;
   getApprovalsByUser(firebaseUid: string): Promise<Record<string, any>[]>;
   createApproval(data: Record<string, any>): Promise<Record<string, any>>;
@@ -975,6 +980,37 @@ export class FirestoreStorage implements IStorage {
     }
     const updated = await ref.get();
     return docToRecord(updated)!;
+  }
+
+  // =========================================================================
+  // PET ID CARD TEMPLATES
+  // =========================================================================
+  async getAllPetIdCardTemplates(): Promise<Record<string, any>[]> {
+    const snapshot = await this.col("petIdCardTemplates").orderBy("createdAt", "desc").get();
+    return docsToRecords(snapshot);
+  }
+
+  async getPetIdCardTemplate(id: string): Promise<Record<string, any> | undefined> {
+    const doc = await this.col("petIdCardTemplates").doc(id).get();
+    return docToRecord(doc);
+  }
+
+  async createPetIdCardTemplate(data: Record<string, any>): Promise<Record<string, any>> {
+    const ref = this.col("petIdCardTemplates").doc();
+    const record = cleanForFirestore({
+      ...data,
+      id: ref.id,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await ref.set(record);
+    await this.incrementCounter("petIdCardTemplates");
+    const created = await ref.get();
+    return docToRecord(created)!;
+  }
+
+  async deletePetIdCardTemplate(id: string): Promise<boolean> {
+    await this.col("petIdCardTemplates").doc(id).delete();
+    return true;
   }
 
   // =========================================================================

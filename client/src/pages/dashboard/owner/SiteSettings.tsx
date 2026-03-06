@@ -20,8 +20,9 @@ import {
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { auth } from "@/lib/firebase";
 import type { WhiteLabelConfig } from "@shared/config";
-import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, ImagePlus, GripVertical, Upload, Film, Video, PawPrint, FileText, Eye, RefreshCw, X } from "lucide-react";
+import { Loader2, Palette, Users, Building2, Save, LayoutTemplate, Link as LinkIcon, Plus, Trash2, Image, ImagePlus, GripVertical, Upload, Film, Video, PawPrint, FileText, Eye, RefreshCw, X, Star, Check } from "lucide-react";
 import { MediaPreview } from "@/components/MediaRenderer";
 
 function MediaUploadInput({
@@ -1421,26 +1422,40 @@ function PetCertificatesTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const testPhotoRef = useRef<HTMLInputElement>(null);
   const [testPhotoUrl, setTestPhotoUrl] = useState("");
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
 
-  const { data: adminSettings, isLoading } = useQuery<any>({
+  const { data: adminSettings } = useQuery<any>({
     queryKey: ["/api/admin/settings"],
   });
 
-  const petIdCardTemplateUrl = adminSettings?.petIdCardTemplateUrl || "";
+  const { data: templates = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/pet-id-card-templates"],
+  });
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const defaultTemplateId = adminSettings?.defaultPetIdCardTemplateId || "";
+
+  const handleAddTemplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/pdf") {
       toast({ title: "Invalid file", description: "Please upload a PDF file", variant: "destructive" });
       return;
     }
+    if (!newTemplateName.trim()) {
+      toast({ title: "Name required", description: "Please enter a name for the template", variant: "destructive" });
+      return;
+    }
     setUploading(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/admin/pet-id-card-template", {
+      formData.append("name", newTemplateName.trim());
+      const res = await fetch("/api/admin/pet-id-card-templates", {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
         credentials: "include",
       });
@@ -1448,9 +1463,10 @@ function PetCertificatesTab() {
         const err = await res.json();
         throw new Error(err.message || "Upload failed");
       }
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setPreviewKey((k) => k + 1);
-      toast({ title: "Template Updated", description: "Pet ID card template has been uploaded successfully." });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/pet-id-card-templates"] });
+      setNewTemplateName("");
+      setShowAddForm(false);
+      toast({ title: "Template Added", description: "New template has been saved to your library." });
     } catch (err: any) {
       toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1459,16 +1475,74 @@ function PetCertificatesTab() {
     }
   };
 
+  const handleDeleteTemplate = async (id: string, name: string) => {
+    if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/pet-id-card-templates/${id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/pet-id-card-templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      if (selectedPreviewUrl) {
+        const deleted = templates.find((t: any) => t.id === id);
+        if (deleted?.url === selectedPreviewUrl) {
+          setSelectedPreviewUrl("");
+        }
+      }
+      toast({ title: "Deleted", description: `Template "${name}" has been removed.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSetDefault = async (id: string) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/pet-id-card-templates/${id}/set-default`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to set default");
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Default Updated", description: "This template is now the site-wide default." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleClearDefault = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/pet-id-card-templates/clear-default", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear default");
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Default Cleared", description: "Reverted to the built-in default template." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const previewUrl = selectedPreviewUrl || adminSettings?.petIdCardTemplateUrl || "";
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PawPrint className="h-5 w-5" />
-            Pet ID Card Template
+            Pet ID Card Templates
           </CardTitle>
           <CardDescription>
-            Upload the PDF template used to generate pet ID cards. The template supports placeholders that get filled in automatically with each pet's details.
+            Manage your template library. Save templates with names, set a site-wide default, and assign specific templates to individual packages.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1500,152 +1574,242 @@ function PetCertificatesTab() {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Current Template</p>
-              <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleUpload}
-                  data-testid="input-pet-id-template"
-                />
-                {petIdCardTemplateUrl && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const token = await (window as any).__firebase_auth?.currentUser?.getIdToken();
-                        const res = await fetch("/api/admin/pet-id-card-template", {
-                          method: "DELETE",
-                          headers: { Authorization: `Bearer ${token}` },
-                        });
-                        if (res.ok) {
-                          setPetIdCardTemplateUrl("");
-                          toast({ title: "Template removed", description: "Reverted to the default template." });
-                        } else {
-                          toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
-                        }
-                      } catch {
-                        toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
-                      }
-                    }}
-                    data-testid="button-remove-pet-id-template"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />Delete Template
-                  </Button>
-                )}
+              <p className="text-sm font-medium">Template Library</p>
+              {!showAddForm && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  data-testid="button-upload-pet-id-template"
+                  onClick={() => setShowAddForm(true)}
+                  data-testid="button-add-template"
                 >
-                  {uploading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin mr-1" />Uploading...</>
-                  ) : petIdCardTemplateUrl ? (
-                    <><Upload className="h-4 w-4 mr-1" />Replace Template</>
-                  ) : (
-                    <><Upload className="h-4 w-4 mr-1" />Upload New Template</>
-                  )}
+                  <Plus className="h-4 w-4 mr-1" />Add Template
                 </Button>
-              </div>
+              )}
             </div>
 
+            {showAddForm && (
+              <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
+                <p className="text-sm font-medium">Add New Template</p>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Template name (e.g. Standard ID Card, Premium Card)"
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    data-testid="input-template-name"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={handleAddTemplate}
+                      data-testid="input-pet-id-template"
+                    />
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        if (!newTemplateName.trim()) {
+                          toast({ title: "Name required", description: "Please enter a name first", variant: "destructive" });
+                          return;
+                        }
+                        fileInputRef.current?.click();
+                      }}
+                      disabled={uploading}
+                      data-testid="button-upload-pet-id-template"
+                    >
+                      {uploading ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-1" />Uploading...</>
+                      ) : (
+                        <><Upload className="h-4 w-4 mr-1" />Choose PDF File</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setShowAddForm(false); setNewTemplateName(""); }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            ) : petIdCardTemplateUrl ? (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-                <FileText className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-700 dark:text-green-400">Custom template active</span>
-                <span className="text-xs text-muted-foreground ml-auto">Use "Delete" to revert to default, or "Replace" to upload a different one</span>
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No templates saved yet</p>
+                <p className="text-xs mt-1">Click "Add Template" to upload your first PDF template</p>
               </div>
             ) : (
-              <div className="flex items-center gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-blue-700 dark:text-blue-400">Using default template</span>
-                <span className="text-xs text-muted-foreground ml-auto">Upload a new PDF to use a custom template</span>
+              <div className="space-y-2">
+                {templates.map((template: any) => {
+                  const isDefault = defaultTemplateId === template.id;
+                  const isSelected = selectedPreviewUrl === template.url;
+                  return (
+                    <div
+                      key={template.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        isDefault ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20" : "hover:bg-muted/30"
+                      } ${isSelected ? "ring-2 ring-primary" : ""}`}
+                      data-testid={`template-item-${template.id}`}
+                    >
+                      <FileText className={`h-5 w-5 shrink-0 ${isDefault ? "text-green-600" : "text-muted-foreground"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{template.name}</p>
+                          {isDefault && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 whitespace-nowrap">
+                              Site Default
+                            </span>
+                          )}
+                        </div>
+                        {template.createdAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Added {new Date(template.createdAt._seconds ? template.createdAt._seconds * 1000 : template.createdAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPreviewUrl(template.url);
+                            setPreviewKey((k) => k + 1);
+                          }}
+                          title="Preview this template"
+                          data-testid={`button-preview-template-${template.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {!isDefault ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSetDefault(template.id)}
+                            title="Set as site-wide default"
+                            data-testid={`button-set-default-${template.id}`}
+                          >
+                            <Star className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleClearDefault}
+                            title="Remove as default"
+                            data-testid={`button-clear-default-${template.id}`}
+                          >
+                            <Check className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTemplate(template.id, template.name)}
+                          className="text-destructive hover:text-destructive"
+                          title="Delete this template"
+                          data-testid={`button-delete-template-${template.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             <p className="text-xs text-muted-foreground">
-              This is the site-wide template. You can also set different templates per package in the Packages page.
+              Set a default template here, then assign specific templates to individual packages in the Packages page.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {(petIdCardTemplateUrl || true) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Template Preview
-            </CardTitle>
-            <CardDescription>
-              Preview how the pet ID card looks with sample data filled in
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-3 gap-2">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={testPhotoRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const url = URL.createObjectURL(file);
-                      setTestPhotoUrl(url);
-                      setPreviewKey((k) => k + 1);
-                    }
-                  }}
-                  data-testid="input-test-photo"
-                />
-                <Button
-                  type="button"
-                  variant={testPhotoUrl ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => testPhotoRef.current?.click()}
-                  data-testid="button-upload-test-photo"
-                >
-                  <ImagePlus className="h-4 w-4 mr-1" />
-                  {testPhotoUrl ? "Change Test Photo" : "Upload Test Photo"}
-                </Button>
-                {testPhotoUrl && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setTestPhotoUrl(""); setPreviewKey((k) => k + 1); }}
-                    data-testid="button-remove-test-photo"
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Remove
-                  </Button>
-                )}
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Template Preview
+          </CardTitle>
+          <CardDescription>
+            {selectedPreviewUrl
+              ? `Previewing: ${templates.find((t: any) => t.url === selectedPreviewUrl)?.name || "Selected template"}`
+              : previewUrl
+                ? "Previewing the site-wide default template"
+                : "Previewing the built-in default template"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                ref={testPhotoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const url = URL.createObjectURL(file);
+                    setTestPhotoUrl(url);
+                    setPreviewKey((k) => k + 1);
+                  }
+                }}
+                data-testid="input-test-photo"
+              />
               <Button
                 type="button"
-                variant="outline"
+                variant={testPhotoUrl ? "default" : "outline"}
                 size="sm"
-                onClick={() => setPreviewKey((k) => k + 1)}
-                data-testid="button-refresh-preview"
+                onClick={() => testPhotoRef.current?.click()}
+                data-testid="button-upload-test-photo"
               >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh Preview
+                <ImagePlus className="h-4 w-4 mr-1" />
+                {testPhotoUrl ? "Change Test Photo" : "Upload Test Photo"}
               </Button>
+              {testPhotoUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setTestPhotoUrl(""); setPreviewKey((k) => k + 1); }}
+                  data-testid="button-remove-test-photo"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Remove
+                </Button>
+              )}
             </div>
-            <PetIdCardPreview key={previewKey} templateUrl={petIdCardTemplateUrl} testPhotoUrl={testPhotoUrl} />
-          </CardContent>
-        </Card>
-      )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewKey((k) => k + 1)}
+              data-testid="button-refresh-preview"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refresh Preview
+            </Button>
+          </div>
+          <PetIdCardPreview key={previewKey} templateUrl={previewUrl} testPhotoUrl={testPhotoUrl} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

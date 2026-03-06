@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Loader2, X, Upload, FileText, PawPrint } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, X, PawPrint } from "lucide-react";
 
 const packageSchema = z.object({
   name: z.string().min(1, "Package name is required"),
@@ -85,8 +85,7 @@ export default function PackagesManagement() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [formFields, setFormFields] = useState<FormFieldDef[]>([]);
   const [packagePetIdTemplateUrl, setPackagePetIdTemplateUrl] = useState("");
-  const [templateUploading, setTemplateUploading] = useState(false);
-  const templateFileRef = useRef<HTMLInputElement>(null);
+  const [packagePetIdTemplateId, setPackagePetIdTemplateId] = useState("");
 
   const addFormField = () => {
     setFormFields([...formFields, { name: "", label: "", type: "text", required: true }]);
@@ -122,36 +121,9 @@ export default function PackagesManagement() {
     },
   });
 
-  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type !== "application/pdf") {
-      toast({ title: "Invalid file", description: "Please upload a PDF file", variant: "destructive" });
-      return;
-    }
-    setTemplateUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/admin/pet-id-card-template", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Upload failed");
-      }
-      const data = await res.json();
-      setPackagePetIdTemplateUrl(data.url);
-      toast({ title: "Template Uploaded", description: "Pet ID card template uploaded successfully." });
-    } catch (err: any) {
-      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
-    } finally {
-      setTemplateUploading(false);
-      if (templateFileRef.current) templateFileRef.current.value = "";
-    }
-  };
+  const { data: savedTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/pet-id-card-templates"],
+  });
 
   const createPackage = useMutation({
     mutationFn: async (data: PackageFormData) => {
@@ -161,6 +133,7 @@ export default function PackagesManagement() {
         features: data.features ? data.features.split("\n").filter(Boolean) : [],
         formFields,
         petIdCardTemplateUrl: packagePetIdTemplateUrl || undefined,
+        petIdCardTemplateId: packagePetIdTemplateId || undefined,
       });
       return response.json();
     },
@@ -190,6 +163,7 @@ export default function PackagesManagement() {
         features: data.features ? data.features.split("\n").filter(Boolean) : [],
         formFields,
         petIdCardTemplateUrl: packagePetIdTemplateUrl || undefined,
+        petIdCardTemplateId: packagePetIdTemplateId || undefined,
       });
       return response.json();
     },
@@ -237,6 +211,7 @@ export default function PackagesManagement() {
     setEditingPackage(null);
     setFormFields([]);
     setPackagePetIdTemplateUrl("");
+    setPackagePetIdTemplateId("");
     form.reset({
       name: "",
       description: "",
@@ -254,6 +229,7 @@ export default function PackagesManagement() {
     setEditingPackage(pkg);
     setFormFields(Array.isArray(pkg.formFields) ? (pkg.formFields as FormFieldDef[]) : []);
     setPackagePetIdTemplateUrl((pkg as any).petIdCardTemplateUrl || "");
+    setPackagePetIdTemplateId((pkg as any).petIdCardTemplateId || "");
     form.reset({
       name: pkg.name,
       description: pkg.description || "",
@@ -655,54 +631,36 @@ export default function PackagesManagement() {
                       <span className="text-sm font-medium">Pet ID Card Template</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Upload a custom PDF template for this package's pet ID cards. If none is set, the site-wide default template will be used.
+                      Choose which template to use for this package's pet ID cards. Templates are managed in Site Settings.
                     </p>
-                    <div className="flex items-center gap-3">
-                      {packagePetIdTemplateUrl ? (
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          <span className="text-sm text-green-700 dark:text-green-400 truncate">Custom template set</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPackagePetIdTemplateUrl("")}
-                            className="text-xs ml-auto"
-                            data-testid="button-remove-package-template"
-                          >
-                            <X className="h-3 w-3 mr-1" />
-                            Remove
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 flex-1">
-                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-sm text-muted-foreground">Using site-wide default</span>
-                        </div>
-                      )}
-                      <input
-                        ref={templateFileRef}
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        onChange={handleTemplateUpload}
-                        data-testid="input-package-template"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => templateFileRef.current?.click()}
-                        disabled={templateUploading}
-                        data-testid="button-upload-package-template"
-                      >
-                        {templateUploading ? (
-                          <><Loader2 className="h-3 w-3 animate-spin mr-1" />Uploading</>
-                        ) : (
-                          <><Upload className="h-3 w-3 mr-1" />{packagePetIdTemplateUrl ? "Replace" : "Upload"}</>
-                        )}
-                      </Button>
-                    </div>
+                    <Select
+                      value={packagePetIdTemplateId || "_default"}
+                      onValueChange={(val) => {
+                        if (val === "_default") {
+                          setPackagePetIdTemplateId("");
+                          setPackagePetIdTemplateUrl("");
+                        } else {
+                          setPackagePetIdTemplateId(val);
+                          const found = savedTemplates.find((t: any) => t.id === val);
+                          setPackagePetIdTemplateUrl(found?.url || "");
+                        }
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-package-template">
+                        <SelectValue placeholder="Select a template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_default">Use Site Default</SelectItem>
+                        {savedTemplates.map((t: any) => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {savedTemplates.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No saved templates yet. Add templates in Site Settings &gt; Pet Certificates.
+                      </p>
+                    )}
                   </div>
                 )}
 
