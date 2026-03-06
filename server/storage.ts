@@ -91,6 +91,7 @@ export interface IStorage {
   getCommissionsByAgent(agentId: string): Promise<Commission[]>;
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
+  createCommissionWithId(id: string, commission: InsertCommission): Promise<Commission>;
   updateCommission(id: string, data: Partial<InsertCommission>): Promise<Commission | undefined>;
 
   getNotification(id: string): Promise<Notification | undefined>;
@@ -799,6 +800,19 @@ export class FirestoreStorage implements IStorage {
 
   async createCommission(commission: InsertCommission): Promise<Commission> {
     const id = randomUUID();
+    const commData = cleanForFirestore({
+      ...commission,
+      status: commission.status ?? "pending",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await this.col("commissions").doc(id).set(commData);
+    const created = await this.col("commissions").doc(id).get();
+    await this.incrementCounter("commissions");
+    return docToRecord(created) as Commission;
+  }
+
+  async createCommissionWithId(id: string, commission: InsertCommission): Promise<Commission> {
     const commData = cleanForFirestore({
       ...commission,
       status: commission.status ?? "pending",

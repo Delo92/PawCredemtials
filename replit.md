@@ -63,9 +63,15 @@ Role names are configurable per deployment.
 - **Urgency Questions**: Application step 2 asks "Moving in next 2 months?" and "Trips planned?" to help prioritize applications.
 - **Benefits Highlights**: Motivational info cards displayed between application wizard steps (Fair Housing Act rights, ESA benefits, pet fee elimination).
 - **Doctor Rotation Exclusion**: Test doctor profiles (level2@test.com) are excluded from round-robin assignment via `excludeFromRotation` flag on doctor profiles. `getActiveDoctors()` filters these out.
+- **Commission System**: Two flat-rate commission types, both configurable from the admin Commissions page:
+  1. **Doctor Review Fee**: Flat dollar amount paid to doctors per approved review. Commission created automatically when doctor approves an application (all 5 approval code paths). Stored in cents in `commissionSettings.doctorReviewFee`.
+  2. **Referral Payout**: Flat dollar amount paid to referrers when a referred applicant's application is completed. Checks `user.referredByUserId`. Stored in cents in `commissionSettings.referralPayoutAmount`.
+  - Commission records stored in `commissions` Firestore collection with `commissionType` field ("doctor_review" or "referral").
+  - Settings API: `GET/PUT /api/admin/commission-settings` (level 3+). Commissions list: `GET /api/commissions` (own) or `GET /api/admin/commissions` (all).
+  - Duplicate prevention: checks existing commissions before creating to avoid double-crediting.
 
 ### API Endpoints
-Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), admin payment processing (`/api/admin/applications/:id/process-payment`), pet photo upload (`/api/upload/pet-photo`), and image proxy (`/api/forms/proxy-image`).
+Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), admin payment processing (`/api/admin/applications/:id/process-payment`), pet photo upload (`/api/upload/pet-photo`), image proxy (`/api/forms/proxy-image`), and commission settings (`/api/admin/commission-settings`).
 
 ## External Dependencies
 
