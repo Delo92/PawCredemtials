@@ -1498,78 +1498,83 @@ function PetCertificatesTab() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            <div className="flex-1 space-y-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Current Template</p>
-              {isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : petIdCardTemplateUrl ? (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-green-700 dark:text-green-400">Custom template uploaded</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm text-blue-700 dark:text-blue-400">Using default template — upload a new one to replace it</span>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {petIdCardTemplateUrl 
-                  ? "Upload a new PDF to replace this template, or remove it to go back to the default." 
-                  : "You can also set per-package templates in the Packages management page."}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={handleUpload}
-                data-testid="input-pet-id-template"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                data-testid="button-upload-pet-id-template"
-              >
-                {uploading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading...</>
-                ) : (
-                  <><Upload className="h-4 w-4 mr-2" />{petIdCardTemplateUrl ? "Replace Template" : "Upload Template"}</>
-                )}
-              </Button>
-              {petIdCardTemplateUrl && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="default"
-                  onClick={async () => {
-                    try {
-                      const token = await (window as any).__firebase_auth?.currentUser?.getIdToken();
-                      const res = await fetch("/api/admin/pet-id-card-template", {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      if (res.ok) {
-                        setPetIdCardTemplateUrl("");
-                        toast({ title: "Template removed", description: "Reverted to the default template." });
-                      } else {
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handleUpload}
+                  data-testid="input-pet-id-template"
+                />
+                {petIdCardTemplateUrl && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const token = await (window as any).__firebase_auth?.currentUser?.getIdToken();
+                        const res = await fetch("/api/admin/pet-id-card-template", {
+                          method: "DELETE",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        if (res.ok) {
+                          setPetIdCardTemplateUrl("");
+                          toast({ title: "Template removed", description: "Reverted to the default template." });
+                        } else {
+                          toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
+                        }
+                      } catch {
                         toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
                       }
-                    } catch {
-                      toast({ title: "Error", description: "Failed to remove template", variant: "destructive" });
-                    }
-                  }}
-                  data-testid="button-remove-pet-id-template"
+                    }}
+                    data-testid="button-remove-pet-id-template"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />Delete Template
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  data-testid="button-upload-pet-id-template"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />Remove
+                  {uploading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-1" />Uploading...</>
+                  ) : petIdCardTemplateUrl ? (
+                    <><Upload className="h-4 w-4 mr-1" />Replace Template</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-1" />Upload New Template</>
+                  )}
                 </Button>
-              )}
+              </div>
             </div>
+
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            ) : petIdCardTemplateUrl ? (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                <FileText className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-700 dark:text-green-400">Custom template active</span>
+                <span className="text-xs text-muted-foreground ml-auto">Use "Delete" to revert to default, or "Replace" to upload a different one</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                <FileText className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-700 dark:text-blue-400">Using default template</span>
+                <span className="text-xs text-muted-foreground ml-auto">Upload a new PDF to use a custom template</span>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              This is the site-wide template. You can also set different templates per package in the Packages page.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -1789,16 +1794,39 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
 
         const filledDoc = await pdfjsLib.getDocument({ data: filledBytes }).promise;
         const filledPage = await filledDoc.getPage(1);
-        const renderViewport = filledPage.getViewport({ scale: 2.0 });
+        const scale = 2.0;
+        const renderViewport = filledPage.getViewport({ scale });
+
+        const offscreen = document.createElement("canvas");
+        offscreen.width = renderViewport.width;
+        offscreen.height = renderViewport.height;
+        const offCtx = offscreen.getContext("2d");
+        if (!offCtx || cancelled) return;
+
+        await filledPage.render({ canvasContext: offCtx, viewport: renderViewport }).promise;
+
+        const imgData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+        const pixels = imgData.data;
+        let bottomY = offscreen.height;
+        outer: for (let y = offscreen.height - 1; y >= 0; y--) {
+          for (let x = 0; x < offscreen.width; x++) {
+            const idx = (y * offscreen.width + x) * 4;
+            if (pixels[idx] < 250 || pixels[idx + 1] < 250 || pixels[idx + 2] < 250) {
+              bottomY = y + 1;
+              break outer;
+            }
+          }
+        }
+
+        const cropHeight = Math.min(bottomY + Math.round(20 * scale), offscreen.height);
 
         const canvas = canvasRef.current;
         if (!canvas || cancelled) return;
-        canvas.width = renderViewport.width;
-        canvas.height = renderViewport.height;
+        canvas.width = offscreen.width;
+        canvas.height = cropHeight;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-
-        await filledPage.render({ canvasContext: ctx, viewport: renderViewport }).promise;
+        ctx.drawImage(offscreen, 0, 0, offscreen.width, cropHeight, 0, 0, offscreen.width, cropHeight);
 
         if (!cancelled) setLoading(false);
       } catch (err: any) {
@@ -1831,7 +1859,6 @@ function PetIdCardPreview({ templateUrl, testPhotoUrl }: { templateUrl: string; 
       <canvas
         ref={canvasRef}
         className="w-full border rounded-lg"
-        style={{ maxHeight: "600px", objectFit: "contain" }}
         data-testid="canvas-pet-id-preview"
       />
     </div>
