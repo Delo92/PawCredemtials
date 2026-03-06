@@ -1658,9 +1658,13 @@ function PetCertificatesTab() {
                   return (
                     <div
                       key={template.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
                         isDefault ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20" : "hover:bg-muted/30"
                       } ${isSelected ? "ring-2 ring-primary" : ""}`}
+                      onClick={() => {
+                        setSelectedPreviewUrl(template.url);
+                        setPreviewKey((k) => k + 1);
+                      }}
                       data-testid={`template-item-${template.id}`}
                     >
                       <FileText className={`h-5 w-5 shrink-0 ${isDefault ? "text-green-600" : "text-muted-foreground"}`} />
@@ -1752,7 +1756,9 @@ function PetCertificatesTab() {
               ? `Previewing: ${templates.find((t: any) => t.url === selectedPreviewUrl)?.name || "Selected template"}`
               : previewUrl
                 ? "Previewing the site-wide default template"
-                : "Previewing the built-in default template"}
+                : templates.length > 0
+                  ? "Showing the built-in default. Click the eye icon on a template above to preview it here."
+                  : "Previewing the built-in default template"}
           </CardDescription>
         </CardHeader>
         <CardContent>
