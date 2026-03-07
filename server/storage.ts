@@ -201,6 +201,10 @@ export interface IStorage {
 
   getSystemReferralCodes(): Promise<Record<string, any>[]>;
   createSystemReferralCode(data: Record<string, any>): Promise<Record<string, any>>;
+  getSystemReferralCodeByCode(code: string): Promise<Record<string, any> | undefined>;
+  updateSystemReferralCode(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined>;
+  deleteSystemReferralCode(id: string): Promise<void>;
+  incrementSystemReferralCodeUseCount(id: string): Promise<void>;
 
   getTermsOfService(): Promise<Record<string, any> | undefined>;
   updateTermsOfService(data: Record<string, any>): Promise<Record<string, any>>;
@@ -1549,11 +1553,38 @@ export class FirestoreStorage implements IStorage {
 
   async createSystemReferralCode(data: Record<string, any>): Promise<Record<string, any>> {
     const id = randomUUID();
-    const cleanData = cleanForFirestore({ ...data, isActive: data.isActive ?? true, createdAt: FieldValue.serverTimestamp() });
+    const cleanData = cleanForFirestore({ ...data, isActive: data.isActive ?? true, useCount: 0, createdAt: FieldValue.serverTimestamp() });
     await this.col("systemReferralCodes").doc(id).set(cleanData);
     await this.incrementCounter("systemReferralCodes");
     const created = await this.col("systemReferralCodes").doc(id).get();
     return docToRecord(created)!;
+  }
+
+  async getSystemReferralCodeByCode(code: string): Promise<Record<string, any> | undefined> {
+    const snap = await this.col("systemReferralCodes").where("code", "==", code).where("isActive", "==", true).limit(1).get();
+    if (snap.empty) return undefined;
+    return docsToRecords(snap)[0];
+  }
+
+  async updateSystemReferralCode(id: string, data: Record<string, any>): Promise<Record<string, any> | undefined> {
+    const ref = this.col("systemReferralCodes").doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) return undefined;
+    const cleanData = cleanForFirestore({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    await ref.update(cleanData);
+    const updated = await ref.get();
+    return docToRecord(updated);
+  }
+
+  async deleteSystemReferralCode(id: string): Promise<void> {
+    await this.col("systemReferralCodes").doc(id).delete();
+  }
+
+  async incrementSystemReferralCodeUseCount(id: string): Promise<void> {
+    await this.col("systemReferralCodes").doc(id).update({
+      useCount: FieldValue.increment(1),
+      lastUsedAt: FieldValue.serverTimestamp(),
+    });
   }
 
   // =========================================================================

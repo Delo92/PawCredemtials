@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
-import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail } from "./email";
+import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail, sendReferralUsedEmail } from "./email";
 import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
 
 function getContactEmail(user: Record<string, any>): string {
@@ -95,6 +95,7 @@ async function createReferralCommission(applicationId: string, applicantUserId: 
 
     const applicant = await storage.getUser(applicantUserId);
     if (!applicant?.referredByUserId) return;
+    if (applicant.referredByUserId.startsWith("system:")) return;
 
     const docId = `referral_${applicationId}`;
     const existing = await storage.getCommission(docId);
@@ -530,10 +531,29 @@ export async function registerRoutes(
       const userReferralCode = randomBytes(4).toString("hex").toUpperCase();
 
       let referredByUserId: string | undefined;
-      if (referralCode) {
-        const referrer = await storage.getUserByReferralCode(referralCode);
+      let referredBySystemCode: Record<string, any> | undefined;
+      let referrerForEmail: { email: string; name: string; code: string } | undefined;
+      const normalizedRefCode = referralCode ? referralCode.toUpperCase().trim() : "";
+      if (normalizedRefCode) {
+        const referrer = await storage.getUserByReferralCode(normalizedRefCode);
         if (referrer) {
           referredByUserId = referrer.id;
+          referrerForEmail = {
+            email: referrer.email,
+            name: `${referrer.firstName || ""} ${referrer.lastName || ""}`.trim() || referrer.email,
+            code: normalizedRefCode,
+          };
+        } else {
+          const systemCode = await storage.getSystemReferralCodeByCode(normalizedRefCode);
+          if (systemCode) {
+            referredBySystemCode = systemCode;
+            referredByUserId = `system:${systemCode.id}`;
+            referrerForEmail = {
+              email: systemCode.email,
+              name: systemCode.name || systemCode.email,
+              code: normalizedRefCode,
+            };
+          }
         }
       }
 
@@ -571,6 +591,20 @@ export async function registerRoutes(
       if (patientAuthorization !== undefined) userData.patientAuthorization = patientAuthorization;
 
       const user = await storage.createUser(userData);
+
+      if (referrerForEmail) {
+        sendReferralUsedEmail({
+          referrerEmail: referrerForEmail.email,
+          referrerName: referrerForEmail.name,
+          referralCode: referrerForEmail.code,
+          newUserName: `${firstName || ""} ${lastName || ""}`.trim() || email,
+          newUserEmail: email,
+        }).catch(e => console.error("[referral-email] Failed:", e));
+      }
+      if (referredBySystemCode) {
+        storage.incrementSystemReferralCodeUseCount(referredBySystemCode.id)
+          .catch(e => console.error("[referral-usecount] Failed:", e));
+      }
 
       await storage.createActivityLog({
         userId: user.id,
@@ -2823,6 +2857,53 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/system-referral-codes", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const codes = await storage.getSystemReferralCodes();
+      const activeCodes = codes.filter((c: any) => c.isActive !== false);
+      res.json(activeCodes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/system-referral-codes", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const { name, email, code } = req.body;
+      if (!name || !email) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
+      const referralCode = code || randomBytes(4).toString("hex").toUpperCase();
+
+      const existingUser = await storage.getUserByReferralCode(referralCode);
+      if (existingUser) {
+        return res.status(400).json({ message: "This code is already in use by a user" });
+      }
+      const existingSystem = await storage.getSystemReferralCodeByCode(referralCode);
+      if (existingSystem) {
+        return res.status(400).json({ message: "This code is already in use" });
+      }
+
+      const created = await storage.createSystemReferralCode({
+        name,
+        email: email.toLowerCase(),
+        code: referralCode,
+      });
+      res.json(created);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/system-referral-codes/:id", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      await storage.updateSystemReferralCode(req.params.id, { isActive: false });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/admin/referrals", requireAuth, requireLevel(3), async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -2831,9 +2912,6 @@ export async function registerRoutes(
       const referrers = allUsers.filter((u: any) => u.referralCode);
       const referralSummary = referrers.map((referrer: any) => {
         const referred = allUsers.filter((u: any) => u.referredByUserId === referrer.id);
-        const referredIds = new Set(referred.map((u: any) => u.id));
-        const referredApps = allApps.filter((a: any) => referredIds.has(a.userId));
-        const completedApps = referredApps.filter((a: any) => a.status === "completed" || a.status === "approved");
 
         return {
           referrerId: referrer.id,
@@ -2841,6 +2919,7 @@ export async function registerRoutes(
           referrerEmail: referrer.email,
           referralCode: referrer.referralCode,
           userLevel: referrer.userLevel,
+          isSystem: false,
           totalReferred: referred.length,
           activeReferrals: referred.filter((u: any) => {
             const apps = allApps.filter((a: any) => a.userId === u.id);
@@ -2860,14 +2939,49 @@ export async function registerRoutes(
         };
       }).filter((r: any) => r.totalReferred > 0);
 
+      const systemCodes = await storage.getSystemReferralCodes();
+      const activeSystemCodes = systemCodes.filter((c: any) => c.isActive !== false);
+      const systemSummary = activeSystemCodes.map((sc: any) => {
+        const systemRefId = `system:${sc.id}`;
+        const referred = allUsers.filter((u: any) => u.referredByUserId === systemRefId);
+
+        return {
+          referrerId: sc.id,
+          referrerName: sc.name,
+          referrerEmail: sc.email,
+          referralCode: sc.code,
+          userLevel: 0,
+          isSystem: true,
+          useCount: sc.useCount || 0,
+          totalReferred: referred.length,
+          activeReferrals: referred.filter((u: any) => {
+            const apps = allApps.filter((a: any) => a.userId === u.id);
+            return apps.length > 0 && !apps.some((a: any) => a.status === "completed" || a.status === "approved");
+          }).length,
+          convertedReferrals: referred.filter((u: any) => {
+            return allApps.some((a: any) => a.userId === u.id && (a.status === "completed" || a.status === "approved"));
+          }).length,
+          referredUsers: referred.map((u: any) => ({
+            id: u.id,
+            name: `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+            email: u.email,
+            createdAt: u.createdAt,
+            applicationCount: allApps.filter((a: any) => a.userId === u.id).length,
+            completedCount: allApps.filter((a: any) => a.userId === u.id && (a.status === "completed" || a.status === "approved")).length,
+          })),
+        };
+      });
+
+      const allReferrers = [...referralSummary, ...systemSummary];
       const totalReferred = allUsers.filter((u: any) => u.referredByUserId).length;
 
       res.json({
-        referrers: referralSummary,
+        referrers: allReferrers,
+        systemCodes: activeSystemCodes,
         stats: {
-          totalReferralCodes: referrers.length,
+          totalReferralCodes: referrers.length + activeSystemCodes.length,
           totalReferred,
-          totalConverted: referralSummary.reduce((sum: number, r: any) => sum + r.convertedReferrals, 0),
+          totalConverted: allReferrers.reduce((sum: number, r: any) => sum + r.convertedReferrals, 0),
         },
       });
     } catch (error: any) {

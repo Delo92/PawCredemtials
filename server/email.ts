@@ -300,6 +300,56 @@ export async function sendDoctorCompletionCopyEmail(data: DoctorCompletionCopyDa
   }
 }
 
+interface ReferralUsedEmailData {
+  referrerEmail: string;
+  referrerName: string;
+  referralCode: string;
+  newUserName: string;
+  newUserEmail: string;
+}
+
+export async function sendReferralUsedEmail(data: ReferralUsedEmailData): Promise<boolean> {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#2563eb;color:white;padding:20px;text-align:center;">
+        <h1 style="margin:0;">Paw Credentials</h1>
+        <p style="margin:5px 0 0;">Referral Notification</p>
+      </div>
+      <div style="padding:20px;background:#f9fafb;">
+        <h2>Someone Used Your Referral Code!</h2>
+        <p>Hi ${data.referrerName},</p>
+        <p>Great news! Someone just signed up using your referral code <strong>${data.referralCode}</strong>.</p>
+        <div style="background:white;padding:15px;border-radius:8px;margin:16px 0;">
+          <h3 style="margin-top:0;">New Signup Details</h3>
+          <p><strong>Name:</strong> ${data.newUserName}</p>
+          <p><strong>Email:</strong> ${data.newUserEmail}</p>
+        </div>
+        <p>Thank you for spreading the word!</p>
+        <p style="color:#666;font-size:12px;">You are receiving this email because your referral code was used on Paw Credentials.</p>
+      </div>
+    </div>
+  `;
+
+  if (!SENDGRID_API_KEY) {
+    console.log(`[email] Would send referral-used notification to ${data.referrerEmail} (code: ${data.referralCode}, new user: ${data.newUserEmail})`);
+    return true;
+  }
+
+  try {
+    await sgMail.send({
+      to: data.referrerEmail,
+      from: SENDGRID_FROM_EMAIL,
+      subject: `Someone used your referral code!`,
+      html,
+    });
+    console.log(`Referral notification email sent to ${data.referrerEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Failed to send referral notification email:", error?.response?.body || error.message);
+    return false;
+  }
+}
+
 export async function sendPatientApprovalEmail(data: PatientApprovalEmailData): Promise<boolean> {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -24,8 +25,8 @@ import {
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Users, Search, Copy, Share2, UserPlus, Link2, CheckCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Users, Search, Copy, Share2, UserPlus, Link2, CheckCircle, Clock, ChevronDown, ChevronUp, Plus, Trash2, ExternalLink } from "lucide-react";
 
 interface ReferredUser {
   id: string;
@@ -50,14 +51,27 @@ interface ReferrerSummary {
   referrerEmail: string;
   referralCode: string;
   userLevel: number;
+  isSystem?: boolean;
+  useCount?: number;
   totalReferred: number;
   activeReferrals: number;
   convertedReferrals: number;
   referredUsers: ReferredUser[];
 }
 
+interface SystemReferralCode {
+  id: string;
+  name: string;
+  email: string;
+  code: string;
+  useCount: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 interface AdminReferralsData {
   referrers: ReferrerSummary[];
+  systemCodes?: SystemReferralCode[];
   stats: { totalReferralCodes: number; totalReferred: number; totalConverted: number };
 }
 
@@ -282,6 +296,11 @@ function PersonalReferralsView() {
 function AdminReferralsView() {
   const [search, setSearch] = useState("");
   const [expandedReferrer, setExpandedReferrer] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newCodeName, setNewCodeName] = useState("");
+  const [newCodeEmail, setNewCodeEmail] = useState("");
+  const [newCodeCustom, setNewCodeCustom] = useState("");
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery<AdminReferralsData>({
     queryKey: ["/api/admin/referrals"],
@@ -291,13 +310,59 @@ function AdminReferralsView() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (body: { name: string; email: string; code?: string }) => {
+      const res = await apiRequest("POST", "/api/admin/system-referral-codes", body);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create referral code");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/referrals"] });
+      setIsCreateOpen(false);
+      setNewCodeName("");
+      setNewCodeEmail("");
+      setNewCodeCustom("");
+      toast({ title: "Referral code created", description: "The referral code has been created and is ready to use." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/system-referral-codes/${id}`);
+      if (!res.ok) throw new Error("Failed to delete");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/referrals"] });
+      toast({ title: "Referral code deactivated" });
+    },
+  });
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied!", description: "Copied to clipboard" });
+  };
+
   const filteredReferrers = (data?.referrers || []).filter((r) => {
     if (!search) return true;
     const s = search.toLowerCase();
     return r.referrerName.toLowerCase().includes(s) || r.referrerEmail.toLowerCase().includes(s) || r.referralCode.toLowerCase().includes(s);
   });
 
-  const levelLabel = (level: number) => {
+  const systemCodes = (data?.systemCodes || []).filter((c) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return c.name.toLowerCase().includes(s) || c.email.toLowerCase().includes(s) || c.code.toLowerCase().includes(s);
+  });
+
+  const levelLabel = (level: number, isSystem?: boolean) => {
+    if (isSystem) return "External";
     switch (level) {
       case 1: return "Applicant";
       case 2: return "Reviewer";
@@ -309,9 +374,15 @@ function AdminReferralsView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-referrals-title">Referral Management</h1>
-        <p className="text-muted-foreground">Track all referral activity across the platform</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-referrals-title">Referral Management</h1>
+          <p className="text-muted-foreground">Track all referral activity across the platform</p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create-referral-code">
+          <Plus className="mr-2 h-4 w-4" />
+          Create Referral Code
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -359,8 +430,91 @@ function AdminReferralsView() {
 
       <Card>
         <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Referral Codes</CardTitle>
+              <CardDescription>External referral codes created for non-users</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : systemCodes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                <ExternalLink className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-sm font-semibold mb-1">No external referral codes yet</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mb-3">
+                Create referral codes for people outside the platform. They'll get an email each time someone uses their code.
+              </p>
+              <Button size="sm" onClick={() => setIsCreateOpen(true)} data-testid="button-create-code-empty">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Code
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead className="text-center">Times Used</TableHead>
+                  <TableHead>Link</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {systemCodes.map((sc) => (
+                  <TableRow key={sc.id} data-testid={`row-system-code-${sc.id}`}>
+                    <TableCell className="font-medium">{sc.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{sc.email}</TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{sc.code}</code>
+                    </TableCell>
+                    <TableCell className="text-center font-medium">{sc.useCount || 0}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(`${window.location.origin}/register?ref=${sc.code}`)}
+                        data-testid={`button-copy-system-link-${sc.id}`}
+                      >
+                        <Copy className="h-3 w-3 mr-1" />
+                        Copy Link
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm(`Deactivate referral code for ${sc.name}?`)) {
+                            deleteMutation.mutate(sc.id);
+                          }
+                        }}
+                        data-testid={`button-delete-system-code-${sc.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Referrers</CardTitle>
-          <CardDescription>Users who have referred others to the platform</CardDescription>
+          <CardDescription>All referrers across the platform (users and external)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="relative mb-4">
@@ -396,7 +550,7 @@ function AdminReferralsView() {
                 <TableRow>
                   <TableHead>Referrer</TableHead>
                   <TableHead>Code</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead className="text-center">Referred</TableHead>
                   <TableHead className="text-center">Active</TableHead>
                   <TableHead className="text-center">Converted</TableHead>
@@ -417,13 +571,15 @@ function AdminReferralsView() {
                         <code className="text-xs bg-muted px-2 py-1 rounded font-mono" data-testid={`text-code-${r.referrerId}`}>{r.referralCode}</code>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{levelLabel(r.userLevel)}</Badge>
+                        <Badge variant={r.isSystem ? "default" : "outline"}>
+                          {levelLabel(r.userLevel, r.isSystem)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-center font-medium">{r.totalReferred}</TableCell>
                       <TableCell className="text-center">{r.activeReferrals}</TableCell>
                       <TableCell className="text-center">{r.convertedReferrals}</TableCell>
                       <TableCell>
-                        {expandedReferrer === r.referrerId ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {r.totalReferred > 0 && (expandedReferrer === r.referrerId ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
                       </TableCell>
                     </TableRow>
                     {expandedReferrer === r.referrerId && r.referredUsers.map((u) => (
@@ -449,6 +605,71 @@ function AdminReferralsView() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Referral Code</DialogTitle>
+            <DialogDescription>
+              Create a referral code for someone outside the platform. They'll receive an email notification each time someone signs up using their code.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="referral-name">Name</Label>
+              <Input
+                id="referral-name"
+                placeholder="John Smith"
+                value={newCodeName}
+                onChange={(e) => setNewCodeName(e.target.value)}
+                data-testid="input-new-code-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="referral-email">Email</Label>
+              <Input
+                id="referral-email"
+                type="email"
+                placeholder="john@example.com"
+                value={newCodeEmail}
+                onChange={(e) => setNewCodeEmail(e.target.value)}
+                data-testid="input-new-code-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="referral-code">Custom Code (optional)</Label>
+              <Input
+                id="referral-code"
+                placeholder="Leave blank to auto-generate"
+                value={newCodeCustom}
+                onChange={(e) => setNewCodeCustom(e.target.value.toUpperCase())}
+                data-testid="input-new-code-custom"
+              />
+              <p className="text-xs text-muted-foreground">If left blank, a random code will be generated.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!newCodeName.trim() || !newCodeEmail.trim()) {
+                  toast({ title: "Missing fields", description: "Name and email are required.", variant: "destructive" });
+                  return;
+                }
+                createMutation.mutate({
+                  name: newCodeName.trim(),
+                  email: newCodeEmail.trim(),
+                  ...(newCodeCustom.trim() ? { code: newCodeCustom.trim() } : {}),
+                });
+              }}
+              disabled={createMutation.isPending}
+              data-testid="button-submit-create-code"
+            >
+              {createMutation.isPending ? "Creating..." : "Create Code"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
