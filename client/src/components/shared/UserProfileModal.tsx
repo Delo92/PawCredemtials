@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 
 const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
+const LazyESALetterViewer = lazy(() => import("@/components/shared/ESALetterViewer").then(m => ({ default: m.ESALetterViewer })));
 
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -1460,7 +1461,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
           </DialogHeader>
           <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             {previewLetterTemplate ? (
-              <LazyGizmoForm
+              <LazyESALetterViewer
                 data={{
                   success: true,
                   patientData: {},
