@@ -518,7 +518,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
     setPlaceholderFields(fields);
     setRadioFields(radios);
-    setCoverRects(rects);
   };
 
   const loadPdf = useCallback(async () => {
