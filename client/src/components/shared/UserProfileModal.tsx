@@ -229,6 +229,7 @@ interface DoctorProfileData {
   stateForms: Record<string, string>;
   letterTemplateUrl: string;
   licensedStates: string[];
+  excludeFromRotation: boolean;
 }
 
 const US_STATES = [
@@ -277,6 +278,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     stateForms: {},
     letterTemplateUrl: "",
     licensedStates: [],
+    excludeFromRotation: false,
   });
 
   const isUserDoctor = selectedUser?.userLevel === 2;
@@ -352,6 +354,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         stateForms: doctorProfile.stateForms || {},
         letterTemplateUrl: doctorProfile.letterTemplateUrl || "",
         licensedStates: doctorProfile.licensedStates || [],
+        excludeFromRotation: doctorProfile.excludeFromRotation || false,
       });
     } else if (selectedUser && isUserDoctor) {
       setDoctorProfileData({
@@ -368,6 +371,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         stateForms: {},
         letterTemplateUrl: "",
         licensedStates: [],
+        excludeFromRotation: false,
       });
     }
   }, [doctorProfile, selectedUser, isUserDoctor]);
@@ -1381,6 +1385,30 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {(selectedUser?.userLevel === 2 || parseInt(newLevel) === 2) && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <Label>Accepting New Assignments</Label>
+                        <Select
+                          value={doctorProfileData.excludeFromRotation ? "paused" : "active"}
+                          onValueChange={(val) => setDoctorProfileData(prev => ({ ...prev, excludeFromRotation: val === "paused" }))}
+                        >
+                          <SelectTrigger data-testid="select-assignment-status">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active - Receiving new patients</SelectItem>
+                            <SelectItem value="paused">Paused - Not receiving new patients</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          When paused, new applications will be assigned to other available reviewers instead.
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   <Separator />
 
