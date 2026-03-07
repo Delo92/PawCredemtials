@@ -47,6 +47,7 @@ function MediaUploadInput({
   const handleUpload = useCallback(async (file: File) => {
     setUploading(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", folder);
@@ -54,6 +55,7 @@ function MediaUploadInput({
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
         const err = await res.json();
