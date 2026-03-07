@@ -111,7 +111,10 @@ export function Footer() {
             {config.footerText || `\u00A9 ${currentYear} ${config.siteName}. All rights reserved.`}
           </p>
           <p className="text-xs text-muted-foreground" data-testid="text-footer-tagline">
-            Trusted support animal registration and certification
+            Website created by{" "}
+            <a href="https://originconcepts.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors" data-testid="link-footer-creator">
+              Original Concepts
+            </a>
           </p>
         </div>
       </div>
