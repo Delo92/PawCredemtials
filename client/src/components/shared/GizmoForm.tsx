@@ -304,43 +304,29 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
       for (const line of lines) {
         line.sort((a, b) => a.transform[4] - b.transform[4]);
-        const fullText = line.map((i) => i.str).join("");
 
-        const placeholderRegex = /\{([a-zA-Z]+)\}?/g;
-        let match;
-        while ((match = placeholderRegex.exec(fullText)) !== null) {
-          const tokenName = match[1];
-          const token = `{${tokenName}}`;
-          const mapping = PLACEHOLDER_MAP[token];
+        for (const item of line) {
+          if (!/\{[a-zA-Z]+\}/.test(item.str)) continue;
 
-          if (mapping) {
-            let charPos = 0;
-            let anchorItem: TextItem | null = null;
-            let anchorOffset = 0;
+          const itemX = item.transform[4];
+          const itemY = item.transform[5];
+          const avgCharW = item.width / Math.max(item.str.length, 1);
 
-            for (const item of line) {
-              if (charPos + item.str.length > match.index) {
-                anchorItem = item;
-                anchorOffset = match.index - charPos;
-                break;
-              }
-              charPos += item.str.length;
-            }
+          const placeholderRegex = /\{([a-zA-Z]+)\}/g;
+          let match;
+          while ((match = placeholderRegex.exec(item.str)) !== null) {
+            const token = match[0];
+            const mapping = PLACEHOLDER_MAP[token];
+            if (!mapping) continue;
 
-            if (anchorItem) {
-              const x = anchorItem.transform[4] + (anchorOffset * (anchorItem.width / Math.max(anchorItem.str.length, 1)));
-              const y = anchorItem.transform[5];
+            const x = itemX + match.index * avgCharW;
+            const y = itemY;
 
-              pendingFields.push({
-                token,
-                mapping,
-                x,
-                y,
-                pageIndex: pageNum - 1,
-              });
-            }
+            pendingFields.push({ token, mapping, x, y, pageIndex: pageNum - 1 });
           }
         }
+
+        const fullText = line.map((i) => i.str).join("");
 
         const radioRegex = /\{radio_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}/g;
         let radioMatch;
@@ -399,25 +385,9 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       }
 
       for (const pf of pendingFields) {
-        const sameLine = pendingFields.filter(
-          (other) => other.pageIndex === pf.pageIndex
-            && Math.abs(other.y - pf.y) < 3
-            && other.x > pf.x
-        );
-        const nextX = sameLine.length > 0 ? Math.min(...sameLine.map((f) => f.x)) : null;
-
         const autoValue = resolveValue(pf.mapping.source, pf.mapping.key, data);
-        const charWidth = 6.5;
-        const tokenLen = pf.token.length;
-        const valueLen = Math.max((autoValue || "").length, tokenLen);
-        const estimatedWidth = valueLen * charWidth + 12;
 
-        let fieldWidth: number;
-        if (nextX && (nextX - pf.x - 5) < estimatedWidth + 20) {
-          fieldWidth = nextX - pf.x - 5;
-        } else {
-          fieldWidth = estimatedWidth;
-        }
+        const fieldWidth = Math.max(pf.token.length * 7 + 20, 60);
 
         fields.push({
           token: pf.token,
@@ -426,7 +396,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           dataKey: pf.mapping.key,
           x: pf.x + offsets.x,
           y: viewport.height - pf.y + offsets.y,
-          width: Math.max(fieldWidth, 40),
+          width: fieldWidth,
           pageIndex: pf.pageIndex,
           value: autoValue,
         });
