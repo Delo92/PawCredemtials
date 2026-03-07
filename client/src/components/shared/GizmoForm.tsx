@@ -551,7 +551,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
       if (hasPlaceholders) {
         setMode("placeholder");
-        await extractPlaceholdersFromPdf(pdf);
 
         try {
           const token = await auth.currentUser?.getIdToken();
