@@ -299,7 +299,7 @@ export default function PackagesManagement() {
                   </TableHeader>
                   <TableBody>
                     {packages && packages.length > 0 ? (
-                      packages.map((pkg) => (
+                      [...packages].sort((a, b) => (a.price || 0) - (b.price || 0)).map((pkg) => (
                         <TableRow key={pkg.id} data-testid={`package-row-${pkg.id}`}>
                           <TableCell className="font-medium">{pkg.name}</TableCell>
                           <TableCell className="max-w-xs truncate">
