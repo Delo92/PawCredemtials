@@ -565,78 +565,36 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             (item): item is ScanTextItem => "str" in item && item.str.length > 0
           );
 
-          const scanLines: ScanTextItem[][] = [];
           for (const item of scanItems) {
-            const y = item.transform[5];
-            let found = false;
-            for (const line of scanLines) {
-              if (Math.abs(y - line[0].transform[5]) < 3) { line.push(item); found = true; break; }
-            }
-            if (!found) scanLines.push([item]);
-          }
+            if (!/\{[a-zA-Z_]+\}/.test(item.str)) continue;
 
-          for (const line of scanLines) {
-            line.sort((a, b) => a.transform[4] - b.transform[4]);
-            const fullText = line.map(i => i.str).join("");
-            if (!/\{[a-zA-Z_]+\}/.test(fullText)) continue;
+            const hasKnownPlaceholder = /\{([a-zA-Z_]+)\}/g.test(item.str) &&
+              item.str.match(/\{([a-zA-Z_]+)\}/g)?.some(tok => PLACEHOLDER_MAP[tok]);
+            if (!hasKnownPlaceholder) continue;
 
-            let charOffset = 0;
-            const itemRanges: { item: ScanTextItem; startChar: number; endChar: number }[] = [];
-            for (const item of line) {
-              itemRanges.push({ item, startChar: charOffset, endChar: charOffset + item.str.length });
-              charOffset += item.str.length;
-            }
+            const ix = item.transform[4];
+            const iy = item.transform[5];
+            const iw = item.width;
+            const fs = Math.abs(item.transform[3]) || item.height || 12;
 
-            const touchedIndices = new Set<number>();
-            const phRegex = /\{([a-zA-Z_]+)\}/g;
-            let m;
-            while ((m = phRegex.exec(fullText)) !== null) {
-              if (!PLACEHOLDER_MAP[m[0]]) continue;
-              const phStart = m.index;
-              const phEnd = m.index + m[0].length;
-              for (let i = 0; i < itemRanges.length; i++) {
-                const r = itemRanges[i];
-                if (phStart < r.endChar && phEnd > r.startChar) touchedIndices.add(i);
-              }
-            }
+            cleanPage.drawRectangle({
+              x: ix - 1, y: iy - 2, width: iw + 2, height: fs + 4,
+              color: pdfRgb(1, 1, 1), opacity: 1,
+            });
 
-            if (touchedIndices.size === 0) continue;
-
-            const sortedIdx = Array.from(touchedIndices).sort((a, b) => a - b);
-            const groups: number[][] = [];
-            let curGroup = [sortedIdx[0]];
-            for (let i = 1; i < sortedIdx.length; i++) {
-              if (sortedIdx[i] === sortedIdx[i - 1] + 1) curGroup.push(sortedIdx[i]);
-              else { groups.push(curGroup); curGroup = [sortedIdx[i]]; }
-            }
-            groups.push(curGroup);
-
-            for (const group of groups) {
-              const grItems = group.map(i => itemRanges[i]);
-              const first = grItems[0].item;
-              const last = grItems[grItems.length - 1].item;
-              const gx = first.transform[4];
-              const gy = first.transform[5];
-              const gw = (last.transform[4] + last.width) - gx;
-              const fs = Math.abs(first.transform[3]) || first.height || 12;
-
-              cleanPage.drawRectangle({
-                x: gx - 2, y: gy - 3, width: gw + 4, height: fs + 6,
-                color: pdfRgb(1, 1, 1), opacity: 1,
+            const replaced = item.str.replace(/\{([a-zA-Z_]+)\}/g, (tok) => {
+              return PLACEHOLDER_MAP[tok] ? "" : tok;
+            });
+            if (replaced.trim()) {
+              cleanPage.drawText(replaced, {
+                x: ix, y: iy, size: fs, font: cleanFont, color: pdfRgb(0, 0, 0),
               });
-
-              let combined = grItems.map(g => g.item.str).join("");
-              const replaced = combined.replace(/\{([a-zA-Z_]+)\}/g, () => "");
-              if (replaced.trim()) {
-                cleanPage.drawText(replaced, {
-                  x: gx, y: gy, size: fs, font: cleanFont, color: pdfRgb(0, 0, 0),
-                });
-              }
             }
           }
         }
 
         scanPdf.destroy();
+        pdf.destroy();
         const cleanBytes = await cleanDoc.save();
         const cleanBuffer = cleanBytes.buffer.slice(0) as ArrayBuffer;
         setPdfBytes(cleanBuffer);
