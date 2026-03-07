@@ -225,8 +225,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [acroFormFields, setAcroFormFields] = useState<{ name: string; normalizedName: string; value: string; matched: boolean }[]>([]);
   const [downloading, setDownloading] = useState(false);
   const [petPhotoMarker, setPetPhotoMarker] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number } | null>(null);
-  const [coverRects, setCoverRects] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number; nonPlaceholderPrefix: string; fontSize: number }[]>([]);
-  const [pageBgColor, setPageBgColor] = useState<string>("rgb(255,255,255)");
+
 
   const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
@@ -234,7 +233,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
     const fields: PlaceholderField[] = [];
     const radios: RadioField[] = [];
-    const rects: typeof coverRects = [];
+    const rects: { x: number; y: number; width: number; height: number; pageIndex: number; nonPlaceholderPrefix: string; fontSize: number }[] = [];
     const selectedRadioIds = new Set<string>(
       (data.selectedRadioIds || []).map((id) => String(id))
     );
