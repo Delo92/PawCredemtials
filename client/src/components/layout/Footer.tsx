@@ -112,7 +112,7 @@ export function Footer() {
           </p>
           <p className="text-xs text-muted-foreground" data-testid="text-footer-tagline">
             Website created by{" "}
-            <a href="https://oraginconcepts.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors" data-testid="link-footer-creator">
+            <a href="https://oraginalconcpets.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors" data-testid="link-footer-creator">
               Oraginal Concepts
             </a>
           </p>
