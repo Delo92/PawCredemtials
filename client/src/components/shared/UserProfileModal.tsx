@@ -87,6 +87,7 @@ interface DoctorProfileData {
   state: string;
   gizmoFormUrl: string;
   stateForms: Record<string, string>;
+  letterTemplateUrl: string;
 }
 
 interface UserProfileModalProps {
@@ -105,6 +106,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
   const [newStatus, setNewStatus] = useState<string>("");
   const [newNote, setNewNote] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
+  const [letterUploading, setLetterUploading] = useState(false);
   const [showGizmoPreview, setShowGizmoPreview] = useState(false);
   const [selectedPdfState, setSelectedPdfState] = useState<string>("");
   const [previewPdfState, setPreviewPdfState] = useState<string>("");
@@ -120,6 +122,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     state: "",
     gizmoFormUrl: "",
     stateForms: {},
+    letterTemplateUrl: "",
   });
 
   const isUserDoctor = selectedUser?.userLevel === 2;
@@ -193,6 +196,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         state: doctorProfile.state || "",
         gizmoFormUrl: doctorProfile.gizmoFormUrl || "",
         stateForms: doctorProfile.stateForms || {},
+        letterTemplateUrl: doctorProfile.letterTemplateUrl || "",
       });
     } else if (selectedUser && isUserDoctor) {
       setDoctorProfileData({
@@ -207,6 +211,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         state: "",
         gizmoFormUrl: "",
         stateForms: {},
+        letterTemplateUrl: "",
       });
     }
   }, [doctorProfile, selectedUser, isUserDoctor]);
@@ -1001,6 +1006,100 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                       {!doctorProfile?.id && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
                           Save the doctor profile first, then you can upload a PDF form.
+                        </p>
+                      )}
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <FileText className="h-4 w-4" />
+                      Letter Template
+                    </h4>
+
+                    <div className="p-3 bg-muted/50 border rounded-md text-sm text-muted-foreground flex items-start gap-2">
+                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Upload a letter template PDF that will be auto-filled with patient and doctor data
+                        and sent alongside the Pet ID Card when an application is approved.
+                      </span>
+                    </div>
+
+                    {doctorProfileData.letterTemplateUrl && (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
+                            data-testid="button-clear-letter-template"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" /> Clear
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <Label>Upload Letter Template</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          className="hidden"
+                          id="letter-template-upload"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (!doctorProfile?.id) {
+                              toast({ title: "Save doctor profile first", variant: "destructive" });
+                              return;
+                            }
+                            setLetterUploading(true);
+                            try {
+                              const formData = new FormData();
+                              formData.append("file", file);
+                              const token = await auth.currentUser?.getIdToken();
+                              const res = await fetch(
+                                `/api/admin/doctor-templates/${doctorProfile.id}/letter-template`,
+                                {
+                                  method: "POST",
+                                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                  body: formData,
+                                }
+                              );
+                              if (!res.ok) throw new Error((await res.json()).message || "Upload failed");
+                              const data = await res.json();
+                              setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: data.url });
+                              toast({ title: "Letter Template Uploaded" });
+                            } catch (err: any) {
+                              toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+                            } finally {
+                              setLetterUploading(false);
+                              e.target.value = "";
+                            }
+                          }}
+                          data-testid="input-letter-template-upload"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={letterUploading || !doctorProfile?.id}
+                          onClick={() => document.getElementById("letter-template-upload")?.click()}
+                          data-testid="button-upload-letter"
+                        >
+                          {letterUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                          {letterUploading ? "Uploading..." : "Choose PDF File"}
+                        </Button>
+                      </div>
+                      {!doctorProfile?.id && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Save the doctor profile first, then you can upload a letter template.
                         </p>
                       )}
                     </div>

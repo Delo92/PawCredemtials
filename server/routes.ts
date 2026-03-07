@@ -3115,6 +3115,56 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/admin/doctor-templates/:doctorProfileId/letter-template", requireAuth, requireLevel(3), (req, res, next) => {
+    pdfUpload.single("file")(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ message: "File size must be under 20MB" });
+          return;
+        }
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (err) {
+        res.status(400).json({ message: err.message });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ message: "No file uploaded" });
+        return;
+      }
+
+      try {
+        const { doctorProfileId } = req.params;
+        const profile = await storage.getDoctorProfile(doctorProfileId);
+        if (!profile) {
+          res.status(404).json({ message: "Doctor profile not found" });
+          return;
+        }
+
+        const bucket = firebaseStorage.bucket();
+        const uniqueSuffix = Date.now() + "-" + randomBytes(4).toString("hex");
+        const ext = ".pdf";
+        const fileName = `doctor-templates/${doctorProfileId}-letter-${uniqueSuffix}${ext}`;
+        const file = bucket.file(fileName);
+
+        await file.save(req.file.buffer, {
+          metadata: { contentType: "application/pdf" },
+        });
+
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+
+        await storage.updateDoctorProfile(doctorProfileId, { letterTemplateUrl: url });
+
+        res.json({ url });
+      } catch (error: any) {
+        console.error("Letter template upload error:", error);
+        res.status(500).json({ message: "Failed to upload letter template" });
+      }
+    });
+  });
+
   app.get("/api/forms/proxy-image", async (req, res) => {
     try {
       const url = req.query.url as string;
@@ -3194,10 +3244,11 @@ export async function registerRoutes(
       }
 
       let doctorProfile: Record<string, any> | undefined;
-      if (application.assignedDoctorId) {
-        doctorProfile = await storage.getDoctorProfile(application.assignedDoctorId);
+      const doctorUserId = (application as any).assignedReviewerId || application.assignedDoctorId;
+      if (doctorUserId) {
+        doctorProfile = await storage.getDoctorProfile(doctorUserId);
         if (!doctorProfile) {
-          doctorProfile = await storage.getDoctorProfileByUserId(application.assignedDoctorId);
+          doctorProfile = await storage.getDoctorProfileByUserId(doctorUserId);
         }
       }
 
@@ -3293,11 +3344,14 @@ export async function registerRoutes(
         petIdCardUrl = packagePetIdTemplate || siteWideTemplate || builtInDefault;
       }
 
+      const letterTemplateUrl = doctorProfile?.letterTemplateUrl || null;
+
       res.json({
         success: true,
         patientData,
         doctorData,
         gizmoFormUrl,
+        letterTemplateUrl,
         generatedDate,
         patientName: `${patientData.firstName} ${patientData.lastName}`.trim(),
         packageName: pkg?.name || "",
