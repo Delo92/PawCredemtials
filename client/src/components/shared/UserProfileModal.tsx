@@ -1044,11 +1044,24 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                           <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                         </div>
                         <div className="border rounded-md overflow-hidden bg-white" data-testid="letter-template-preview">
-                          <iframe
-                            src={doctorProfileData.letterTemplateUrl}
+                          <object
+                            data={doctorProfileData.letterTemplateUrl}
+                            type="application/pdf"
                             className="w-full h-[400px]"
-                            title="Letter Template Preview"
-                          />
+                          >
+                            <div className="flex flex-col items-center justify-center h-[400px] gap-2 text-muted-foreground">
+                              <FileText className="h-8 w-8" />
+                              <p className="text-sm">PDF preview not available in this browser</p>
+                              <a
+                                href={doctorProfileData.letterTemplateUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 underline"
+                              >
+                                Open PDF in new tab
+                              </a>
+                            </div>
+                          </object>
                         </div>
                       </div>
                     )}
