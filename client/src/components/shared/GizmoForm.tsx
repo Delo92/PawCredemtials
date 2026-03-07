@@ -548,6 +548,103 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (hasPlaceholders) {
         setMode("placeholder");
         await extractPlaceholdersFromPdf(pdf);
+
+        const { PDFDocument: PDFDoc, rgb: pdfRgb, StandardFonts } = await import("pdf-lib");
+        const cleanDoc = await PDFDoc.load(originalBytes.slice(0));
+        const cleanFont = await cleanDoc.embedFont(StandardFonts.TimesRoman);
+        const scanPdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
+
+        for (let pageNum = 1; pageNum <= scanPdf.numPages; pageNum++) {
+          const scanPage = await scanPdf.getPage(pageNum);
+          const textContent = await scanPage.getTextContent();
+          const cleanPage = cleanDoc.getPages()[pageNum - 1];
+          if (!cleanPage) continue;
+
+          interface ScanTextItem { str: string; transform: number[]; width: number; height: number; }
+          const scanItems = textContent.items.filter(
+            (item): item is ScanTextItem => "str" in item && item.str.length > 0
+          );
+
+          const scanLines: ScanTextItem[][] = [];
+          for (const item of scanItems) {
+            const y = item.transform[5];
+            let found = false;
+            for (const line of scanLines) {
+              if (Math.abs(y - line[0].transform[5]) < 3) { line.push(item); found = true; break; }
+            }
+            if (!found) scanLines.push([item]);
+          }
+
+          for (const line of scanLines) {
+            line.sort((a, b) => a.transform[4] - b.transform[4]);
+            const fullText = line.map(i => i.str).join("");
+            if (!/\{[a-zA-Z_]+\}/.test(fullText)) continue;
+
+            let charOffset = 0;
+            const itemRanges: { item: ScanTextItem; startChar: number; endChar: number }[] = [];
+            for (const item of line) {
+              itemRanges.push({ item, startChar: charOffset, endChar: charOffset + item.str.length });
+              charOffset += item.str.length;
+            }
+
+            const touchedIndices = new Set<number>();
+            const phRegex = /\{([a-zA-Z_]+)\}/g;
+            let m;
+            while ((m = phRegex.exec(fullText)) !== null) {
+              if (!PLACEHOLDER_MAP[m[0]]) continue;
+              const phStart = m.index;
+              const phEnd = m.index + m[0].length;
+              for (let i = 0; i < itemRanges.length; i++) {
+                const r = itemRanges[i];
+                if (phStart < r.endChar && phEnd > r.startChar) touchedIndices.add(i);
+              }
+            }
+
+            if (touchedIndices.size === 0) continue;
+
+            const sortedIdx = Array.from(touchedIndices).sort((a, b) => a - b);
+            const groups: number[][] = [];
+            let curGroup = [sortedIdx[0]];
+            for (let i = 1; i < sortedIdx.length; i++) {
+              if (sortedIdx[i] === sortedIdx[i - 1] + 1) curGroup.push(sortedIdx[i]);
+              else { groups.push(curGroup); curGroup = [sortedIdx[i]]; }
+            }
+            groups.push(curGroup);
+
+            for (const group of groups) {
+              const grItems = group.map(i => itemRanges[i]);
+              const first = grItems[0].item;
+              const last = grItems[grItems.length - 1].item;
+              const gx = first.transform[4];
+              const gy = first.transform[5];
+              const gw = (last.transform[4] + last.width) - gx;
+              const fs = Math.abs(first.transform[3]) || first.height || 12;
+
+              cleanPage.drawRectangle({
+                x: gx - 2, y: gy - 3, width: gw + 4, height: fs + 6,
+                color: pdfRgb(1, 1, 1), opacity: 1,
+              });
+
+              let combined = grItems.map(g => g.item.str).join("");
+              const replaced = combined.replace(/\{([a-zA-Z_]+)\}/g, () => "");
+              if (replaced.trim()) {
+                cleanPage.drawText(replaced, {
+                  x: gx, y: gy, size: fs, font: cleanFont, color: pdfRgb(0, 0, 0),
+                });
+              }
+            }
+          }
+        }
+
+        scanPdf.destroy();
+        const cleanBytes = await cleanDoc.save();
+        const cleanBuffer = cleanBytes.buffer.slice(0) as ArrayBuffer;
+        setPdfBytes(cleanBuffer);
+
+        const cleanPdf = await pdfjsLib.getDocument({ data: new Uint8Array(cleanBuffer.slice(0)) }).promise;
+        setPdfDoc(cleanPdf);
+        setTotalPages(cleanPdf.numPages);
+
         setLoading(false);
         return;
       }

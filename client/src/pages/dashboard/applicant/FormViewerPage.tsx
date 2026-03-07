@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearch } from "wouter";
 import { GizmoForm, type GizmoFormData } from "@/components/shared/GizmoForm";
-import { ESALetterViewer } from "@/components/shared/ESALetterViewer";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -134,7 +133,7 @@ export default function FormViewerPage() {
           )}
 
           {activeTab === "esaletter" && letterData && (
-            <ESALetterViewer data={letterData} onClose={() => window.history.back()} />
+            <GizmoForm data={letterData} onClose={() => window.history.back()} />
           )}
 
           {activeTab === "idcard" && idCardData && (
