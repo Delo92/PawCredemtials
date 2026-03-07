@@ -405,7 +405,19 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             && other.x > pf.x
         );
         const nextX = sameLine.length > 0 ? Math.min(...sameLine.map((f) => f.x)) : null;
-        const fieldWidth = nextX ? nextX - pf.x - 5 : viewport.width - pf.x - 20;
+
+        const autoValue = resolveValue(pf.mapping.source, pf.mapping.key, data);
+        const tokenLen = pf.token.length;
+        const charWidth = 6.5;
+        const valueLen = Math.max((autoValue || "").length, tokenLen);
+        const estimatedWidth = valueLen * charWidth + 16;
+
+        let fieldWidth: number;
+        if (nextX) {
+          fieldWidth = Math.min(nextX - pf.x - 5, Math.max(estimatedWidth, 60));
+        } else {
+          fieldWidth = Math.min(estimatedWidth + 20, viewport.width - pf.x - 20);
+        }
 
         fields.push({
           token: pf.token,
@@ -414,9 +426,9 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           dataKey: pf.mapping.key,
           x: pf.x + offsets.x,
           y: viewport.height - pf.y + offsets.y,
-          width: Math.max(fieldWidth, 40),
+          width: Math.max(fieldWidth, 50),
           pageIndex: pf.pageIndex,
-          value: resolveValue(pf.mapping.source, pf.mapping.key, data),
+          value: autoValue,
         });
       }
 
@@ -946,13 +958,15 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   key={`field-${globalIdx}`}
                   value={field.value}
                   onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
-                  className="absolute bg-yellow-50/80 border-yellow-400 text-xs h-6 px-1 text-black"
+                  className="absolute bg-yellow-50 border-yellow-400 text-xs px-1 text-black rounded-none"
                   style={{
                     left: field.x * scale,
-                    top: field.y * scale,
+                    top: (field.y - 1) * scale,
                     width: field.width * scale,
-                    fontSize: 10 * scale,
-                    height: 16 * scale,
+                    fontSize: 9 * scale,
+                    height: 14 * scale,
+                    lineHeight: `${14 * scale}px`,
+                    padding: `0 ${2 * scale}px`,
                   }}
                   data-testid={`input-field-${field.dataKey}`}
                 />
