@@ -239,7 +239,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1 });
+      const rotation = page.rotate || 0;
+      const viewport = page.getViewport({ scale: 1, rotation });
 
       interface TextItem {
         str: string;
@@ -256,7 +257,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         let foundLine = false;
         for (const line of lines) {
           const lineY = line[0].transform[5];
-          if (Math.abs(y - lineY) < 3) {
+          if (Math.abs(y - lineY) < 6) {
             line.push(item);
             foundLine = true;
             break;
@@ -402,7 +403,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       for (const pf of pendingFields) {
         const sameLine = pendingFields.filter(
           (other) => other.pageIndex === pf.pageIndex
-            && Math.abs(other.y - pf.y) < 3
+            && Math.abs(other.y - pf.y) < 6
             && other.x > pf.x
         );
         const nextX = sameLine.length > 0 ? Math.min(...sameLine.map((f) => f.x)) : null;
@@ -576,7 +577,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             const y = item.transform[5];
             let found = false;
             for (const line of textLines) {
-              if (Math.abs(y - line[0].transform[5]) < 3) {
+              if (Math.abs(y - line[0].transform[5]) < 6) {
                 line.push(item);
                 found = true;
                 break;
@@ -584,6 +585,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             }
             if (!found) textLines.push([item]);
           }
+
+          const replacedPositions = new Set<string>();
 
           for (const line of textLines) {
             line.sort((a, b) => a.transform[4] - b.transform[4]);
@@ -643,7 +646,52 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   font,
                   color: pdfRgb(0, 0, 0),
                 });
+                replacedPositions.add(`${Math.round(firstX)}-${Math.round(refY)}`);
               }
+            }
+          }
+
+          for (const item of textItems) {
+            const itemPlaceholderRegex = /\{([a-zA-Z_]+)\}/g;
+            let im;
+            while ((im = itemPlaceholderRegex.exec(item.str)) !== null) {
+              const token = im[0];
+              const mapping = PLACEHOLDER_MAP[token];
+              if (!mapping) continue;
+
+              const charW = item.width / Math.max(item.str.length, 1);
+              const offsetChars = im.index;
+              const itemX = item.transform[4] + offsetChars * charW;
+              const itemY = item.transform[5];
+              const posKey = `${Math.round(itemX)}-${Math.round(itemY)}`;
+              if (replacedPositions.has(posKey)) continue;
+
+              const replacementValue = resolveValue(mapping.source, mapping.key, data);
+              if (!replacementValue) continue;
+
+              const coverChars = im[0].length;
+              const rectX = itemX - 1;
+              const rectW = coverChars * charW + 2;
+              const fontSize = Math.abs(item.transform[3]) || item.height || 12;
+
+              filledPage.drawRectangle({
+                x: rectX,
+                y: itemY - 2,
+                width: rectW,
+                height: fontSize + 4,
+                color: pdfRgb(1, 1, 1),
+                opacity: 1,
+              });
+
+              const drawSize = Math.min(fontSize * 0.85, 11);
+              filledPage.drawText(replacementValue, {
+                x: itemX,
+                y: itemY,
+                size: drawSize,
+                font,
+                color: pdfRgb(0, 0, 0),
+              });
+              replacedPositions.add(posKey);
             }
           }
         }
@@ -742,6 +790,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   }, [loadPdf]);
 
   const renderTaskRef = useRef<any>(null);
+  const isRenderingRef = useRef(false);
 
   const renderPage = useCallback(async () => {
     if (!pdfDoc) return;
@@ -749,9 +798,16 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
     if (renderTaskRef.current) {
       try {
         renderTaskRef.current.cancel();
+        await renderTaskRef.current.promise.catch(() => {});
       } catch (_) {}
       renderTaskRef.current = null;
     }
+
+    while (isRenderingRef.current) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    isRenderingRef.current = true;
 
     const tryRender = async (retries = 5): Promise<void> => {
       const canvas = canvasRef.current;
@@ -764,7 +820,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       }
 
       const page = await pdfDoc.getPage(currentPage);
-      const viewport = page.getViewport({ scale });
+      const rotation = page.rotate || 0;
+      const viewport = page.getViewport({ scale, rotation });
       const ctx = canvas.getContext("2d")!;
 
       canvas.width = viewport.width;
@@ -777,11 +834,16 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       } catch (err: any) {
         if (err?.name === "RenderingCancelledException") return;
         throw err;
+      } finally {
+        renderTaskRef.current = null;
       }
-      renderTaskRef.current = null;
     };
 
-    await tryRender();
+    try {
+      await tryRender();
+    } finally {
+      isRenderingRef.current = false;
+    }
   }, [pdfDoc, currentPage, scale]);
 
   useEffect(() => {
