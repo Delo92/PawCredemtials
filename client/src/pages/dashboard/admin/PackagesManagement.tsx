@@ -328,7 +328,7 @@ export default function PackagesManagement() {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              {user?.userLevel === 5 && (
+                              {user?.userLevel >= 4 && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
