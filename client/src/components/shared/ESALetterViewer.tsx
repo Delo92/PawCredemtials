@@ -146,10 +146,19 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
           if (!found) textLines.push([item]);
         }
 
-        const replacedPositions = new Set<string>();
+        const replacedTokens = new Set<string>();
 
+        const itemCumulativeOffsets: Map<TextItem, number> = new Map();
         for (const line of textLines) {
           line.sort((a, b) => a.transform[4] - b.transform[4]);
+          let offset = 0;
+          for (const item of line) {
+            itemCumulativeOffsets.set(item, offset);
+            offset += item.str.length;
+          }
+        }
+
+        for (const line of textLines) {
           const fullText = line.map((i) => i.str).join("");
           const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
           let m;
@@ -160,56 +169,69 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
               ? resolveValue(mapping.source, mapping.key, data)
               : "";
 
-            let charPos = 0;
-            let firstX: number | null = null;
+            let coverStartX: number | null = null;
+            let coverEndX = 0;
             let refY = 0;
             let refFontSize = 12;
 
             for (const item of line) {
-              const itemStart = charPos;
-              const itemEnd = charPos + item.str.length;
+              const itemStart = itemCumulativeOffsets.get(item) || 0;
+              const itemEnd = itemStart + item.str.length;
               const overlapStart = Math.max(m.index, itemStart);
               const overlapEnd = Math.min(m.index + m[0].length, itemEnd);
 
               if (overlapStart < overlapEnd) {
-                const charW = item.width / Math.max(item.str.length, 1);
-                const offsetChars = overlapStart - itemStart;
-                const coverChars = overlapEnd - overlapStart;
-                const rectX = item.transform[4] + offsetChars * charW - 1;
-                const rectW = coverChars * charW + 2;
                 const fontSize =
                   Math.abs(item.transform[3]) || item.height || 12;
 
-                if (firstX === null) {
-                  firstX = item.transform[4] + offsetChars * charW;
-                  refY = item.transform[5];
-                  refFontSize = fontSize;
+                if (overlapStart === itemStart && overlapEnd === itemEnd) {
+                  const startX = item.transform[4];
+                  const endX = startX + item.width;
+                  if (coverStartX === null) {
+                    coverStartX = startX;
+                    refY = item.transform[5];
+                    refFontSize = fontSize;
+                  }
+                  coverEndX = endX;
+                } else {
+                  const charW = item.width / Math.max(item.str.length, 1);
+                  const offsetChars = overlapStart - itemStart;
+                  const coverChars = overlapEnd - overlapStart;
+                  const startX = item.transform[4] + offsetChars * charW;
+                  const endX = startX + coverChars * charW;
+                  if (coverStartX === null) {
+                    coverStartX = startX;
+                    refY = item.transform[5];
+                    refFontSize = fontSize;
+                  }
+                  coverEndX = endX;
                 }
-
-                filledPage.drawRectangle({
-                  x: rectX,
-                  y: item.transform[5] - 2,
-                  width: rectW,
-                  height: fontSize + 4,
-                  color: pdfRgb(1, 1, 1),
-                  opacity: 1,
-                });
               }
-              charPos += item.str.length;
             }
 
-            if (firstX !== null && replacementValue) {
-              const drawSize = Math.min(refFontSize * 0.85, 11);
-              filledPage.drawText(replacementValue, {
-                x: firstX,
-                y: refY,
-                size: drawSize,
-                font,
-                color: pdfRgb(0, 0, 0),
+            if (coverStartX !== null) {
+              const pad = refFontSize * 0.15;
+              filledPage.drawRectangle({
+                x: coverStartX - pad,
+                y: refY - 2,
+                width: coverEndX - coverStartX + pad * 2,
+                height: refFontSize + 4,
+                color: pdfRgb(1, 1, 1),
+                opacity: 1,
               });
-              replacedPositions.add(
-                `${Math.round(firstX)}-${Math.round(refY)}`
-              );
+
+              if (replacementValue) {
+                const drawSize = Math.min(refFontSize * 0.85, 11);
+                filledPage.drawText(replacementValue, {
+                  x: coverStartX,
+                  y: refY,
+                  size: drawSize,
+                  font,
+                  color: pdfRgb(0, 0, 0),
+                });
+              }
+              const tokenKey = `${pageNum}-${token}-${Math.round(refY)}`;
+              replacedTokens.add(tokenKey);
             }
           }
         }
@@ -222,12 +244,10 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
             const mapping = PLACEHOLDER_MAP[token];
             if (!mapping) continue;
 
-            const charW = item.width / Math.max(item.str.length, 1);
-            const offsetChars = im.index;
-            const itemX = item.transform[4] + offsetChars * charW;
+            const itemX = item.transform[4];
             const itemY = item.transform[5];
-            const posKey = `${Math.round(itemX)}-${Math.round(itemY)}`;
-            if (replacedPositions.has(posKey)) continue;
+            const tokenKey = `${pageNum}-${token}-${Math.round(itemY)}`;
+            if (replacedTokens.has(tokenKey)) continue;
 
             const replacementValue = resolveValue(
               mapping.source,
@@ -235,32 +255,48 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
               data
             );
 
-            const coverChars = im[0].length;
-            const rectX = itemX - 1;
-            const rectW = coverChars * charW + 2;
             const fontSize =
               Math.abs(item.transform[3]) || item.height || 12;
 
-            filledPage.drawRectangle({
-              x: rectX,
-              y: itemY - 2,
-              width: rectW,
-              height: fontSize + 4,
-              color: pdfRgb(1, 1, 1),
-              opacity: 1,
-            });
+            if (im.index === 0 && im[0].length === item.str.length) {
+              const pad = fontSize * 0.15;
+              filledPage.drawRectangle({
+                x: itemX - pad,
+                y: itemY - 2,
+                width: item.width + pad * 2,
+                height: fontSize + 4,
+                color: pdfRgb(1, 1, 1),
+                opacity: 1,
+              });
+            } else {
+              const charW = item.width / Math.max(item.str.length, 1);
+              const offsetChars = im.index;
+              const coverChars = im[0].length;
+              const startX = itemX + offsetChars * charW;
+              const pad = fontSize * 0.15;
+              filledPage.drawRectangle({
+                x: startX - pad,
+                y: itemY - 2,
+                width: coverChars * charW + pad * 2,
+                height: fontSize + 4,
+                color: pdfRgb(1, 1, 1),
+                opacity: 1,
+              });
+            }
 
             if (replacementValue) {
+              const charW = item.width / Math.max(item.str.length, 1);
+              const drawX = itemX + im.index * charW;
               const drawSize = Math.min(fontSize * 0.85, 11);
               filledPage.drawText(replacementValue, {
-                x: itemX,
+                x: drawX,
                 y: itemY,
                 size: drawSize,
                 font,
                 color: pdfRgb(0, 0, 0),
               });
             }
-            replacedPositions.add(posKey);
+            replacedTokens.add(tokenKey);
           }
         }
       }
