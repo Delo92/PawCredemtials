@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 
 const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
+const LazyESALetterViewer = lazy(() => import("@/components/shared/ESALetterViewer").then(m => ({ default: m.ESALetterViewer })));
 
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -1459,32 +1460,55 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
             <DialogDescription>Preview and fill the PDF form</DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-            <LazyGizmoForm
-              data={{
-                success: true,
-                patientData: {},
-                doctorData: {
-                  firstName: doctorProfileData.fullName?.split(" ")[0] || "",
-                  lastName: doctorProfileData.fullName?.split(" ").slice(1).join(" ") || "",
-                  phone: doctorProfileData.phone || "",
-                  address: doctorProfileData.address || "",
-                  state: doctorProfileData.state || "",
-                  licenseNumber: doctorProfileData.licenseNumber || "",
-                  npiNumber: doctorProfileData.npiNumber || "",
-                  deaNumber: doctorProfileData.deaNumber || "",
-                  specialty: doctorProfileData.specialty || "",
-                  fax: doctorProfileData.fax || "",
-                },
-                gizmoFormUrl: previewLetterTemplate
-                  ? doctorProfileData.letterTemplateUrl
-                  : previewPdfState
+            {previewLetterTemplate ? (
+              <LazyESALetterViewer
+                data={{
+                  success: true,
+                  patientData: {},
+                  doctorData: {
+                    firstName: doctorProfileData.fullName?.split(" ")[0] || "",
+                    lastName: doctorProfileData.fullName?.split(" ").slice(1).join(" ") || "",
+                    phone: doctorProfileData.phone || "",
+                    address: doctorProfileData.address || "",
+                    state: doctorProfileData.state || "",
+                    licenseNumber: doctorProfileData.licenseNumber || "",
+                    npiNumber: doctorProfileData.npiNumber || "",
+                    deaNumber: doctorProfileData.deaNumber || "",
+                    specialty: doctorProfileData.specialty || "",
+                    fax: doctorProfileData.fax || "",
+                  },
+                  gizmoFormUrl: doctorProfileData.letterTemplateUrl,
+                  generatedDate: new Date().toLocaleDateString(),
+                  patientName: "Test Patient",
+                }}
+                onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); setPreviewLetterTemplate(false); }}
+              />
+            ) : (
+              <LazyGizmoForm
+                data={{
+                  success: true,
+                  patientData: {},
+                  doctorData: {
+                    firstName: doctorProfileData.fullName?.split(" ")[0] || "",
+                    lastName: doctorProfileData.fullName?.split(" ").slice(1).join(" ") || "",
+                    phone: doctorProfileData.phone || "",
+                    address: doctorProfileData.address || "",
+                    state: doctorProfileData.state || "",
+                    licenseNumber: doctorProfileData.licenseNumber || "",
+                    npiNumber: doctorProfileData.npiNumber || "",
+                    deaNumber: doctorProfileData.deaNumber || "",
+                    specialty: doctorProfileData.specialty || "",
+                    fax: doctorProfileData.fax || "",
+                  },
+                  gizmoFormUrl: previewPdfState
                     ? (doctorProfileData.stateForms || {})[previewPdfState]
                     : doctorProfileData.gizmoFormUrl,
-                generatedDate: new Date().toLocaleDateString(),
-                patientName: "Test Patient",
-              }}
-              onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); setPreviewLetterTemplate(false); }}
-            />
+                  generatedDate: new Date().toLocaleDateString(),
+                  patientName: "Test Patient",
+                }}
+                onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); setPreviewLetterTemplate(false); }}
+              />
+            )}
           </Suspense>
         </DialogContent>
       </Dialog>
