@@ -551,6 +551,132 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (hasPlaceholders) {
         setMode("placeholder");
         await extractPlaceholdersFromPdf(pdf);
+
+        const { PDFDocument: PDFDoc, rgb: pdfRgb, StandardFonts } = await import("pdf-lib");
+        const filledDoc = await PDFDoc.load(originalBytes.slice(0));
+        const timesRoman = await filledDoc.embedFont(StandardFonts.TimesRoman);
+        const filledPages = filledDoc.getPages();
+        const scanPdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
+
+        for (let pageNum = 1; pageNum <= scanPdf.numPages; pageNum++) {
+          const scanPage = await scanPdf.getPage(pageNum);
+          const textContent = await scanPage.getTextContent();
+          const filledPage = filledPages[pageNum - 1];
+          if (!filledPage) continue;
+
+          interface ScanTextItem { str: string; transform: number[]; width: number; height: number; }
+          const textItems = textContent.items.filter(
+            (item): item is ScanTextItem => "str" in item && item.str.length > 0
+          );
+
+          const textLines: ScanTextItem[][] = [];
+          for (const item of textItems) {
+            const y = item.transform[5];
+            let found = false;
+            for (const line of textLines) {
+              if (Math.abs(y - line[0].transform[5]) < 3) {
+                line.push(item);
+                found = true;
+                break;
+              }
+            }
+            if (!found) textLines.push([item]);
+          }
+
+          for (const line of textLines) {
+            line.sort((a, b) => a.transform[4] - b.transform[4]);
+            const fullText = line.map((i) => i.str).join("");
+            if (!/\{[a-zA-Z_]+\}/.test(fullText)) continue;
+
+            let charOffset = 0;
+            const itemRanges: { item: ScanTextItem; startChar: number; endChar: number }[] = [];
+            for (const item of line) {
+              itemRanges.push({ item, startChar: charOffset, endChar: charOffset + item.str.length });
+              charOffset += item.str.length;
+            }
+
+            const touchedIndices = new Set<number>();
+            const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
+            let m;
+            while ((m = placeholderRegex.exec(fullText)) !== null) {
+              const mapping = PLACEHOLDER_MAP[m[0]];
+              if (!mapping) continue;
+              for (let i = 0; i < itemRanges.length; i++) {
+                const r = itemRanges[i];
+                if (m.index < r.endChar && m.index + m[0].length > r.startChar) {
+                  touchedIndices.add(i);
+                }
+              }
+            }
+            if (touchedIndices.size === 0) continue;
+
+            const sortedIndices = Array.from(touchedIndices).sort((a, b) => a - b);
+            const groups: number[][] = [];
+            let currentGroup = [sortedIndices[0]];
+            for (let i = 1; i < sortedIndices.length; i++) {
+              if (sortedIndices[i] === sortedIndices[i - 1] + 1) {
+                currentGroup.push(sortedIndices[i]);
+              } else {
+                groups.push(currentGroup);
+                currentGroup = [sortedIndices[i]];
+              }
+            }
+            groups.push(currentGroup);
+
+            for (const group of groups) {
+              const groupItems = group.map((i) => itemRanges[i]);
+              const firstItem = groupItems[0].item;
+              const lastItem = groupItems[groupItems.length - 1].item;
+              const groupX = firstItem.transform[4];
+              const groupY = firstItem.transform[5];
+              const groupEndX = lastItem.transform[4] + lastItem.width;
+              const groupWidth = groupEndX - groupX;
+              const fontSize = Math.abs(firstItem.transform[3]) || firstItem.height || 12;
+
+              filledPage.drawRectangle({
+                x: groupX - 2,
+                y: groupY - 3,
+                width: groupWidth + 4,
+                height: fontSize + 6,
+                color: pdfRgb(1, 1, 1),
+                opacity: 1,
+              });
+
+              let combinedStr = "";
+              for (const gr of groupItems) {
+                combinedStr += gr.item.str;
+              }
+
+              const replacedStr = combinedStr.replace(
+                /\{([a-zA-Z_]+)\}/g,
+                (tok) => {
+                  const mapping = PLACEHOLDER_MAP[tok];
+                  if (!mapping) return tok;
+                  return resolveValue(mapping.source, mapping.key, data);
+                }
+              );
+
+              if (replacedStr.trim()) {
+                filledPage.drawText(replacedStr, {
+                  x: groupX,
+                  y: groupY,
+                  size: fontSize,
+                  font: timesRoman,
+                  color: pdfRgb(0, 0, 0),
+                });
+              }
+            }
+          }
+        }
+
+        scanPdf.destroy();
+        const filledBytes = await filledDoc.save();
+        const filledBuffer = filledBytes.buffer.slice(0) as ArrayBuffer;
+        setPdfBytes(filledBuffer);
+
+        const displayPdf = await pdfjsLib.getDocument({ data: new Uint8Array(filledBuffer.slice(0)) }).promise;
+        setPdfDoc(displayPdf);
+        setTotalPages(displayPdf.numPages);
         setLoading(false);
         return;
       }
@@ -679,12 +805,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       }
       renderTaskRef.current = null;
 
-      if (mode === "placeholder") {
-        try {
-          const pixel = ctx.getImageData(5, 5, 1, 1).data;
-          setPageBgColor(`rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`);
-        } catch {}
-      }
     };
 
     try { await tryRender(); } catch {}
