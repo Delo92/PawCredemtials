@@ -565,6 +565,21 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             (item): item is ScanTextItem => "str" in item && item.str.length > 0
           );
 
+          let bgColor = pdfRgb(1, 1, 1);
+          const pageWidth = cleanPage.getWidth();
+          const pageHeight = cleanPage.getHeight();
+          try {
+            const tempCanvas = document.createElement("canvas");
+            const vp = scanPage.getViewport({ scale: 1 });
+            tempCanvas.width = vp.width;
+            tempCanvas.height = vp.height;
+            const tempCtx = tempCanvas.getContext("2d")!;
+            await scanPage.render({ canvasContext: tempCtx, viewport: vp }).promise;
+            const corner = tempCtx.getImageData(5, 5, 1, 1).data;
+            bgColor = pdfRgb(corner[0] / 255, corner[1] / 255, corner[2] / 255);
+            tempCanvas.remove();
+          } catch {}
+
           for (const item of scanItems) {
             if (!/\{[a-zA-Z_]+\}/.test(item.str)) continue;
 
@@ -579,7 +594,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
             cleanPage.drawRectangle({
               x: ix - 1, y: iy - 2, width: iw + 2, height: fs + 4,
-              color: pdfRgb(1, 1, 1), opacity: 1,
+              color: bgColor, opacity: 1,
             });
 
             const replaced = item.str.replace(/\{([a-zA-Z_]+)\}/g, (tok) => {
@@ -1013,7 +1028,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   key={`field-${globalIdx}`}
                   value={field.value}
                   onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
-                  className="absolute bg-yellow-50 border-yellow-400 text-xs h-6 px-1 text-black"
+                  className="absolute bg-transparent border-0 border-b border-gray-400 rounded-none text-xs h-6 px-1 text-black focus:ring-0 focus:border-gray-600"
                   style={{
                     left: field.x * scale,
                     top: field.y * scale,
