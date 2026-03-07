@@ -32,6 +32,15 @@ interface AdminEmailData {
   applicationId: string;
 }
 
+interface NewRegistrationEmailData {
+  adminEmail: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  userState: string;
+  dashboardUrl: string;
+}
+
 interface PatientApprovalEmailData {
   patientEmail: string;
   patientName: string;
@@ -170,6 +179,51 @@ export async function sendAdminNotificationEmail(data: AdminEmailData): Promise<
     return true;
   } catch (error: any) {
     console.error("Failed to send admin notification email:", error?.response?.body || error.message);
+    return false;
+  }
+}
+
+export async function sendNewRegistrationEmail(data: NewRegistrationEmailData): Promise<boolean> {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#1a365d;color:white;padding:20px;text-align:center;">
+        <h1 style="margin:0;">Paw Credentials</h1>
+        <p style="margin:5px 0 0;">New Registration</p>
+      </div>
+      <div style="padding:20px;background:#f9fafb;">
+        <h2>New User Registered</h2>
+        <p>A new user has created an account on the platform.</p>
+        <div style="background:white;padding:15px;border-radius:8px;margin:16px 0;">
+          <p><strong>Name:</strong> ${data.userName}</p>
+          <p><strong>Email:</strong> ${data.userEmail}</p>
+          <p><strong>Phone:</strong> ${data.userPhone || "Not provided"}</p>
+          <p><strong>State:</strong> ${data.userState || "Not provided"}</p>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${data.dashboardUrl}" style="background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:bold;">
+            View in Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (!SENDGRID_API_KEY) {
+    console.log(`[email] Would send new registration notification to ${data.adminEmail} for user ${data.userEmail}`);
+    return true;
+  }
+
+  try {
+    await sgMail.send({
+      to: data.adminEmail,
+      from: SENDGRID_FROM_EMAIL,
+      subject: `[Admin] New Registration: ${data.userName}`,
+      html,
+    });
+    console.log(`New registration email sent to ${data.adminEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Failed to send new registration email:", error?.response?.body || error.message);
     return false;
   }
 }

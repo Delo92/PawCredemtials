@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
-import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail, sendReferralUsedEmail } from "./email";
+import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail, sendReferralUsedEmail, sendNewRegistrationEmail } from "./email";
 import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
 
 function getContactEmail(user: Record<string, any>): string {
@@ -613,6 +613,21 @@ export async function registerRoutes(
         entityId: user.id,
         details: { referredBy: referralCode || null },
       });
+
+      const adminSettings = await storage.getAdminSettings();
+      const notificationEmail = adminSettings?.notificationEmail;
+      if (notificationEmail) {
+        const protocol = "https";
+        const host = req.get("host") || "localhost:5000";
+        sendNewRegistrationEmail({
+          adminEmail: notificationEmail,
+          userName: `${firstName} ${lastName}`,
+          userEmail: email,
+          userPhone: phone || "",
+          userState: state || "",
+          dashboardUrl: `${protocol}://${host}/dashboard/admin/users`,
+        }).catch(err => console.error("Registration admin notification error:", err));
+      }
 
       res.json({
         user: {
