@@ -3478,27 +3478,31 @@ export async function registerRoutes(
         "{doctorNpiNumber}": doctorData?.npiNumber || "",
       };
 
-      const rawStr = Buffer.from(originalBytes).toString("latin1");
+      const rawBuf = Buffer.from(originalBytes);
 
-      let modified = rawStr;
+      let modified = rawBuf;
       for (const [placeholder, value] of Object.entries(placeholderMap)) {
-        if (modified.includes(placeholder)) {
-          modified = modified.split(placeholder).join(value);
+        const phBuf = Buffer.from(placeholder, "latin1");
+        let pos = 0;
+        while (true) {
+          const idx = modified.indexOf(phBuf, pos);
+          if (idx === -1) break;
+          const padded = value.padEnd(placeholder.length, " ").substring(0, Math.max(placeholder.length, value.length));
+          const valueBuf = Buffer.from(padded, "latin1");
+          if (valueBuf.length === phBuf.length) {
+            valueBuf.copy(modified, idx);
+          } else {
+            const before = modified.subarray(0, idx);
+            const after = modified.subarray(idx + phBuf.length);
+            modified = Buffer.concat([before, valueBuf, after]);
+          }
+          pos = idx + valueBuf.length;
         }
       }
 
-      if (modified !== rawStr) {
-        const modifiedBytes = Buffer.from(modified, "latin1");
-        const filledDoc = await PDFDocument.load(modifiedBytes);
-        const filledBytes = await filledDoc.save();
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Cache-Control", "no-store");
-        res.send(Buffer.from(filledBytes));
-      } else {
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Cache-Control", "no-store");
-        res.send(Buffer.from(originalBytes));
-      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "no-store");
+      res.send(modified);
     } catch (error: any) {
       console.error("Fill letter error:", error);
       res.status(500).json({ error: error.message || "Failed to fill letter" });
