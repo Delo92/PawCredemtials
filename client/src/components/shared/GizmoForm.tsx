@@ -610,6 +610,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             }
             if (touchedIndices.size === 0) continue;
 
+            console.log(`[PLACEHOLDER-FILL] Line: "${fullText.substring(0, 80)}" touched: [${Array.from(touchedIndices)}] items: ${itemRanges.map((r, i) => `${i}:"${r.item.str}"(x=${r.item.transform[4].toFixed(0)},w=${r.item.width.toFixed(0)})`).join(", ")}`);
+
             const sortedIndices = Array.from(touchedIndices).sort((a, b) => a - b);
             const groups: number[][] = [];
             let currentGroup = [sortedIndices[0]];
@@ -634,10 +636,10 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
               const fontSize = Math.abs(firstItem.transform[3]) || firstItem.height || 12;
 
               filledPage.drawRectangle({
-                x: groupX - 2,
-                y: groupY - 3,
-                width: groupWidth + 4,
-                height: fontSize + 6,
+                x: groupX - 4,
+                y: groupY - 4,
+                width: groupWidth + 8,
+                height: fontSize + 8,
                 color: pdfRgb(1, 1, 1),
                 opacity: 1,
               });
