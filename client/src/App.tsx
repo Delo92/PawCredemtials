@@ -196,6 +196,11 @@ function App() {
                       <SharedPaymentsManagementPage />
                     </ProtectedRoute>
                   </Route>
+                  <Route path="/dashboard/admin/referrals">
+                    <ProtectedRoute minLevel={3}>
+                      <SharedReferralsPage />
+                    </ProtectedRoute>
+                  </Route>
                   <Route path="/dashboard/admin/analytics">
                     <ProtectedRoute minLevel={3}>
                       <SharedAnalyticsPage />
@@ -256,6 +261,11 @@ function App() {
                   <Route path="/dashboard/owner/commissions">
                     <ProtectedRoute minLevel={4}>
                       <SharedCommissionsPage />
+                    </ProtectedRoute>
+                  </Route>
+                  <Route path="/dashboard/owner/referrals">
+                    <ProtectedRoute minLevel={4}>
+                      <SharedReferralsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner/analytics">

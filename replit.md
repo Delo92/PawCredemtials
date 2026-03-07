@@ -71,8 +71,10 @@ Role names are configurable per deployment.
   - Settings API: `GET/PUT /api/admin/commission-settings` (level 3+). Commissions list: `GET /api/commissions` (own) or `GET /api/admin/commissions` (all).
   - Duplicate prevention: checks existing commissions before creating to avoid double-crediting.
 
+- **Referral Tracking System**: Each user gets a unique `referralCode` on registration. When someone registers with `?ref=CODE`, they're linked via `referredByUserId`. Doctors see their own referrals on their Referrals page (`/api/referrals/my-referrals`). Admins/Owners see platform-wide referral data with expandable referrer rows (`/api/admin/referrals`). Referral commissions auto-created when referred user's application is completed.
+
 ### API Endpoints
-Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), admin payment processing (`/api/admin/applications/:id/process-payment`), pet photo upload (`/api/upload/pet-photo`), image proxy (`/api/forms/proxy-image`), and commission settings (`/api/admin/commission-settings`).
+Key endpoints exist for authentication, user profiles, site configuration, package management, application submission, doctor review processes, admin and owner functionalities, form data handling, payment processing (`/api/payment/config`, `/api/payment/charge`), draft form persistence (`/api/profile/draft-form`), admin payment processing (`/api/admin/applications/:id/process-payment`), pet photo upload (`/api/upload/pet-photo`), image proxy (`/api/forms/proxy-image`), commission settings (`/api/admin/commission-settings`), and referral tracking (`/api/referrals/my-referrals`, `/api/admin/referrals`).
 
 ## External Dependencies
 

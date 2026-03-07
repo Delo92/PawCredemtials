@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -11,124 +13,199 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Search, Copy, Share2, UserPlus, Link2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Users, Search, Copy, Share2, UserPlus, Link2, CheckCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
 
-export default function ReferralsPage() {
+interface ReferredUser {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email: string;
+  createdAt?: string;
+  applicationCount: number;
+  completedCount: number;
+  status?: string;
+}
+
+interface MyReferralsData {
+  referrals: ReferredUser[];
+  stats: { total: number; active: number; converted: number };
+}
+
+interface ReferrerSummary {
+  referrerId: string;
+  referrerName: string;
+  referrerEmail: string;
+  referralCode: string;
+  userLevel: number;
+  totalReferred: number;
+  activeReferrals: number;
+  convertedReferrals: number;
+  referredUsers: ReferredUser[];
+}
+
+interface AdminReferralsData {
+  referrers: ReferrerSummary[];
+  stats: { totalReferralCodes: number; totalReferred: number; totalConverted: number };
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "converted") return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" data-testid={`badge-status-${status}`}><CheckCircle className="h-3 w-3 mr-1" />Converted</Badge>;
+  if (status === "active") return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" data-testid={`badge-status-${status}`}><Clock className="h-3 w-3 mr-1" />Active</Badge>;
+  return <Badge variant="secondary" data-testid={`badge-status-${status}`}>Registered</Badge>;
+}
+
+function PersonalReferralsView() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const referralCode = user?.referralCode || "AGENT123";
+  const referralCode = user?.referralCode || "";
   const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
+
+  const { data, isLoading } = useQuery<MyReferralsData>({
+    queryKey: ["/api/referrals/my-referrals"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/referrals/my-referrals");
+      return res.json();
+    },
+  });
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Referral link copied to clipboard",
-    });
+    toast({ title: "Copied!", description: "Copied to clipboard" });
   };
 
-  if (!user) return null;
+  const filteredReferrals = (data?.referrals || []).filter((r) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    const name = `${r.firstName || ""} ${r.lastName || ""}`.toLowerCase();
+    return name.includes(s) || r.email.toLowerCase().includes(s);
+  });
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-referrals-title">
-              My Referrals
-            </h1>
-            <p className="text-muted-foreground">
-              Manage your referrals and track commissions
-            </p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-referrals-title">My Referrals</h1>
+          <p className="text-muted-foreground">Manage your referrals and track commissions</p>
+        </div>
+        <Button onClick={() => setIsShareOpen(true)} data-testid="button-share-referral">
+          <Share2 className="mr-2 h-4 w-4" />
+          Share Referral Link
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Referral Code</CardTitle>
+          <CardDescription>Share this code to earn commissions on referrals</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Referral Code</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold font-mono" data-testid="text-referral-code">{referralCode || "—"}</span>
+                {referralCode && (
+                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(referralCode)} data-testid="button-copy-code">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Referral Link</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm truncate" data-testid="text-referral-link">{referralLink}</span>
+                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(referralLink)} data-testid="button-copy-link">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
-          <Button onClick={() => setIsShareOpen(true)} data-testid="button-share-referral">
-            <Share2 className="mr-2 h-4 w-4" />
-            Share Referral Link
-          </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Referral Code Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Referral Code</CardTitle>
-            <CardDescription>Share this code to earn commissions on referrals</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Referral Code</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold font-mono">{referralCode}</span>
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(referralCode)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex-1 p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Referral Link</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm truncate">{referralLink}</span>
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(referralLink)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-referrals">{data?.stats.total || 0}</div>
+                <p className="text-xs text-muted-foreground">All time</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <UserPlus className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-active-referrals">{data?.stats.active || 0}</div>
+                <p className="text-xs text-muted-foreground">With pending applications</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Converted</CardTitle>
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-converted-referrals">{data?.stats.converted || 0}</div>
+                <p className="text-xs text-muted-foreground">Completed applications</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Referral History</CardTitle>
+          <CardDescription>People who signed up using your referral code</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search referrals..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="input-search-referrals"
+            />
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <UserPlus className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">With pending applications</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Converted</CardTitle>
-              <Link2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Completed applications</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Referrals List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Referral History</CardTitle>
-            <CardDescription>People who signed up using your referral code</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search referrals..." className="pl-9" data-testid="input-search-referrals" />
-            </div>
-
-            {/* Empty state */}
+          ) : filteredReferrals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
                 <Users className="h-8 w-8 text-muted-foreground" />
@@ -142,44 +219,250 @@ export default function ReferralsPage() {
                 Share Your Link
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Applications</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredReferrals.map((r) => (
+                  <TableRow key={r.id} data-testid={`row-referral-${r.id}`}>
+                    <TableCell className="font-medium">{r.firstName} {r.lastName}</TableCell>
+                    <TableCell>{r.email}</TableCell>
+                    <TableCell>{r.applicationCount} ({r.completedCount} completed)</TableCell>
+                    <TableCell><StatusBadge status={r.status || "registered"} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Share Dialog */}
-        <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Share Your Referral Link</DialogTitle>
-              <DialogDescription>
-                Share this link with potential applicants to earn commissions
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Referral Link</label>
-                <div className="flex gap-2">
-                  <Input value={referralLink} readOnly data-testid="input-referral-link" />
-                  <Button variant="outline" onClick={() => copyToClipboard(referralLink)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Referral Code</label>
-                <div className="flex gap-2">
-                  <Input value={referralCode} readOnly data-testid="input-referral-code" />
-                  <Button variant="outline" onClick={() => copyToClipboard(referralCode)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
+      <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Your Referral Link</DialogTitle>
+            <DialogDescription>Share this link with potential applicants to earn commissions</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your Referral Link</label>
+              <div className="flex gap-2">
+                <Input value={referralLink} readOnly data-testid="input-referral-link" />
+                <Button variant="outline" onClick={() => copyToClipboard(referralLink)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={() => setIsShareOpen(false)}>Done</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your Referral Code</label>
+              <div className="flex gap-2">
+                <Input value={referralCode} readOnly data-testid="input-referral-code" />
+                <Button variant="outline" onClick={() => copyToClipboard(referralCode)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsShareOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AdminReferralsView() {
+  const [search, setSearch] = useState("");
+  const [expandedReferrer, setExpandedReferrer] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery<AdminReferralsData>({
+    queryKey: ["/api/admin/referrals"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/referrals");
+      return res.json();
+    },
+  });
+
+  const filteredReferrers = (data?.referrers || []).filter((r) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return r.referrerName.toLowerCase().includes(s) || r.referrerEmail.toLowerCase().includes(s) || r.referralCode.toLowerCase().includes(s);
+  });
+
+  const levelLabel = (level: number) => {
+    switch (level) {
+      case 1: return "Applicant";
+      case 2: return "Reviewer";
+      case 3: return "Admin";
+      case 4: return "Owner";
+      default: return `Level ${level}`;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-referrals-title">Referral Management</h1>
+        <p className="text-muted-foreground">Track all referral activity across the platform</p>
       </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </>
+        ) : (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Referral Codes</CardTitle>
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-codes">{data?.stats.totalReferralCodes || 0}</div>
+                <p className="text-xs text-muted-foreground">Users with referral codes</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Total Referred</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-referred">{data?.stats.totalReferred || 0}</div>
+                <p className="text-xs text-muted-foreground">Users signed up via referrals</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">Converted</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-converted">{data?.stats.totalConverted || 0}</div>
+                <p className="text-xs text-muted-foreground">Completed applications from referrals</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Referrers</CardTitle>
+          <CardDescription>Users who have referred others to the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, or code..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="input-search-referrers"
+            />
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : filteredReferrers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+                <Users className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No referral activity yet</h3>
+              <p className="text-muted-foreground max-w-sm">
+                Referral data will appear here once users start referring others.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Referrer</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="text-center">Referred</TableHead>
+                  <TableHead className="text-center">Active</TableHead>
+                  <TableHead className="text-center">Converted</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredReferrers.map((r) => (
+                  <>
+                    <TableRow key={r.referrerId} className="cursor-pointer" onClick={() => setExpandedReferrer(expandedReferrer === r.referrerId ? null : r.referrerId)} data-testid={`row-referrer-${r.referrerId}`}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{r.referrerName}</p>
+                          <p className="text-xs text-muted-foreground">{r.referrerEmail}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono" data-testid={`text-code-${r.referrerId}`}>{r.referralCode}</code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{levelLabel(r.userLevel)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center font-medium">{r.totalReferred}</TableCell>
+                      <TableCell className="text-center">{r.activeReferrals}</TableCell>
+                      <TableCell className="text-center">{r.convertedReferrals}</TableCell>
+                      <TableCell>
+                        {expandedReferrer === r.referrerId ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </TableCell>
+                    </TableRow>
+                    {expandedReferrer === r.referrerId && r.referredUsers.map((u) => (
+                      <TableRow key={u.id} className="bg-muted/30" data-testid={`row-referred-user-${u.id}`}>
+                        <TableCell className="pl-8">
+                          <p className="text-sm">{u.name}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground">{u.email}</p>
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-center text-sm">{u.applicationCount} apps</TableCell>
+                        <TableCell className="text-center text-sm">{u.completedCount} done</TableCell>
+                        <TableCell colSpan={2}>
+                          <StatusBadge status={u.completedCount > 0 ? "converted" : u.applicationCount > 0 ? "active" : "registered"} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function ReferralsPage() {
+  const { user } = useAuth();
+
+  if (!user) return null;
+
+  const isAdmin = (user.userLevel || 1) >= 3;
+
+  return (
+    <DashboardLayout>
+      {isAdmin ? <AdminReferralsView /> : <PersonalReferralsView />}
     </DashboardLayout>
   );
 }

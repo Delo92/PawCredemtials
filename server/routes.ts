@@ -2779,6 +2779,97 @@ export async function registerRoutes(
   });
 
   // ===========================================================================
+  // REFERRAL ROUTES
+  // ===========================================================================
+
+  app.get("/api/referrals/my-referrals", requireAuth, async (req, res) => {
+    try {
+      const currentUser = (req as any).user;
+      const allUsers = await storage.getAllUsers();
+      const referred = allUsers.filter((u: any) => u.referredByUserId === currentUser.id);
+      const allApps = await storage.getAllApplications();
+
+      const referralData = referred.map((u: any) => {
+        const userApps = allApps.filter((a: any) => a.userId === u.id);
+        const completedApps = userApps.filter((a: any) => a.status === "completed" || a.status === "approved");
+        return {
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          createdAt: u.createdAt,
+          applicationCount: userApps.length,
+          completedCount: completedApps.length,
+          status: completedApps.length > 0 ? "converted" : userApps.length > 0 ? "active" : "registered",
+        };
+      });
+
+      res.json({
+        referrals: referralData,
+        stats: {
+          total: referred.length,
+          active: referralData.filter((r: any) => r.status === "active").length,
+          converted: referralData.filter((r: any) => r.status === "converted").length,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/referrals", requireAuth, requireLevel(3), async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allApps = await storage.getAllApplications();
+
+      const referrers = allUsers.filter((u: any) => u.referralCode);
+      const referralSummary = referrers.map((referrer: any) => {
+        const referred = allUsers.filter((u: any) => u.referredByUserId === referrer.id);
+        const referredIds = new Set(referred.map((u: any) => u.id));
+        const referredApps = allApps.filter((a: any) => referredIds.has(a.userId));
+        const completedApps = referredApps.filter((a: any) => a.status === "completed" || a.status === "approved");
+
+        return {
+          referrerId: referrer.id,
+          referrerName: `${referrer.firstName || ""} ${referrer.lastName || ""}`.trim(),
+          referrerEmail: referrer.email,
+          referralCode: referrer.referralCode,
+          userLevel: referrer.userLevel,
+          totalReferred: referred.length,
+          activeReferrals: referred.filter((u: any) => {
+            const apps = allApps.filter((a: any) => a.userId === u.id);
+            return apps.length > 0 && !apps.some((a: any) => a.status === "completed" || a.status === "approved");
+          }).length,
+          convertedReferrals: referred.filter((u: any) => {
+            return allApps.some((a: any) => a.userId === u.id && (a.status === "completed" || a.status === "approved"));
+          }).length,
+          referredUsers: referred.map((u: any) => ({
+            id: u.id,
+            name: `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+            email: u.email,
+            createdAt: u.createdAt,
+            applicationCount: allApps.filter((a: any) => a.userId === u.id).length,
+            completedCount: allApps.filter((a: any) => a.userId === u.id && (a.status === "completed" || a.status === "approved")).length,
+          })),
+        };
+      }).filter((r: any) => r.totalReferred > 0);
+
+      const totalReferred = allUsers.filter((u: any) => u.referredByUserId).length;
+
+      res.json({
+        referrers: referralSummary,
+        stats: {
+          totalReferralCodes: referrers.length,
+          totalReferred,
+          totalConverted: referralSummary.reduce((sum: number, r: any) => sum + r.convertedReferrals, 0),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
   // OWNER ROUTES (Site Configuration)
   // ===========================================================================
 
