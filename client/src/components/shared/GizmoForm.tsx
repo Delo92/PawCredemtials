@@ -551,6 +551,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
       if (hasPlaceholders) {
         setMode("placeholder");
+        await extractPlaceholdersFromPdf(pdf);
 
         try {
           const token = await auth.currentUser?.getIdToken();
@@ -1007,7 +1008,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                     width: (field.width + 4) * scale,
                     fontSize: 10 * scale,
                     height: 20 * scale,
-                    backgroundColor: pageBgColor,
+                    backgroundColor: "transparent",
                     lineHeight: `${20 * scale}px`,
                   }}
                   data-testid={`input-field-${field.dataKey}`}
