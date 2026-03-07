@@ -40,17 +40,26 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (config.primaryColor) {
-      const hsl = hexToHsl(config.primaryColor);
-      if (hsl) root.style.setProperty("--primary", hsl);
-    }
     if (config.secondaryColor) {
       const hsl = hexToHsl(config.secondaryColor);
-      if (hsl) root.style.setProperty("--secondary", hsl);
+      if (hsl) root.style.setProperty("--primary", hsl);
+    }
+    if (config.primaryColor) {
+      const hsl = hexToHsl(config.primaryColor);
+      if (hsl) {
+        root.style.setProperty("--primary-foreground", hsl);
+      }
+    }
+    if (config.secondaryColor) {
+      const hslAccent = hexToHsl(config.secondaryColor);
+      if (hslAccent) {
+        root.style.setProperty("--accent", hslAccent);
+        root.style.setProperty("--accent-foreground", "0 0% 100%");
+      }
     }
     if (config.accentColor) {
       const hsl = hexToHsl(config.accentColor);
-      if (hsl) root.style.setProperty("--accent", hsl);
+      if (hsl) root.style.setProperty("--secondary", hsl);
     }
   }, [config.primaryColor, config.secondaryColor, config.accentColor]);
 
