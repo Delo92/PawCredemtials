@@ -1167,35 +1167,32 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                     </div>
 
                     {doctorProfileData.letterTemplateUrl && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => { setPreviewLetterTemplate(true); setShowGizmoPreview(true); }}
-                                data-testid="button-preview-letter-template"
-                              >
-                                <FileText className="h-3 w-3 mr-1" /> Preview & Fill
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                                onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
-                                data-testid="button-clear-letter-template"
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" /> Remove
-                              </Button>
-                            </div>
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setPreviewLetterTemplate(true); setShowGizmoPreview(true); }}
+                              data-testid="button-preview-letter-template"
+                            >
+                              <FileText className="h-3 w-3 mr-1" /> Preview & Fill
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
+                              data-testid="button-clear-letter-template"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" /> Remove
+                            </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                         </div>
-                        <PdfTemplatePreview url={doctorProfileData.letterTemplateUrl} />
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                       </div>
                     )}
 
