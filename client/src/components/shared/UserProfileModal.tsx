@@ -250,6 +250,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
   const [showGizmoPreview, setShowGizmoPreview] = useState(false);
   const [selectedPdfState, setSelectedPdfState] = useState<string>("");
   const [previewPdfState, setPreviewPdfState] = useState<string>("");
+  const [previewLetterTemplate, setPreviewLetterTemplate] = useState(false);
   const [doctorProfileData, setDoctorProfileData] = useState<DoctorProfileData>({
     fullName: "",
     licenseNumber: "",
@@ -1170,16 +1171,27 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
-                              data-testid="button-clear-letter-template"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" /> Clear
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setPreviewLetterTemplate(true); setShowGizmoPreview(true); }}
+                                data-testid="button-preview-letter-template"
+                              >
+                                <FileText className="h-3 w-3 mr-1" /> Preview & Fill
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
+                                data-testid="button-clear-letter-template"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Remove
+                              </Button>
+                            </div>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                         </div>
@@ -1342,11 +1354,11 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
       </DialogContent>
     </Dialog>
 
-    {showGizmoPreview && (previewPdfState ? (doctorProfileData.stateForms || {})[previewPdfState] : doctorProfileData.gizmoFormUrl) && (
-      <Dialog open={showGizmoPreview} onOpenChange={(open) => { setShowGizmoPreview(open); if (!open) setPreviewPdfState(""); }}>
+    {showGizmoPreview && (previewLetterTemplate ? doctorProfileData.letterTemplateUrl : (previewPdfState ? (doctorProfileData.stateForms || {})[previewPdfState] : doctorProfileData.gizmoFormUrl)) && (
+      <Dialog open={showGizmoPreview} onOpenChange={(open) => { setShowGizmoPreview(open); if (!open) { setPreviewPdfState(""); setPreviewLetterTemplate(false); } }}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-auto [&>button.absolute]:hidden">
           <DialogHeader className="sr-only">
-            <DialogTitle>PDF Form Preview</DialogTitle>
+            <DialogTitle>{previewLetterTemplate ? "Letter Template Preview" : "PDF Form Preview"}</DialogTitle>
             <DialogDescription>Preview and fill the PDF form</DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
@@ -1366,13 +1378,15 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                   specialty: doctorProfileData.specialty || "",
                   fax: doctorProfileData.fax || "",
                 },
-                gizmoFormUrl: previewPdfState
-                  ? (doctorProfileData.stateForms || {})[previewPdfState]
-                  : doctorProfileData.gizmoFormUrl,
+                gizmoFormUrl: previewLetterTemplate
+                  ? doctorProfileData.letterTemplateUrl
+                  : previewPdfState
+                    ? (doctorProfileData.stateForms || {})[previewPdfState]
+                    : doctorProfileData.gizmoFormUrl,
                 generatedDate: new Date().toLocaleDateString(),
                 patientName: "Test Patient",
               }}
-              onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); }}
+              onClose={() => { setShowGizmoPreview(false); setPreviewPdfState(""); setPreviewLetterTemplate(false); }}
             />
           </Suspense>
         </DialogContent>
