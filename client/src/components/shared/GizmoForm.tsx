@@ -298,6 +298,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         x: number;
         y: number;
         pageIndex: number;
+        measuredWidth?: number;
       }
 
       const pendingFields: PendingField[] = [];
@@ -310,7 +311,8 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
           const itemX = item.transform[4];
           const itemY = item.transform[5];
-          const avgCharW = item.width / Math.max(item.str.length, 1);
+          const totalWidth = item.width;
+          const totalChars = item.str.length;
 
           const placeholderRegex = /\{([a-zA-Z]+)\}/g;
           let match;
@@ -319,10 +321,17 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             const mapping = PLACEHOLDER_MAP[token];
             if (!mapping) continue;
 
-            const x = itemX + match.index * avgCharW;
-            const y = itemY;
+            const charsBefore = match.index;
+            const xFraction = totalChars > 0 ? charsBefore / totalChars : 0;
+            const x = itemX + xFraction * totalWidth;
 
-            pendingFields.push({ token, mapping, x, y, pageIndex: pageNum - 1 });
+            const tokenFraction = totalChars > 0 ? token.length / totalChars : 1;
+            const tokenWidth = tokenFraction * totalWidth;
+
+            pendingFields.push({
+              token, mapping, x, y: itemY, pageIndex: pageNum - 1,
+              measuredWidth: tokenWidth,
+            });
           }
         }
 
@@ -387,7 +396,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       for (const pf of pendingFields) {
         const autoValue = resolveValue(pf.mapping.source, pf.mapping.key, data);
 
-        const fieldWidth = Math.max(pf.token.length * 7 + 20, 60);
+        const fieldWidth = pf.measuredWidth ? Math.max(pf.measuredWidth, 60) : Math.max(pf.token.length * 7 + 20, 60);
 
         fields.push({
           token: pf.token,
