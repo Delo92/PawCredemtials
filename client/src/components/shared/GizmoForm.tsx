@@ -216,6 +216,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [mode, setMode] = useState<"acroform" | "placeholder" | null>(null);
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const originalPdfBytesRef = useRef<ArrayBuffer | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [scale, setScale] = useState(1.0);
@@ -548,20 +549,29 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (hasPlaceholders) {
         setMode("placeholder");
         await extractPlaceholdersFromPdf(pdf);
+        originalPdfBytesRef.current = originalBytes.slice(0);
 
-        const { PDFDocument, rgb: pdfRgb } = await import("pdf-lib");
-        const cleanDoc = await PDFDocument.load(originalBytes.slice(0));
-        const cleanPages = cleanDoc.getPages();
+        const { PDFDocument, rgb: pdfRgb, StandardFonts } = await import("pdf-lib");
+        const filledDoc = await PDFDocument.load(originalBytes.slice(0));
+        const font = await filledDoc.embedFont(StandardFonts.Helvetica);
+        const filledPages = filledDoc.getPages();
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const pdfPage = await pdf.getPage(pageNum);
           const textContent = await pdfPage.getTextContent();
-          const vp = pdfPage.getViewport({ scale: 1 });
-          const pageHeight = cleanPages[pageNum - 1]?.getHeight() || vp.height;
+          const filledPage = filledPages[pageNum - 1];
+          if (!filledPage) continue;
 
-          const textItems = textContent.items.filter((item): item is { str: string; transform: number[]; width: number; height: number } => "str" in item && item.str.length > 0);
+          interface TextItem {
+            str: string;
+            transform: number[];
+            width: number;
+            height: number;
+          }
 
-          const textLines: typeof textItems[] = [];
+          const textItems = textContent.items.filter((item): item is TextItem => "str" in item && item.str.length > 0);
+
+          const textLines: TextItem[][] = [];
           for (const item of textItems) {
             const y = item.transform[5];
             let found = false;
@@ -581,11 +591,19 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
             let m;
             while ((m = placeholderRegex.exec(fullText)) !== null) {
+              const token = m[0];
+              const mapping = PLACEHOLDER_MAP[token];
+              const replacementValue = mapping ? resolveValue(mapping.source, mapping.key, data) : "";
+
               let charPos = 0;
+              let firstX: number | null = null;
+              let totalWidth = 0;
+              let refY = 0;
+              let refFontSize = 12;
+
               for (const item of line) {
                 const itemStart = charPos;
                 const itemEnd = charPos + item.str.length;
-
                 const overlapStart = Math.max(m.index, itemStart);
                 const overlapEnd = Math.min(m.index + m[0].length, itemEnd);
 
@@ -596,31 +614,49 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   const rectX = item.transform[4] + offsetChars * charW - 1;
                   const rectW = coverChars * charW + 2;
                   const fontSize = Math.abs(item.transform[3]) || item.height || 12;
-                  const rectY = item.transform[5] - 2;
-                  const rectH = fontSize + 4;
 
-                  cleanPages[pageNum - 1]?.drawRectangle({
+                  if (firstX === null) {
+                    firstX = item.transform[4] + offsetChars * charW;
+                    refY = item.transform[5];
+                    refFontSize = fontSize;
+                  }
+                  totalWidth += rectW;
+
+                  filledPage.drawRectangle({
                     x: rectX,
-                    y: rectY,
+                    y: item.transform[5] - 2,
                     width: rectW,
-                    height: rectH,
+                    height: fontSize + 4,
                     color: pdfRgb(1, 1, 1),
                     opacity: 1,
                   });
                 }
                 charPos += item.str.length;
               }
+
+              if (firstX !== null && replacementValue) {
+                const drawSize = Math.min(refFontSize * 0.85, 11);
+                filledPage.drawText(replacementValue, {
+                  x: firstX,
+                  y: refY,
+                  size: drawSize,
+                  font,
+                  color: pdfRgb(0, 0, 0),
+                });
+              }
             }
           }
         }
 
-        const cleanedBytes = await cleanDoc.save();
-        const cleanedBuffer = cleanedBytes.buffer as ArrayBuffer;
-        setPdfBytes(cleanedBuffer.slice(0));
+        await embedPetPhoto(filledDoc);
 
-        const cleanedPdf = await pdfjsLib.getDocument({ data: new Uint8Array(cleanedBuffer.slice(0)) }).promise;
-        setPdfDoc(cleanedPdf);
-        setTotalPages(cleanedPdf.numPages);
+        const filledBytes = await filledDoc.save();
+        const filledBuffer = filledBytes.buffer.slice(0) as ArrayBuffer;
+        setPdfBytes(filledBuffer);
+
+        const filledPdf = await pdfjsLib.getDocument({ data: new Uint8Array(filledBuffer.slice(0)) }).promise;
+        setPdfDoc(filledPdf);
+        setTotalPages(filledPdf.numPages);
 
         setLoading(false);
         return;
@@ -843,25 +879,9 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         }
         form.flatten();
       } else if (mode === "placeholder") {
-        const pages = pdfLibDoc.getPages();
-
-        for (const field of placeholderFields) {
-          if (!field.value) continue;
-          const page = pages[field.pageIndex];
-          if (!page) continue;
-
-          const pageHeight = page.getHeight();
-          page.drawText(field.value, {
-            x: field.x,
-            y: pageHeight - field.y,
-            size: 10,
-            font,
-            color: rgb(0, 0, 0),
-          });
-        }
-
         for (const radio of radioFields) {
           if (!radio.selected) continue;
+          const pages = pdfLibDoc.getPages();
           const page = pages[radio.pageIndex];
           if (!page) continue;
 
@@ -920,15 +940,9 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         }
         form.flatten();
       } else if (mode === "placeholder") {
-        const pages = pdfLibDoc.getPages();
-        for (const field of placeholderFields) {
-          if (!field.value) continue;
-          const page = pages[field.pageIndex];
-          if (!page) continue;
-          page.drawText(field.value, { x: field.x, y: page.getHeight() - field.y, size: 10, font, color: rgb(0, 0, 0) });
-        }
         for (const radio of radioFields) {
           if (!radio.selected) continue;
+          const pages = pdfLibDoc.getPages();
           const page = pages[radio.pageIndex];
           if (!page) continue;
           const sz = 8;
@@ -1025,51 +1039,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           <div className="relative inline-block" style={{ minWidth: "fit-content" }}>
             <canvas ref={canvasRef} className="block" />
 
-            {mode === "placeholder" && pageFields.map((field, idx) => {
-              const globalIdx = placeholderFields.indexOf(field);
-              return (
-                <Input
-                  key={`field-${globalIdx}`}
-                  value={field.value}
-                  onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
-                  className="absolute bg-yellow-50 border-yellow-400 text-xs px-1 text-black rounded-none"
-                  style={{
-                    left: field.x * scale,
-                    top: (field.y - 1) * scale,
-                    width: field.width * scale,
-                    fontSize: 9 * scale,
-                    height: 14 * scale,
-                    lineHeight: `${14 * scale}px`,
-                    padding: `0 ${2 * scale}px`,
-                  }}
-                  data-testid={`input-field-${field.dataKey}`}
-                />
-              );
-            })}
-
-            {mode === "placeholder" && pageRadios.map((radio, idx) => {
-              const globalIdx = radioFields.indexOf(radio);
-              const size = 10 * scale;
-              return (
-                <button
-                  key={`radio-${globalIdx}`}
-                  onClick={() => toggleRadio(globalIdx)}
-                  className="absolute rounded-sm flex items-center justify-center transition-colors"
-                  style={{
-                    left: radio.x * scale,
-                    top: (radio.y - 2) * scale,
-                    width: size,
-                    height: size,
-                    backgroundColor: radio.selected ? "#000" : "#fff",
-                    border: `${Math.max(1, 1.5 * scale)}px solid ${radio.selected ? "#000" : "#999"}`,
-                    zIndex: 10,
-                  }}
-                  data-testid={`radio-${radio.group}-${radio.option}`}
-                >
-                  {radio.selected && <Check className="text-white" style={{ width: 7 * scale, height: 7 * scale }} />}
-                </button>
-              );
-            })}
+            
           </div>
         </div>
 
