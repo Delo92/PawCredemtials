@@ -548,6 +548,80 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (hasPlaceholders) {
         setMode("placeholder");
         await extractPlaceholdersFromPdf(pdf);
+
+        const { PDFDocument, rgb: pdfRgb } = await import("pdf-lib");
+        const cleanDoc = await PDFDocument.load(originalBytes.slice(0));
+        const cleanPages = cleanDoc.getPages();
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const pdfPage = await pdf.getPage(pageNum);
+          const textContent = await pdfPage.getTextContent();
+          const vp = pdfPage.getViewport({ scale: 1 });
+          const pageHeight = cleanPages[pageNum - 1]?.getHeight() || vp.height;
+
+          const textItems = textContent.items.filter((item): item is { str: string; transform: number[]; width: number; height: number } => "str" in item && item.str.length > 0);
+
+          const textLines: typeof textItems[] = [];
+          for (const item of textItems) {
+            const y = item.transform[5];
+            let found = false;
+            for (const line of textLines) {
+              if (Math.abs(y - line[0].transform[5]) < 3) {
+                line.push(item);
+                found = true;
+                break;
+              }
+            }
+            if (!found) textLines.push([item]);
+          }
+
+          for (const line of textLines) {
+            line.sort((a, b) => a.transform[4] - b.transform[4]);
+            const fullText = line.map(i => i.str).join("");
+            const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
+            let m;
+            while ((m = placeholderRegex.exec(fullText)) !== null) {
+              let charPos = 0;
+              for (const item of line) {
+                const itemStart = charPos;
+                const itemEnd = charPos + item.str.length;
+
+                const overlapStart = Math.max(m.index, itemStart);
+                const overlapEnd = Math.min(m.index + m[0].length, itemEnd);
+
+                if (overlapStart < overlapEnd) {
+                  const charW = item.width / Math.max(item.str.length, 1);
+                  const offsetChars = overlapStart - itemStart;
+                  const coverChars = overlapEnd - overlapStart;
+                  const rectX = item.transform[4] + offsetChars * charW - 1;
+                  const rectW = coverChars * charW + 2;
+                  const fontSize = Math.abs(item.transform[3]) || item.height || 12;
+                  const rectY = item.transform[5] - 2;
+                  const rectH = fontSize + 4;
+
+                  cleanPages[pageNum - 1]?.drawRectangle({
+                    x: rectX,
+                    y: rectY,
+                    width: rectW,
+                    height: rectH,
+                    color: pdfRgb(1, 1, 1),
+                    opacity: 1,
+                  });
+                }
+                charPos += item.str.length;
+              }
+            }
+          }
+        }
+
+        const cleanedBytes = await cleanDoc.save();
+        const cleanedBuffer = cleanedBytes.buffer as ArrayBuffer;
+        setPdfBytes(cleanedBuffer.slice(0));
+
+        const cleanedPdf = await pdfjsLib.getDocument({ data: new Uint8Array(cleanedBuffer.slice(0)) }).promise;
+        setPdfDoc(cleanedPdf);
+        setTotalPages(cleanedPdf.numPages);
+
         setLoading(false);
         return;
       }
