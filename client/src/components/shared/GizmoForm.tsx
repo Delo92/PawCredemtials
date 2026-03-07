@@ -405,7 +405,19 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
             && other.x > pf.x
         );
         const nextX = sameLine.length > 0 ? Math.min(...sameLine.map((f) => f.x)) : null;
-        const fieldWidth = nextX ? nextX - pf.x - 5 : viewport.width - pf.x - 20;
+
+        const autoValue = resolveValue(pf.mapping.source, pf.mapping.key, data);
+        const charWidth = 6.5;
+        const tokenLen = pf.token.length;
+        const valueLen = Math.max((autoValue || "").length, tokenLen);
+        const estimatedWidth = valueLen * charWidth + 12;
+
+        let fieldWidth: number;
+        if (nextX && (nextX - pf.x - 5) < estimatedWidth + 20) {
+          fieldWidth = nextX - pf.x - 5;
+        } else {
+          fieldWidth = estimatedWidth;
+        }
 
         fields.push({
           token: pf.token,
@@ -416,7 +428,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           y: viewport.height - pf.y + offsets.y,
           width: Math.max(fieldWidth, 40),
           pageIndex: pf.pageIndex,
-          value: resolveValue(pf.mapping.source, pf.mapping.key, data),
+          value: autoValue,
         });
       }
 
@@ -946,7 +958,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   key={`field-${globalIdx}`}
                   value={field.value}
                   onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
-                  className="absolute bg-yellow-50/80 border-yellow-400 text-xs h-6 px-1 text-black"
+                  className="absolute bg-yellow-50 border-yellow-400 text-xs h-6 px-1 text-black"
                   style={{
                     left: field.x * scale,
                     top: field.y * scale,
