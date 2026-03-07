@@ -1250,7 +1250,7 @@ export async function registerRoutes(
 
       const adminSettings = await storage.getAdminSettings();
       const patientAppState = formData?.state || patient.state || "";
-      const doctor = await storage.getNextDoctorForAssignment();
+      const doctor = await storage.getNextDoctorForAssignment(patientAppState);
 
       if (doctor) {
         const doctorUser = await storage.getUser(doctor.userId || doctor.id);
@@ -1457,7 +1457,8 @@ export async function registerRoutes(
       if (reqPaymentStatus === "paid" || autoSendToDoctor) {
         try {
           const adminSettings = await storage.getAdminSettings();
-          const doctor = await storage.getNextDoctorForAssignment();
+          const appState = formData?.state || req.user!.state || "";
+          const doctor = await storage.getNextDoctorForAssignment(appState);
           if (doctor) {
             const patient = req.user!;
             const doctorUser = await storage.getUser(doctor.userId || doctor.id);
@@ -1855,7 +1856,8 @@ export async function registerRoutes(
         });
       }
       const adminSettings = await storage.getAdminSettings();
-      const doctor = await storage.getNextDoctorForAssignment();
+      const targetState = targetUser.state || "";
+      const doctor = await storage.getNextDoctorForAssignment(targetState);
       if (doctor) {
         const doctorUser = await storage.getUser(doctor.userId || doctor.id);
         const protocol = process.env.NODE_ENV === "production" ? "https" : "https";
@@ -1986,7 +1988,8 @@ export async function registerRoutes(
       });
 
       const adminSettings = await storage.getAdminSettings();
-      const doctor = await storage.getNextDoctorForAssignment();
+      const processPaymentState = patient.state || formData?.state || "";
+      const doctor = await storage.getNextDoctorForAssignment(processPaymentState);
       const protocol = "https";
       const host = req.get("host") || "localhost:5000";
 
@@ -2084,6 +2087,9 @@ export async function registerRoutes(
         return;
       }
 
+      const applicant = application.userId ? await storage.getUser(application.userId) : null;
+      const applicantState = applicant?.state || (application.formData as any)?.state || "";
+
       let doctor;
       if (manualDoctorId) {
         doctor = await storage.getDoctorProfile(manualDoctorId);
@@ -2092,7 +2098,7 @@ export async function registerRoutes(
           doctor = allDoctors.find(d => d.userId === manualDoctorId);
         }
       } else {
-        doctor = await storage.getNextDoctorForAssignment();
+        doctor = await storage.getNextDoctorForAssignment(applicantState);
       }
 
       if (!doctor) {

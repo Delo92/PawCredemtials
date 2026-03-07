@@ -228,7 +228,19 @@ interface DoctorProfileData {
   gizmoFormUrl: string;
   stateForms: Record<string, string>;
   letterTemplateUrl: string;
+  licensedStates: string[];
 }
+
+const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+  "Wisconsin", "Wyoming",
+];
 
 interface UserProfileModalProps {
   user: User | null;
@@ -264,6 +276,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
     gizmoFormUrl: "",
     stateForms: {},
     letterTemplateUrl: "",
+    licensedStates: [],
   });
 
   const isUserDoctor = selectedUser?.userLevel === 2;
@@ -338,6 +351,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         gizmoFormUrl: doctorProfile.gizmoFormUrl || "",
         stateForms: doctorProfile.stateForms || {},
         letterTemplateUrl: doctorProfile.letterTemplateUrl || "",
+        licensedStates: doctorProfile.licensedStates || [],
       });
     } else if (selectedUser && isUserDoctor) {
       setDoctorProfileData({
@@ -353,6 +367,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
         gizmoFormUrl: "",
         stateForms: {},
         letterTemplateUrl: "",
+        licensedStates: [],
       });
     }
   }, [doctorProfile, selectedUser, isUserDoctor]);
@@ -999,6 +1014,63 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                           placeholder="FL"
                           data-testid="input-doctor-profile-state"
                         />
+                      </div>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4" />
+                      Licensed States
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Select the states this doctor is licensed to practice in. Only applicants from these states will be assigned to this doctor.
+                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDoctorProfileData({ ...doctorProfileData, licensedStates: [...US_STATES] })}
+                          data-testid="button-select-all-states"
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDoctorProfileData({ ...doctorProfileData, licensedStates: [] })}
+                          data-testid="button-clear-all-states"
+                        >
+                          Clear All
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {doctorProfileData.licensedStates.length} of {US_STATES.length} selected
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 max-h-[200px] overflow-y-auto border rounded-md p-2" data-testid="licensed-states-grid">
+                        {US_STATES.map((st) => {
+                          const isChecked = doctorProfileData.licensedStates.includes(st);
+                          return (
+                            <label key={st} className="flex items-center gap-1.5 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  const updated = isChecked
+                                    ? doctorProfileData.licensedStates.filter((s) => s !== st)
+                                    : [...doctorProfileData.licensedStates, st];
+                                  setDoctorProfileData({ ...doctorProfileData, licensedStates: updated });
+                                }}
+                                className="rounded border-gray-300"
+                                data-testid={`checkbox-state-${st.replace(/\s/g, "-")}`}
+                              />
+                              {st}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
 

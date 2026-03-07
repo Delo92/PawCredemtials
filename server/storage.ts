@@ -77,7 +77,7 @@ export interface IStorage {
   getDoctorReviewTokensByApplication(applicationId: string): Promise<DoctorReviewToken[]>;
   createDoctorReviewToken(data: InsertDoctorReviewToken): Promise<DoctorReviewToken>;
   updateDoctorReviewToken(id: string, data: Partial<InsertDoctorReviewToken>): Promise<DoctorReviewToken | undefined>;
-  getNextDoctorForAssignment(): Promise<Record<string, any> | undefined>;
+  getNextDoctorForAssignment(applicantState?: string): Promise<Record<string, any> | undefined>;
   getActiveDoctors(): Promise<Record<string, any>[]>;
 
   getPayment(id: string): Promise<Payment | undefined>;
@@ -698,9 +698,22 @@ export class FirestoreStorage implements IStorage {
     return docToRecord(updated) as DoctorReviewToken;
   }
 
-  async getNextDoctorForAssignment(): Promise<Record<string, any> | undefined> {
-    const doctors = await this.getActiveDoctors();
-    if (doctors.length === 0) return undefined;
+  async getNextDoctorForAssignment(applicantState?: string): Promise<Record<string, any> | undefined> {
+    const allDoctors = await this.getActiveDoctors();
+    if (allDoctors.length === 0) return undefined;
+
+    let doctors = allDoctors;
+    if (applicantState) {
+      const normalizedState = applicantState.trim();
+      const stateMatched = allDoctors.filter(d => {
+        const licensed = d.licensedStates as string[] | undefined;
+        if (!licensed || licensed.length === 0) return false;
+        return licensed.some((s: string) => s.toLowerCase() === normalizedState.toLowerCase());
+      });
+      if (stateMatched.length > 0) {
+        doctors = stateMatched;
+      }
+    }
 
     const settings = await this.getAdminSettings();
     const lastAssignedDoctorId = settings?.lastAssignedDoctorId || null;
