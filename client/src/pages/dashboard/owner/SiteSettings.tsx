@@ -530,7 +530,7 @@ export default function SiteSettings() {
                         <FormItem>
                           <FormLabel>Logo</FormLabel>
                           <FormControl>
-                            <MediaUploadField
+                            <MediaUploadInput
                               value={field.value || ""}
                               onChange={field.onChange}
                               placeholder="Upload or paste logo URL"
