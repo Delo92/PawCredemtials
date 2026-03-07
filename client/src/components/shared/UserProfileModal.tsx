@@ -1026,21 +1026,30 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                     </div>
 
                     {doctorProfileData.letterTemplateUrl && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
-                            data-testid="button-clear-letter-template"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" /> Clear
-                          </Button>
+                      <div className="space-y-2">
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="uploaded-letter-card">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-sm text-blue-700 dark:text-blue-300">Uploaded Letter Template</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => setDoctorProfileData({ ...doctorProfileData, letterTemplateUrl: "" })}
+                              data-testid="button-clear-letter-template"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" /> Clear
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
+                        <div className="border rounded-md overflow-hidden bg-white" data-testid="letter-template-preview">
+                          <iframe
+                            src={doctorProfileData.letterTemplateUrl}
+                            className="w-full h-[400px]"
+                            title="Letter Template Preview"
+                          />
+                        </div>
                       </div>
                     )}
 
