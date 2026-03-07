@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,146 @@ import {
 } from "lucide-react";
 
 const LazyGizmoForm = lazy(() => import("@/components/shared/GizmoForm").then(m => ({ default: m.GizmoForm })));
+
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+const PLACEHOLDER_LABELS: Record<string, string> = {
+  firstName: "Patient First Name",
+  lastName: "Patient Last Name",
+  middleName: "Patient Middle Name",
+  suffix: "Patient Suffix",
+  dateOfBirth: "Date of Birth",
+  address: "Patient Address",
+  apt: "Apt/Unit",
+  city: "Patient City",
+  state: "Patient State",
+  zipCode: "Patient Zip Code",
+  zip: "Patient Zip Code",
+  phone: "Patient Phone",
+  email: "Patient Email",
+  date: "Date Generated",
+  medicalCondition: "Medical Condition",
+  idNumber: "ID Number",
+  driverLicenseNumber: "Driver License #",
+  dlNumber: "Driver License #",
+  petName: "Pet Name",
+  petType: "Pet Type",
+  petBreed: "Pet Breed",
+  petWeight: "Pet Weight",
+  registrationId: "Registration ID",
+  doctorFirstName: "Doctor First Name",
+  doctorLastName: "Doctor Last Name",
+  doctorMiddleName: "Doctor Middle Name",
+  doctorPhone: "Doctor Phone",
+  doctorAddress: "Doctor Address",
+  doctorCity: "Doctor City",
+  doctorState: "Doctor State",
+  doctorZipCode: "Doctor Zip Code",
+  doctorLicenseNumber: "Doctor License #",
+  doctorNpiNumber: "Doctor NPI #",
+};
+
+function PdfTemplatePreview({ url }: { url: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [placeholders, setPlaceholders] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function render() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.0 });
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        const maxWidth = canvas.parentElement?.clientWidth || 500;
+        const scale = maxWidth / viewport.width;
+        const scaledViewport = page.getViewport({ scale });
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+
+        const found: string[] = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const pg = await pdf.getPage(p);
+          const textContent = await pg.getTextContent();
+          const fullText = textContent.items
+            .filter((item): item is { str: string } & Record<string, any> => "str" in item)
+            .map((item) => item.str)
+            .join("");
+          const regex = /\{([a-zA-Z]+)\}/g;
+          let m;
+          while ((m = regex.exec(fullText)) !== null) {
+            if (!found.includes(m[1])) found.push(m[1]);
+          }
+        }
+        if (!cancelled) setPlaceholders(found);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || "Failed to load PDF");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    render();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  return (
+    <div className="space-y-2">
+      <div className="border rounded-md overflow-hidden bg-white relative" data-testid="letter-template-preview">
+        {loading && (
+          <div className="flex items-center justify-center h-[300px]">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-col items-center justify-center h-[300px] gap-2 text-muted-foreground">
+            <AlertCircle className="h-8 w-8" />
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+        <canvas ref={canvasRef} className={`w-full ${loading || error ? "hidden" : ""}`} />
+      </div>
+      {placeholders.length > 0 && (
+        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md" data-testid="detected-placeholders">
+          <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">
+            <CheckCircle className="h-3 w-3 inline mr-1" />
+            {placeholders.length} placeholder{placeholders.length !== 1 ? "s" : ""} detected:
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {placeholders.map((p) => (
+              <span
+                key={p}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-green-100 dark:bg-green-800/40 text-green-800 dark:text-green-200"
+                title={PLACEHOLDER_LABELS[p] || p}
+              >
+                {"{" + p + "}"} → {PLACEHOLDER_LABELS[p] || "unknown"}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {!loading && !error && placeholders.length === 0 && (
+        <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            <AlertCircle className="h-3 w-3 inline mr-1" />
+            No placeholders detected. Use {"{firstName}"}, {"{lastName}"}, etc. in your PDF for auto-fill.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ALL_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
@@ -1043,26 +1183,7 @@ export function UserProfileModal({ user: selectedUser, onClose, canEditLevel = t
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 truncate">{doctorProfileData.letterTemplateUrl.split("/").pop()}</p>
                         </div>
-                        <div className="border rounded-md overflow-hidden bg-white" data-testid="letter-template-preview">
-                          <object
-                            data={doctorProfileData.letterTemplateUrl}
-                            type="application/pdf"
-                            className="w-full h-[400px]"
-                          >
-                            <div className="flex flex-col items-center justify-center h-[400px] gap-2 text-muted-foreground">
-                              <FileText className="h-8 w-8" />
-                              <p className="text-sm">PDF preview not available in this browser</p>
-                              <a
-                                href={doctorProfileData.letterTemplateUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 underline"
-                              >
-                                Open PDF in new tab
-                              </a>
-                            </div>
-                          </object>
-                        </div>
+                        <PdfTemplatePreview url={doctorProfileData.letterTemplateUrl} />
                       </div>
                     )}
 
