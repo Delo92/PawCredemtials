@@ -843,7 +843,7 @@ export async function registerRoutes(
         driverLicenseNumber, medicalCondition, ssn,
         hasMedicare, isVeteran,
         smsConsent, emailConsent, chargeUnderstanding, patientAuthorization,
-        registrationComplete, referralCode
+        registrationComplete, referralCode, contactEmail
       } = req.body;
 
       const updates: Record<string, any> = {};
@@ -868,6 +868,7 @@ export async function registerRoutes(
       if (patientAuthorization !== undefined) updates.patientAuthorization = patientAuthorization;
       if (registrationComplete !== undefined) updates.registrationComplete = registrationComplete;
       if (referralCode !== undefined) updates.referralCode = referralCode;
+      if (contactEmail !== undefined) updates.contactEmail = contactEmail;
 
       const user = await storage.updateUser(req.user!.id, updates as any);
       if (!user) {
@@ -1135,28 +1136,6 @@ export async function registerRoutes(
   // ===========================================================================
   // PROFILE ROUTES
   // ===========================================================================
-
-  app.get("/api/profile", requireAuth, async (req, res) => {
-    try {
-      const user = await storage.getUser(req.user!.id);
-      if (!user) {
-        res.status(404).json({ message: "User not found" });
-        return;
-      }
-      res.json(user);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.put("/api/profile", requireAuth, async (req, res) => {
-    try {
-      const updated = await storage.updateUser(req.user!.id, req.body);
-      res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
 
   app.get("/api/profile/draft-form", requireAuth, async (req, res) => {
     try {
