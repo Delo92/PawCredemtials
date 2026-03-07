@@ -3424,6 +3424,87 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/forms/fill-letter", requireAuth, async (req, res) => {
+    try {
+      const { pdfUrl, patientData, doctorData, generatedDate } = req.body;
+      if (!pdfUrl) {
+        res.status(400).json({ error: "pdfUrl required" });
+        return;
+      }
+
+      const pdfResponse = await fetch(pdfUrl);
+      if (!pdfResponse.ok) {
+        res.status(502).json({ error: "Failed to fetch letter PDF" });
+        return;
+      }
+      const originalBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+
+      const placeholderMap: Record<string, string> = {
+        "{firstName}": patientData?.firstName || "",
+        "{middleName}": patientData?.middleName || "",
+        "{lastName}": patientData?.lastName || "",
+        "{suffix}": patientData?.suffix || "",
+        "{dateOfBirth}": patientData?.dateOfBirth || "",
+        "{address}": patientData?.address || "",
+        "{apt}": patientData?.apt || "",
+        "{city}": patientData?.city || "",
+        "{state}": patientData?.state || "",
+        "{zipCode}": patientData?.zipCode || "",
+        "{zip}": patientData?.zipCode || "",
+        "{phone}": patientData?.phone || "",
+        "{email}": patientData?.email || "",
+        "{medicalCondition}": patientData?.medicalCondition || "",
+        "{petName}": patientData?.petName || "",
+        "{petBreed}": patientData?.petBreed || "",
+        "{petType}": patientData?.petType || "",
+        "{petWeight}": patientData?.petWeight || "",
+        "{registrationId}": patientData?.registrationId || "",
+        "{idNumber}": patientData?.idNumber || "",
+        "{driverLicenseNumber}": patientData?.driverLicenseNumber || "",
+        "{dlNumber}": patientData?.driverLicenseNumber || "",
+        "{idExpirationDate}": patientData?.idExpirationDate || "",
+        "{date}": generatedDate || new Date().toLocaleDateString(),
+        "{doctorFirstName}": doctorData?.firstName || "",
+        "{doctorMiddleName}": doctorData?.middleName || "",
+        "{doctorLastName}": doctorData?.lastName || "",
+        "{doctorPhone}": doctorData?.phone || "",
+        "{doctorAddress}": doctorData?.address || "",
+        "{doctorCity}": doctorData?.city || "",
+        "{doctorState}": doctorData?.state || "",
+        "{doctorZipCode}": doctorData?.zipCode || "",
+        "{doctorLicenseNumber}": doctorData?.licenseNumber || "",
+        "{doctorNpiNumber}": doctorData?.npiNumber || "",
+      };
+
+      const rawStr = Buffer.from(originalBytes).toString("latin1");
+
+      let modified = rawStr;
+      for (const [placeholder, value] of Object.entries(placeholderMap)) {
+        if (modified.includes(placeholder)) {
+          modified = modified.split(placeholder).join(value);
+        }
+      }
+
+      if (modified !== rawStr) {
+        const modifiedBytes = Buffer.from(modified, "latin1");
+        const filledDoc = await PDFDocument.load(modifiedBytes);
+        const filledBytes = await filledDoc.save();
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Cache-Control", "no-store");
+        res.send(Buffer.from(filledBytes));
+      } else {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Cache-Control", "no-store");
+        res.send(Buffer.from(originalBytes));
+      }
+    } catch (error: any) {
+      console.error("Fill letter error:", error);
+      res.status(500).json({ error: error.message || "Failed to fill letter" });
+    }
+  });
+
   app.get("/api/forms/data/:applicationId", requireAuth, async (req, res) => {
     try {
       const application = await storage.getApplication(req.params.applicationId);
