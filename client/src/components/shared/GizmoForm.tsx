@@ -609,7 +609,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         }
 
         scanPdf.destroy();
-        pdf.destroy();
         const cleanBytes = await cleanDoc.save();
         const cleanBuffer = cleanBytes.buffer.slice(0) as ArrayBuffer;
         setPdfBytes(cleanBuffer);
@@ -723,7 +722,13 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         return;
       }
 
-      const page = await pdfDoc.getPage(currentPage);
+      let page;
+      try {
+        page = await pdfDoc.getPage(currentPage);
+      } catch {
+        return;
+      }
+      if (!page) return;
       const viewport = page.getViewport({ scale });
       const ctx = canvas.getContext("2d")!;
 
@@ -741,7 +746,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       renderTaskRef.current = null;
     };
 
-    await tryRender();
+    try { await tryRender(); } catch {}
   }, [pdfDoc, currentPage, scale]);
 
   useEffect(() => {
