@@ -146,157 +146,83 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
           if (!found) textLines.push([item]);
         }
 
-        const replacedTokens = new Set<string>();
+        const coveredItems = new Set<TextItem>();
 
-        const itemCumulativeOffsets: Map<TextItem, number> = new Map();
         for (const line of textLines) {
-          line.sort((a, b) => a.transform[4] - b.transform[4]);
-          let offset = 0;
+          let cumOffset = 0;
+          const itemOffsets: { item: TextItem; start: number }[] = [];
           for (const item of line) {
-            itemCumulativeOffsets.set(item, offset);
-            offset += item.str.length;
+            itemOffsets.push({ item, start: cumOffset });
+            cumOffset += item.str.length;
           }
-        }
 
-        for (const line of textLines) {
           const fullText = line.map((i) => i.str).join("");
+          if (!/\{[a-zA-Z_]+\}/.test(fullText)) continue;
+
+          const touchedItems = new Set<TextItem>();
           const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
           let m;
           while ((m = placeholderRegex.exec(fullText)) !== null) {
-            const token = m[0];
-            const mapping = PLACEHOLDER_MAP[token];
-            const replacementValue = mapping
-              ? resolveValue(mapping.source, mapping.key, data)
-              : "";
-
-            let coverStartX: number | null = null;
-            let coverEndX = 0;
-            let refY = 0;
-            let refFontSize = 12;
-
-            for (const item of line) {
-              const itemStart = itemCumulativeOffsets.get(item) || 0;
-              const itemEnd = itemStart + item.str.length;
-              const overlapStart = Math.max(m.index, itemStart);
-              const overlapEnd = Math.min(m.index + m[0].length, itemEnd);
-
-              if (overlapStart < overlapEnd) {
-                const fontSize =
-                  Math.abs(item.transform[3]) || item.height || 12;
-
-                if (overlapStart === itemStart && overlapEnd === itemEnd) {
-                  const startX = item.transform[4];
-                  const endX = startX + item.width;
-                  if (coverStartX === null) {
-                    coverStartX = startX;
-                    refY = item.transform[5];
-                    refFontSize = fontSize;
-                  }
-                  coverEndX = endX;
-                } else {
-                  const charW = item.width / Math.max(item.str.length, 1);
-                  const offsetChars = overlapStart - itemStart;
-                  const coverChars = overlapEnd - overlapStart;
-                  const startX = item.transform[4] + offsetChars * charW;
-                  const endX = startX + coverChars * charW;
-                  if (coverStartX === null) {
-                    coverStartX = startX;
-                    refY = item.transform[5];
-                    refFontSize = fontSize;
-                  }
-                  coverEndX = endX;
-                }
+            const phStart = m.index;
+            const phEnd = m.index + m[0].length;
+            for (const { item, start } of itemOffsets) {
+              const itemEnd = start + item.str.length;
+              if (phStart < itemEnd && phEnd > start) {
+                touchedItems.add(item);
               }
-            }
-
-            if (coverStartX !== null) {
-              const pad = refFontSize * 0.15;
-              filledPage.drawRectangle({
-                x: coverStartX - pad,
-                y: refY - 2,
-                width: coverEndX - coverStartX + pad * 2,
-                height: refFontSize + 4,
-                color: pdfRgb(1, 1, 1),
-                opacity: 1,
-              });
-
-              if (replacementValue) {
-                const drawSize = Math.min(refFontSize * 0.85, 11);
-                filledPage.drawText(replacementValue, {
-                  x: coverStartX,
-                  y: refY,
-                  size: drawSize,
-                  font,
-                  color: pdfRgb(0, 0, 0),
-                });
-              }
-              const tokenKey = `${pageNum}-${token}-${Math.round(refY)}`;
-              replacedTokens.add(tokenKey);
             }
           }
-        }
 
-        for (const item of textItems) {
-          const itemRegex = /\{([a-zA-Z_]+)\}/g;
-          let im;
-          while ((im = itemRegex.exec(item.str)) !== null) {
-            const token = im[0];
-            const mapping = PLACEHOLDER_MAP[token];
-            if (!mapping) continue;
+          if (touchedItems.size === 0) continue;
 
-            const itemX = item.transform[4];
-            const itemY = item.transform[5];
-            const tokenKey = `${pageNum}-${token}-${Math.round(itemY)}`;
-            if (replacedTokens.has(tokenKey)) continue;
+          for (const item of touchedItems) {
+            if (coveredItems.has(item)) continue;
+            coveredItems.add(item);
 
-            const replacementValue = resolveValue(
-              mapping.source,
-              mapping.key,
-              data
-            );
+            const fontSize = Math.abs(item.transform[3]) || item.height || 12;
+            const pad = fontSize * 0.2;
+            filledPage.drawRectangle({
+              x: item.transform[4] - pad,
+              y: item.transform[5] - 3,
+              width: item.width + pad * 2,
+              height: fontSize + 6,
+              color: pdfRgb(1, 1, 1),
+              opacity: 1,
+            });
+          }
 
-            const fontSize =
-              Math.abs(item.transform[3]) || item.height || 12;
+          const sortedTouched = Array.from(touchedItems).sort(
+            (a, b) => a.transform[4] - b.transform[4]
+          );
 
-            if (im.index === 0 && im[0].length === item.str.length) {
-              const pad = fontSize * 0.15;
-              filledPage.drawRectangle({
-                x: itemX - pad,
-                y: itemY - 2,
-                width: item.width + pad * 2,
-                height: fontSize + 4,
-                color: pdfRgb(1, 1, 1),
-                opacity: 1,
-              });
-            } else {
-              const charW = item.width / Math.max(item.str.length, 1);
-              const offsetChars = im.index;
-              const coverChars = im[0].length;
-              const startX = itemX + offsetChars * charW;
-              const pad = fontSize * 0.15;
-              filledPage.drawRectangle({
-                x: startX - pad,
-                y: itemY - 2,
-                width: coverChars * charW + pad * 2,
-                height: fontSize + 4,
-                color: pdfRgb(1, 1, 1),
-                opacity: 1,
-              });
+          let drawX = sortedTouched[0].transform[4];
+          const refY = sortedTouched[0].transform[5];
+          const refFontSize = Math.abs(sortedTouched[0].transform[3]) || sortedTouched[0].height || 12;
+
+          let combinedStr = "";
+          for (const item of sortedTouched) {
+            combinedStr += item.str;
+          }
+
+          const replacedStr = combinedStr.replace(
+            /\{([a-zA-Z_]+)\}/g,
+            (tok) => {
+              const mapping = PLACEHOLDER_MAP[tok];
+              if (!mapping) return tok;
+              const val = resolveValue(mapping.source, mapping.key, data);
+              return val || "";
             }
+          );
 
-            if (replacementValue) {
-              const charW = item.width / Math.max(item.str.length, 1);
-              const drawX = itemX + im.index * charW;
-              const drawSize = Math.min(fontSize * 0.85, 11);
-              filledPage.drawText(replacementValue, {
-                x: drawX,
-                y: itemY,
-                size: drawSize,
-                font,
-                color: pdfRgb(0, 0, 0),
-              });
-            }
-            replacedTokens.add(tokenKey);
+          if (replacedStr.trim()) {
+            const drawSize = Math.min(refFontSize * 0.9, 11);
+            filledPage.drawText(replacedStr, {
+              x: drawX,
+              y: refY,
+              size: drawSize,
+              font,
+              color: pdfRgb(0, 0, 0),
+            });
           }
         }
       }
