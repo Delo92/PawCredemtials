@@ -528,10 +528,22 @@ export default function SiteSettings() {
                       name="logoUrl"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Logo URL</FormLabel>
+                          <FormLabel>Logo</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://example.com/logo.png" data-testid="input-logo-url" {...field} />
+                            <MediaUploadField
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              placeholder="Upload or paste logo URL"
+                              folder="branding"
+                              accept="image/*"
+                              testId="logo-url"
+                            />
                           </FormControl>
+                          {field.value && (
+                            <div className="mt-2 p-2 border rounded-md inline-block bg-white">
+                              <img src={field.value} alt="Logo preview" className="max-h-16 object-contain" data-testid="img-logo-preview" />
+                            </div>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
