@@ -2621,7 +2621,21 @@ export async function registerRoutes(
   app.get("/api/admin/users", requireAuth, requireLevel(3), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      res.json(users.map((u) => ({ ...u, passwordHash: undefined })));
+      const doctorProfiles = await storage.getAllDoctorProfiles();
+      const doctorMap = new Map<string, Record<string, any>>();
+      for (const dp of doctorProfiles) {
+        if (dp.userId) doctorMap.set(dp.userId, dp);
+      }
+      res.json(users.map((u) => {
+        const result: any = { ...u, passwordHash: undefined };
+        if (u.userLevel === 2) {
+          const dp = doctorMap.get(u.id);
+          if (dp) {
+            result.excludeFromRotation = dp.excludeFromRotation || false;
+          }
+        }
+        return result;
+      }));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

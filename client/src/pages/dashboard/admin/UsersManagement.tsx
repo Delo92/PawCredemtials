@@ -359,9 +359,16 @@ export default function UsersManagement() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={user.isActive ? "default" : "destructive"}>
-                              {user.isActive ? "Active" : "Inactive"}
-                            </Badge>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant={user.isActive ? "default" : "destructive"}>
+                                {user.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                              {user.userLevel === 2 && user.excludeFromRotation && (
+                                <Badge variant="outline" className="text-amber-500 border-amber-500/50" data-testid={`badge-paused-${user.id}`}>
+                                  Paused
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {new Date(user.createdAt).toLocaleDateString()}
