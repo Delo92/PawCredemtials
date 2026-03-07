@@ -133,42 +133,103 @@ export function ESALetterViewer({ data, onClose }: ESALetterViewerProps) {
           (item): item is TextItem => "str" in item && item.str.length > 0
         );
 
+        const textLines: TextItem[][] = [];
         for (const item of textItems) {
-          if (!/\{[a-zA-Z_]+\}/.test(item.str)) continue;
+          const y = item.transform[5];
+          let found = false;
+          for (const line of textLines) {
+            if (Math.abs(y - line[0].transform[5]) < 3) {
+              line.push(item);
+              found = true;
+              break;
+            }
+          }
+          if (!found) textLines.push([item]);
+        }
 
-          const fontSize = Math.abs(item.transform[3]) || item.height || 12;
-          const itemX = item.transform[4];
-          const itemY = item.transform[5];
-          const avgCharWidth = item.str.length > 0 ? item.width / item.str.length : fontSize * 0.5;
+        for (const line of textLines) {
+          line.sort((a, b) => a.transform[4] - b.transform[4]);
+          const fullText = line.map((i) => i.str).join("");
+          if (!/\{[a-zA-Z_]+\}/.test(fullText)) continue;
 
+          let charOffset = 0;
+          const itemRanges: { item: TextItem; startChar: number; endChar: number }[] = [];
+          for (const item of line) {
+            itemRanges.push({ item, startChar: charOffset, endChar: charOffset + item.str.length });
+            charOffset += item.str.length;
+          }
+
+          const touchedIndices = new Set<number>();
           const placeholderRegex = /\{([a-zA-Z_]+)\}/g;
-          let match;
-          while ((match = placeholderRegex.exec(item.str)) !== null) {
-            const token = match[0];
-            const mapping = PLACEHOLDER_MAP[token];
+          let m;
+          while ((m = placeholderRegex.exec(fullText)) !== null) {
+            const mapping = PLACEHOLDER_MAP[m[0]];
             if (!mapping) continue;
+            const phStart = m.index;
+            const phEnd = m.index + m[0].length;
+            for (let i = 0; i < itemRanges.length; i++) {
+              const r = itemRanges[i];
+              if (phStart < r.endChar && phEnd > r.startChar) {
+                touchedIndices.add(i);
+              }
+            }
+          }
 
-            const value = resolveValue(mapping.source, mapping.key, data);
+          if (touchedIndices.size === 0) continue;
 
-            const phStartChar = match.index;
-            const phEndChar = match.index + token.length;
-            const phX = itemX + phStartChar * avgCharWidth;
-            const phWidth = (phEndChar - phStartChar) * avgCharWidth;
+          const sortedIndices = Array.from(touchedIndices).sort((a, b) => a - b);
+          const groups: number[][] = [];
+          let currentGroup = [sortedIndices[0]];
+          for (let i = 1; i < sortedIndices.length; i++) {
+            if (sortedIndices[i] === sortedIndices[i - 1] + 1) {
+              currentGroup.push(sortedIndices[i]);
+            } else {
+              groups.push(currentGroup);
+              currentGroup = [sortedIndices[i]];
+            }
+          }
+          groups.push(currentGroup);
+
+          for (const group of groups) {
+            const groupItems = group.map((i) => itemRanges[i]);
+            const firstItem = groupItems[0].item;
+            const lastItem = groupItems[groupItems.length - 1].item;
+
+            const groupX = firstItem.transform[4];
+            const groupY = firstItem.transform[5];
+            const groupEndX = lastItem.transform[4] + lastItem.width;
+            const groupWidth = groupEndX - groupX;
+            const fontSize = Math.abs(firstItem.transform[3]) || firstItem.height || 12;
 
             const pad = 2;
             filledPage.drawRectangle({
-              x: phX - pad,
-              y: itemY - 3,
-              width: phWidth + pad * 2,
+              x: groupX - pad,
+              y: groupY - 3,
+              width: groupWidth + pad * 2,
               height: fontSize + 6,
               color: pdfRgb(1, 1, 1),
               opacity: 1,
             });
 
-            if (value) {
-              filledPage.drawText(value, {
-                x: phX,
-                y: itemY,
+            let combinedStr = "";
+            for (const gr of groupItems) {
+              combinedStr += gr.item.str;
+            }
+
+            const replacedStr = combinedStr.replace(
+              /\{([a-zA-Z_]+)\}/g,
+              (tok) => {
+                const mapping = PLACEHOLDER_MAP[tok];
+                if (!mapping) return tok;
+                const val = resolveValue(mapping.source, mapping.key, data);
+                return val || "";
+              }
+            );
+
+            if (replacedStr.trim()) {
+              filledPage.drawText(replacedStr, {
+                x: groupX,
+                y: groupY,
                 size: fontSize,
                 font: timesRoman,
                 color: pdfRgb(0, 0, 0),
