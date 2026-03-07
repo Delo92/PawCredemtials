@@ -224,6 +224,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [acroFormFields, setAcroFormFields] = useState<{ name: string; normalizedName: string; value: string; matched: boolean }[]>([]);
   const [downloading, setDownloading] = useState(false);
   const [petPhotoMarker, setPetPhotoMarker] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number } | null>(null);
+  const [coverRects, setCoverRects] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number; nonPlaceholderPrefix: string; fontSize: number }[]>([]);
 
   const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
@@ -231,6 +232,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
     const fields: PlaceholderField[] = [];
     const radios: RadioField[] = [];
+    const rects: typeof coverRects = [];
     const selectedRadioIds = new Set<string>(
       (data.selectedRadioIds || []).map((id) => String(id))
     );
@@ -313,6 +315,26 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
           const itemY = item.transform[5];
           const totalWidth = item.width;
           const totalChars = item.str.length;
+          const fontSize = Math.abs(item.transform[3]) || item.height || 12;
+
+          const hasKnownPlaceholder = item.str.match(/\{([a-zA-Z]+)\}/g)?.some(tok => PLACEHOLDER_MAP[tok]);
+          if (hasKnownPlaceholder) {
+            const firstPlaceholderIdx = item.str.search(/\{[a-zA-Z]+\}/);
+            const prefix = firstPlaceholderIdx > 0 ? item.str.substring(0, firstPlaceholderIdx) : "";
+            const prefixFraction = totalChars > 0 ? firstPlaceholderIdx / totalChars : 0;
+            const coverX = itemX + prefixFraction * totalWidth;
+            const coverWidth = totalWidth - prefixFraction * totalWidth;
+
+            rects.push({
+              x: coverX,
+              y: itemY,
+              width: coverWidth + 2,
+              height: fontSize + 4,
+              pageIndex: pageNum - 1,
+              nonPlaceholderPrefix: prefix,
+              fontSize,
+            });
+          }
 
           const placeholderRegex = /\{([a-zA-Z]+)\}/g;
           let match;
@@ -495,6 +517,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
 
     setPlaceholderFields(fields);
     setRadioFields(radios);
+    setCoverRects(rects);
   };
 
   const loadPdf = useCallback(async () => {
@@ -527,75 +550,6 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       if (hasPlaceholders) {
         setMode("placeholder");
         await extractPlaceholdersFromPdf(pdf);
-
-        const { PDFDocument: PDFDoc, rgb: pdfRgb, StandardFonts } = await import("pdf-lib");
-        const cleanDoc = await PDFDoc.load(originalBytes.slice(0));
-        const cleanFont = await cleanDoc.embedFont(StandardFonts.TimesRoman);
-        const scanPdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
-
-        for (let pageNum = 1; pageNum <= scanPdf.numPages; pageNum++) {
-          const scanPage = await scanPdf.getPage(pageNum);
-          const textContent = await scanPage.getTextContent();
-          const cleanPage = cleanDoc.getPages()[pageNum - 1];
-          if (!cleanPage) continue;
-
-          interface ScanTextItem { str: string; transform: number[]; width: number; height: number; }
-          const scanItems = textContent.items.filter(
-            (item): item is ScanTextItem => "str" in item && item.str.length > 0
-          );
-
-          let bgColor = pdfRgb(1, 1, 1);
-          const pageWidth = cleanPage.getWidth();
-          const pageHeight = cleanPage.getHeight();
-          try {
-            const tempCanvas = document.createElement("canvas");
-            const vp = scanPage.getViewport({ scale: 1 });
-            tempCanvas.width = vp.width;
-            tempCanvas.height = vp.height;
-            const tempCtx = tempCanvas.getContext("2d")!;
-            await scanPage.render({ canvasContext: tempCtx, viewport: vp }).promise;
-            const corner = tempCtx.getImageData(5, 5, 1, 1).data;
-            bgColor = pdfRgb(corner[0] / 255, corner[1] / 255, corner[2] / 255);
-            tempCanvas.remove();
-          } catch {}
-
-          for (const item of scanItems) {
-            if (!/\{[a-zA-Z_]+\}/.test(item.str)) continue;
-
-            const hasKnownPlaceholder = /\{([a-zA-Z_]+)\}/g.test(item.str) &&
-              item.str.match(/\{([a-zA-Z_]+)\}/g)?.some(tok => PLACEHOLDER_MAP[tok]);
-            if (!hasKnownPlaceholder) continue;
-
-            const ix = item.transform[4];
-            const iy = item.transform[5];
-            const iw = item.width;
-            const fs = Math.abs(item.transform[3]) || item.height || 12;
-
-            cleanPage.drawRectangle({
-              x: ix - 1, y: iy - 2, width: iw + 2, height: fs + 4,
-              color: bgColor, opacity: 1,
-            });
-
-            const replaced = item.str.replace(/\{([a-zA-Z_]+)\}/g, (tok) => {
-              return PLACEHOLDER_MAP[tok] ? "" : tok;
-            });
-            if (replaced.trim()) {
-              cleanPage.drawText(replaced, {
-                x: ix, y: iy, size: fs, font: cleanFont, color: pdfRgb(0, 0, 0),
-              });
-            }
-          }
-        }
-
-        scanPdf.destroy();
-        const cleanBytes = await cleanDoc.save();
-        const cleanBuffer = cleanBytes.buffer.slice(0) as ArrayBuffer;
-        setPdfBytes(cleanBuffer);
-
-        const cleanPdf = await pdfjsLib.getDocument({ data: new Uint8Array(cleanBuffer.slice(0)) }).promise;
-        setPdfDoc(cleanPdf);
-        setTotalPages(cleanPdf.numPages);
-
         setLoading(false);
         return;
       }
@@ -723,10 +677,24 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
         throw err;
       }
       renderTaskRef.current = null;
+
+      if (mode === "placeholder" && coverRects.length > 0) {
+        const pageRects = coverRects.filter(r => r.pageIndex === currentPage - 1);
+        for (const rect of pageRects) {
+          const canvasX = rect.x * scale;
+          const canvasY = (viewport.height / scale - rect.y - rect.fontSize) * scale - 2 * scale;
+          const canvasW = (rect.width + 2) * scale;
+          const canvasH = (rect.height + 2) * scale;
+
+          const bgPixel = ctx.getImageData(Math.round(canvasX + 2), Math.round(canvasY + 2), 1, 1).data;
+          ctx.fillStyle = `rgb(${bgPixel[0]}, ${bgPixel[1]}, ${bgPixel[2]})`;
+          ctx.fillRect(canvasX - 1, canvasY - 1, canvasW + 2, canvasH + 2);
+        }
+      }
     };
 
     try { await tryRender(); } catch {}
-  }, [pdfDoc, currentPage, scale]);
+  }, [pdfDoc, currentPage, scale, mode, coverRects]);
 
   useEffect(() => {
     renderPage();
