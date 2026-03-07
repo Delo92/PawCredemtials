@@ -225,6 +225,7 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
   const [downloading, setDownloading] = useState(false);
   const [petPhotoMarker, setPetPhotoMarker] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number } | null>(null);
   const [coverRects, setCoverRects] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number; nonPlaceholderPrefix: string; fontSize: number }[]>([]);
+  const [pageBgColor, setPageBgColor] = useState<string>("rgb(255,255,255)");
 
   const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
   const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
@@ -678,23 +679,16 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
       }
       renderTaskRef.current = null;
 
-      if (mode === "placeholder" && coverRects.length > 0) {
-        const pageRects = coverRects.filter(r => r.pageIndex === currentPage - 1);
-        for (const rect of pageRects) {
-          const canvasX = rect.x * scale;
-          const canvasY = (viewport.height / scale - rect.y - rect.fontSize) * scale - 2 * scale;
-          const canvasW = (rect.width + 2) * scale;
-          const canvasH = (rect.height + 2) * scale;
-
-          const bgPixel = ctx.getImageData(Math.round(canvasX + 2), Math.round(canvasY + 2), 1, 1).data;
-          ctx.fillStyle = `rgb(${bgPixel[0]}, ${bgPixel[1]}, ${bgPixel[2]})`;
-          ctx.fillRect(canvasX - 1, canvasY - 1, canvasW + 2, canvasH + 2);
-        }
+      if (mode === "placeholder") {
+        try {
+          const pixel = ctx.getImageData(5, 5, 1, 1).data;
+          setPageBgColor(`rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`);
+        } catch {}
       }
     };
 
     try { await tryRender(); } catch {}
-  }, [pdfDoc, currentPage, scale, mode, coverRects]);
+  }, [pdfDoc, currentPage, scale, mode]);
 
   useEffect(() => {
     renderPage();
@@ -980,13 +974,15 @@ export function GizmoForm({ data, onClose }: GizmoFormProps) {
                   key={`field-${globalIdx}`}
                   value={field.value}
                   onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
-                  className="absolute bg-transparent border-0 border-b border-gray-400 rounded-none text-xs h-6 px-1 text-black focus:ring-0 focus:border-gray-600"
+                  className="absolute border-0 border-b border-gray-400 rounded-none text-xs px-0 text-black focus:ring-0 focus:border-gray-600"
                   style={{
                     left: field.x * scale,
-                    top: field.y * scale,
-                    width: field.width * scale,
+                    top: (field.y - 4) * scale,
+                    width: (field.width + 4) * scale,
                     fontSize: 10 * scale,
-                    height: 16 * scale,
+                    height: 20 * scale,
+                    backgroundColor: pageBgColor,
+                    lineHeight: `${20 * scale}px`,
                   }}
                   data-testid={`input-field-${field.dataKey}`}
                 />
