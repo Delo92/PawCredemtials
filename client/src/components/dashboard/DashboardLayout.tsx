@@ -34,6 +34,7 @@ import {
   Bell,
   HelpCircle,
   Link2,
+  AlertTriangle,
 } from "lucide-react";
 
 interface NavItem {
@@ -101,6 +102,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Referrals", href: "/dashboard/owner/referrals", icon: Link2 },
           { title: "Analytics", href: "/dashboard/owner/analytics", icon: BarChart3 },
           { title: "Site Settings", href: "/dashboard/owner/site-settings", icon: Building2 },
+          { title: "Diagnostics", href: "/dashboard/owner/diagnostics", icon: AlertTriangle },
           { title: "My Settings", href: "/dashboard/owner/settings", icon: Settings },
         ];
       default:

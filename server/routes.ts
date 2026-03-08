@@ -10,6 +10,7 @@ import fs from "fs";
 import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./firebase-admin";
 import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail, sendReferralUsedEmail, sendNewRegistrationEmail } from "./email";
 import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
+import { logError, getErrorLogs, createErrorContext } from "./services/errorLogger";
 
 function getContactEmail(user: Record<string, any>): string {
   return user.contactEmail || user.email;
@@ -893,6 +894,99 @@ export async function registerRoutes(
       res.json({ ...user, passwordHash: undefined });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===========================================================================
+  // ERROR LOGGING ROUTES
+  // ===========================================================================
+
+  app.post("/api/error/log-client-error", async (req, res) => {
+    try {
+      const {
+        errorType, severity, message,
+        userUid, userName, userEmail, userLevel,
+        endpoint, context, stackTrace
+      } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ success: false, error: 'Message is required' });
+      }
+
+      let verifiedUid: string | undefined;
+      let verifiedEmail: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        try {
+          const decoded = await getAdminAuth().verifyIdToken(authHeader.split(" ")[1]);
+          verifiedUid = decoded.uid;
+          verifiedEmail = decoded.email;
+        } catch {}
+      }
+
+      await logError({
+        errorType: errorType || 'client',
+        severity: severity || 'error',
+        message,
+        stackTrace,
+        userUid: verifiedUid || userUid || undefined,
+        userName: userName || undefined,
+        userEmail: verifiedEmail || userEmail || undefined,
+        userLevel: userLevel || undefined,
+        endpoint: endpoint || 'client-side',
+        method: 'CLIENT',
+        wasShownToUser: true,
+        context: {
+          ...context,
+          source: 'client_error',
+          identityVerified: !!verifiedUid,
+          userAgent: req.headers['user-agent'],
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      res.json({ success: true, message: 'Error logged successfully' });
+    } catch (error) {
+      console.error('Failed to log client error:', error);
+      res.json({ success: false, message: 'Failed to log error' });
+    }
+  });
+
+  app.get("/api/admin/error-logs", requireAuth, requireLevel(4), async (req, res) => {
+    try {
+      const { startDate, endDate, severity, errorType, userLevel, userUid, limit, offset } = req.query;
+
+      const options: any = {};
+      if (startDate) options.startDate = new Date(startDate as string);
+      if (endDate) options.endDate = new Date(endDate as string);
+      if (severity) options.severity = severity as string;
+      if (errorType) options.errorType = errorType as string;
+      if (userLevel !== undefined) options.userLevel = parseInt(userLevel as string);
+      if (userUid) options.userUid = userUid as string;
+      if (limit) options.limit = parseInt(limit as string);
+      if (offset) options.offset = parseInt(offset as string);
+
+      const result = await getErrorLogs(options);
+
+      const enrichedLogs = result.logs.map((log: any) => {
+        const context = log.context || {};
+
+        let userName = log.userName;
+        if (!userName && context.patientName) userName = context.patientName;
+        if (!userName && context.firstName && context.lastName) {
+          userName = `${context.firstName} ${context.lastName}`;
+        }
+
+        const userEmail = log.userEmail || context.email || context.userEmail;
+        const userUid = log.userUid || context.patientFirebaseUid || context.firebaseUid;
+
+        return { ...log, userName, userEmail, userUid };
+      });
+
+      res.json({ logs: enrichedLogs, total: result.total });
+    } catch (error) {
+      console.error('Error fetching error logs:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch error logs' });
     }
   });
 
