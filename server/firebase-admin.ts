@@ -38,7 +38,7 @@ function tryParseServiceAccountKey(raw: string): { projectId: string; clientEmai
   return null;
 }
 
-function getCredentials(): { projectId: string; clientEmail: string; privateKey: string } {
+export function getCredentials(): { projectId: string; clientEmail: string; privateKey: string } {
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (serviceAccountKey) {
     const result = tryParseServiceAccountKey(serviceAccountKey);

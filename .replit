@@ -52,3 +52,4 @@ BOOTSTRAP_TOKEN = "seed-2026-init"
 
 [userenv.shared]
 FIREBASE_STORAGE_BUCKET = "paw-credentials.firebasestorage.app"
+GA4_PROPERTY_ID = "518327972"
