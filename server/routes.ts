@@ -11,6 +11,7 @@ import { firebaseStorage, firebaseAuth, getAdminAuth, firestore } from "./fireba
 import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprovalEmail, sendWelcomeEmail, sendDoctorCompletionCopyEmail, sendReferralUsedEmail, sendNewRegistrationEmail } from "./email";
 import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
 import { logError, getErrorLogs, createErrorContext } from "./services/errorLogger";
+import { getGA4Report } from "./services/ga4Analytics";
 
 function getContactEmail(user: Record<string, any>): string {
   return user.contactEmail || user.email;
@@ -987,6 +988,17 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error fetching error logs:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch error logs' });
+    }
+  });
+
+  app.get("/api/admin/ga4-analytics", requireAuth, requireLevel(4), async (req, res) => {
+    try {
+      const dateRange = (req.query.dateRange as string) || "30d";
+      const data = await getGA4Report(dateRange);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("GA4 analytics error:", error.message);
+      res.status(500).json({ success: false, message: "Failed to fetch analytics data" });
     }
   });
 
