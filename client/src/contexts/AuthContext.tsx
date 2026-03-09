@@ -107,6 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const data = await response.json();
       setUser(data.user || data);
+      const { trackEvent } = await import("@/lib/analytics");
+      trackEvent("login", { method: "email" });
       return data.user || data;
     } catch (error: any) {
       if (error?.message?.includes?.('Login failed')) throw error;
@@ -167,6 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const result = await response.json();
       setUser(result.user);
+      const { trackEvent } = await import("@/lib/analytics");
+      trackEvent("sign_up", { method: "email" });
       return result.user;
     } finally {
       setLoading(false);

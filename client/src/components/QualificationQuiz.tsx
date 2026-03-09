@@ -85,7 +85,17 @@ export default function QualificationQuiz() {
     if (currentQuestion < questions.length - 1) {
       setTimeout(() => setCurrentQuestion(currentQuestion + 1), 300);
     } else {
-      setTimeout(() => setFinished(true), 300);
+      setTimeout(() => {
+        setFinished(true);
+        import("@/lib/analytics").then(({ trackEvent }) => {
+          const posCount = newAnswers.reduce((count, answer, idx) => {
+            const q = questions[idx];
+            const opt = q.options.find((o) => o.value === answer);
+            return count + (opt?.positive ? 1 : 0);
+          }, 0);
+          trackEvent("quiz_complete", { qualified: posCount >= 3 });
+        });
+      }, 300);
     }
   };
 
@@ -101,7 +111,7 @@ export default function QualificationQuiz() {
               <p className="text-muted-foreground max-w-xl mx-auto mt-4 text-base mb-8">
                 Take our quick 5-question screening to see if you may qualify for an ESA letter. It only takes 30 seconds.
               </p>
-              <Button size="lg" onClick={() => setStarted(true)} data-testid="button-start-quiz">
+              <Button size="lg" onClick={() => { setStarted(true); import("@/lib/analytics").then(({ trackEvent }) => trackEvent("quiz_start")); }} data-testid="button-start-quiz">
                 Take the Quiz
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

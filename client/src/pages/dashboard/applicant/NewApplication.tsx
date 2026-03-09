@@ -283,6 +283,9 @@ export default function NewApplication() {
             title: "Order Submitted!",
             description: "Payment processed and application submitted successfully.",
           });
+          import("@/lib/analytics").then(({ trackEvent }) => {
+            trackEvent("purchase", { package_name: selectedPackage.name, value: selectedPackage.price / 100, currency: "USD" });
+          });
           setLocation(`/dashboard/applicant/applications/${result.application?.id || ""}`);
         } catch (error: any) {
           toast({ title: "Payment Failed", description: error.message || "Payment processing failed", variant: "destructive" });
@@ -307,6 +310,9 @@ export default function NewApplication() {
         toast({
           title: "Order Submitted!",
           description: "Your ESA letter application has been submitted successfully.",
+        });
+        import("@/lib/analytics").then(({ trackEvent }) => {
+          trackEvent("purchase", { package_name: selectedPackage.name, value: selectedPackage.price / 100, currency: "USD" });
         });
         setLocation(`/dashboard/applicant/applications/${application.id}`);
       } catch (error: any) {

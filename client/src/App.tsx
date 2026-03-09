@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,6 +10,7 @@ import { ConfigProvider } from "@/contexts/ConfigContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Loader2 } from "lucide-react";
+import { trackPageView } from "@/lib/analytics";
 
 // Lazy load pages for code-splitting
 const Home = lazy(() => import("@/pages/Home"));
@@ -61,6 +62,14 @@ function PageLoader() {
   );
 }
 
+function PageViewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    trackPageView(location);
+  }, [location]);
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -69,6 +78,7 @@ function App() {
           <ConfigProvider>
             <TooltipProvider>
               <Toaster />
+              <PageViewTracker />
               <Suspense fallback={<PageLoader />}>
                 <Switch>
                   {/* Public routes with AppShell */}

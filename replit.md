@@ -99,3 +99,4 @@ Key endpoints exist for authentication, user profiles, site configuration, packa
 
 ### Services
 - **SendGrid**: For transactional email notifications (doctor approval emails, admin notifications, patient approvals).
+- **Google Analytics 4**: Measurement ID `G-CP63092WYN`. Tracks page views (automatic via `PageViewTracker` in App.tsx), plus custom events: `login`, `sign_up`, `purchase`, `quiz_start`, `quiz_complete`. Analytics helper at `client/src/lib/analytics.ts` exports `trackEvent()` and `trackPageView()`.
