@@ -25,7 +25,6 @@ import {
   Settings,
   LogOut,
   Users,
-  BarChart3,
   FolderOpen,
   ClipboardList,
   UserCheck,
@@ -87,7 +86,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Registration Types", href: "/dashboard/admin/packages", icon: Building2 },
           { title: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
           { title: "Referrals", href: "/dashboard/admin/referrals", icon: Link2 },
-          { title: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
           { title: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
           { title: "Settings", href: "/dashboard/admin/settings", icon: Settings },
         ];
@@ -100,7 +98,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { title: "Payments", href: "/dashboard/owner/payments", icon: CreditCard },
           { title: "Commissions", href: "/dashboard/owner/commissions", icon: DollarSign },
           { title: "Referrals", href: "/dashboard/owner/referrals", icon: Link2 },
-          { title: "Analytics", href: "/dashboard/owner/analytics", icon: BarChart3 },
           { title: "Site Settings", href: "/dashboard/owner/site-settings", icon: Building2 },
           { title: "Diagnostics", href: "/dashboard/owner/diagnostics", icon: AlertTriangle },
           { title: "My Settings", href: "/dashboard/owner/settings", icon: Settings },

@@ -44,7 +44,6 @@ const SharedMessagesPage = lazy(() => import("@/pages/dashboard/shared/MessagesP
 const SharedCompletedPage = lazy(() => import("@/pages/dashboard/shared/CompletedPage"));
 const SharedApplicationsListPage = lazy(() => import("@/pages/dashboard/shared/ApplicationsListPage"));
 const SharedPaymentsManagementPage = lazy(() => import("@/pages/dashboard/shared/PaymentsManagementPage"));
-const SharedAnalyticsPage = lazy(() => import("@/pages/dashboard/shared/AnalyticsPage"));
 const SharedCommissionsPage = lazy(() => import("@/pages/dashboard/shared/CommissionsPage"));
 const SharedReferralsPage = lazy(() => import("@/pages/dashboard/shared/ReferralsPage"));
 
@@ -212,11 +211,6 @@ function App() {
                       <SharedReferralsPage />
                     </ProtectedRoute>
                   </Route>
-                  <Route path="/dashboard/admin/analytics">
-                    <ProtectedRoute minLevel={3}>
-                      <SharedAnalyticsPage />
-                    </ProtectedRoute>
-                  </Route>
                   <Route path="/dashboard/admin/reports">
                     <ProtectedRoute minLevel={3}>
                       <PlaceholderPage />
@@ -282,11 +276,6 @@ function App() {
                   <Route path="/dashboard/owner/referrals">
                     <ProtectedRoute minLevel={4}>
                       <SharedReferralsPage />
-                    </ProtectedRoute>
-                  </Route>
-                  <Route path="/dashboard/owner/analytics">
-                    <ProtectedRoute minLevel={4}>
-                      <SharedAnalyticsPage />
                     </ProtectedRoute>
                   </Route>
                   <Route path="/dashboard/owner">
