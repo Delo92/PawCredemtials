@@ -1,0 +1,1130 @@
+# Missing From Other Project — Exact 1-to-1 Code
+
+---
+
+## 1. PDF System — `client/src/components/shared/GizmoForm.tsx`
+
+This is the entire file. Replace whatever version exists in the other project completely.
+
+```tsx
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Download, Printer, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase";
+
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+export interface GizmoFormData {
+  success: boolean;
+  gizmoFormLayout?: "A" | "B";
+  patientData: Record<string, string>;
+  doctorData: Record<string, string>;
+  gizmoFormUrl: string | null;
+  generatedDate: string;
+  patientName: string;
+  selectedRadioIds?: string[];
+  petPhotoUrl?: string;
+}
+
+interface PlaceholderField {
+  token: string;
+  key: string;
+  source: "patient" | "doctor" | "meta";
+  dataKey: string;
+  x: number;
+  y: number;
+  width: number;
+  pageIndex: number;
+  value: string;
+}
+
+interface RadioField {
+  token: string;
+  group: string;
+  option: string;
+  x: number;
+  y: number;
+  pageIndex: number;
+  selected: boolean;
+  fontSize: number;
+}
+
+interface GizmoFormProps {
+  data: GizmoFormData;
+  onClose?: () => void;
+}
+
+const FIELD_NAME_MAP: Record<string, { source: "patient" | "doctor" | "meta"; key: string }> = {
+  firstname: { source: "patient", key: "firstName" },
+  middlename: { source: "patient", key: "middleName" },
+  lastname: { source: "patient", key: "lastName" },
+  suffix: { source: "patient", key: "suffix" },
+  dateofbirth: { source: "patient", key: "dateOfBirth" },
+  dob: { source: "patient", key: "dateOfBirth" },
+  address: { source: "patient", key: "address" },
+  apt: { source: "patient", key: "apt" },
+  city: { source: "patient", key: "city" },
+  state: { source: "patient", key: "state" },
+  zipcode: { source: "patient", key: "zipCode" },
+  zip: { source: "patient", key: "zipCode" },
+  phone: { source: "patient", key: "phone" },
+  email: { source: "patient", key: "email" },
+  medicalcondition: { source: "patient", key: "medicalCondition" },
+  idnumber: { source: "patient", key: "idNumber" },
+  driverlicensenumber: { source: "patient", key: "driverLicenseNumber" },
+  driverlicense: { source: "patient", key: "driverLicenseNumber" },
+  dlnumber: { source: "patient", key: "driverLicenseNumber" },
+  driverslicense: { source: "patient", key: "driverLicenseNumber" },
+  driverslicensenumber: { source: "patient", key: "driverLicenseNumber" },
+  driverlicensestateidentificationcardnumber: { source: "patient", key: "driverLicenseNumber" },
+  idexpirationdate: { source: "patient", key: "idExpirationDate" },
+  date: { source: "meta", key: "generatedDate" },
+  doctorfirstname: { source: "doctor", key: "firstName" },
+  doctormiddlename: { source: "doctor", key: "middleName" },
+  doctorlastname: { source: "doctor", key: "lastName" },
+  doctorphone: { source: "doctor", key: "phone" },
+  doctoraddress: { source: "doctor", key: "address" },
+  doctorcity: { source: "doctor", key: "city" },
+  doctorstate: { source: "doctor", key: "state" },
+  doctorzipcode: { source: "doctor", key: "zipCode" },
+  doctorlicensenumber: { source: "doctor", key: "licenseNumber" },
+  doctornpinumber: { source: "doctor", key: "npiNumber" },
+  petname: { source: "patient", key: "petName" },
+  petbreed: { source: "patient", key: "petBreed" },
+  pettype: { source: "patient", key: "petType" },
+  petweight: { source: "patient", key: "petWeight" },
+  registrationid: { source: "patient", key: "registrationId" },
+};
+
+const PLACEHOLDER_MAP: Record<string, { source: "patient" | "doctor" | "meta"; key: string }> = {
+  "{firstName}": { source: "patient", key: "firstName" },
+  "{middleName}": { source: "patient", key: "middleName" },
+  "{lastName}": { source: "patient", key: "lastName" },
+  "{suffix}": { source: "patient", key: "suffix" },
+  "{dateOfBirth}": { source: "patient", key: "dateOfBirth" },
+  "{address}": { source: "patient", key: "address" },
+  "{apt}": { source: "patient", key: "apt" },
+  "{city}": { source: "patient", key: "city" },
+  "{state}": { source: "patient", key: "state" },
+  "{zipCode}": { source: "patient", key: "zipCode" },
+  "{zip}": { source: "patient", key: "zipCode" },
+  "{phone}": { source: "patient", key: "phone" },
+  "{email}": { source: "patient", key: "email" },
+  "{medicalCondition}": { source: "patient", key: "medicalCondition" },
+  "{idNumber}": { source: "patient", key: "idNumber" },
+  "{driverLicenseNumber}": { source: "patient", key: "driverLicenseNumber" },
+  "{dlNumber}": { source: "patient", key: "driverLicenseNumber" },
+  "{idExpirationDate}": { source: "patient", key: "idExpirationDate" },
+  "{date}": { source: "meta", key: "generatedDate" },
+  "{doctorFirstName}": { source: "doctor", key: "firstName" },
+  "{doctorMiddleName}": { source: "doctor", key: "middleName" },
+  "{doctorLastName}": { source: "doctor", key: "lastName" },
+  "{doctorPhone}": { source: "doctor", key: "phone" },
+  "{doctorAddress}": { source: "doctor", key: "address" },
+  "{doctorCity}": { source: "doctor", key: "city" },
+  "{doctorState}": { source: "doctor", key: "state" },
+  "{doctorZipCode}": { source: "doctor", key: "zipCode" },
+  "{doctorLicenseNumber}": { source: "doctor", key: "licenseNumber" },
+  "{doctorNpiNumber}": { source: "doctor", key: "npiNumber" },
+  "{petName}": { source: "patient", key: "petName" },
+  "{petBreed}": { source: "patient", key: "petBreed" },
+  "{petType}": { source: "patient", key: "petType" },
+  "{petWeight}": { source: "patient", key: "petWeight" },
+  "{registrationId}": { source: "patient", key: "registrationId" },
+};
+
+function normalizeFieldName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function getRadioGroup(option: string): string {
+  const num = parseInt(option, 10);
+  if (num >= 1 && num <= 3) return "placardtype";
+  if (num >= 4 && num <= 5) return "placardcount";
+  if (num >= 7 && num <= 14) return "condition";
+  if (num >= 15 && num <= 16) return "duration";
+  return "other";
+}
+
+const RADIO_AUTO_FILL: Record<string, { sourceField: string; valueMap: Record<string, string>; defaultOption?: string }> = {
+  idtype: {
+    sourceField: "idType",
+    valueMap: {
+      drivers_license: "dl",
+      us_passport_photo_id: "passport",
+      id_card: "idcard",
+      tribal_id_card: "tribal",
+    },
+  },
+  condition: {
+    sourceField: "disabilityCondition",
+    defaultOption: "7",
+    valueMap: {
+      A: "7", B: "8", C: "9", D: "10",
+      E: "11", F: "12", G: "13", H: "14",
+    },
+  },
+};
+
+const DOCTOR_FORM_OFFSETS: Record<string, { x: number; y: number }> = {};
+
+function resolveValue(source: "patient" | "doctor" | "meta", key: string, data: GizmoFormData): string {
+  if (source === "meta") {
+    if (key === "generatedDate") return data.generatedDate || "";
+    return "";
+  }
+  const sourceObj = source === "patient" ? data.patientData : data.doctorData;
+  let val = sourceObj[key] || "";
+  if (key === "dateOfBirth" && val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const [y, m, d] = val.split("-");
+    val = `${m}/${d}/${y}`;
+  }
+  return val;
+}
+
+function sanitizeFilename(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+async function checkForPlaceholderTokens(pdf: pdfjsLib.PDFDocumentProxy): Promise<boolean> {
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const allText = textContent.items
+      .filter((item): item is { str: string } => "str" in item)
+      .map((item) => item.str)
+      .join("");
+    if (/\{(firstName|lastName|middleName|dateOfBirth|address|city|state|zipCode|zip|phone|email|date|driverLicenseNumber|medicalCondition|idNumber|suffix|apt|petName|petBreed|petType|petWeight|registrationId)\}?/i.test(allText)) return true;
+    if (/\{radio[_\s]/i.test(allText) || /radio\s*_?\s*id/i.test(allText)) return true;
+  }
+  return false;
+}
+
+export function GizmoForm({ data, onClose }: GizmoFormProps) {
+  const { toast } = useToast();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"acroform" | "placeholder" | null>(null);
+  const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [scale, setScale] = useState(1.0);
+  const [placeholderFields, setPlaceholderFields] = useState<PlaceholderField[]>([]);
+  const [radioFields, setRadioFields] = useState<RadioField[]>([]);
+  const [acroFormFields, setAcroFormFields] = useState<{ name: string; normalizedName: string; value: string; matched: boolean }[]>([]);
+  const [downloading, setDownloading] = useState(false);
+  const [petPhotoMarker, setPetPhotoMarker] = useState<{ x: number; y: number; width: number; height: number; pageIndex: number } | null>(null);
+
+  const doctorLastName = (data.doctorData?.lastName || "").toLowerCase();
+  const offsets = DOCTOR_FORM_OFFSETS[doctorLastName] || { x: 0, y: 0 };
+
+  const extractPlaceholdersFromPdf = async (pdf: pdfjsLib.PDFDocumentProxy) => {
+    const fields: PlaceholderField[] = [];
+    const radios: RadioField[] = [];
+    const rects: { x: number; y: number; width: number; height: number; pageIndex: number; nonPlaceholderPrefix: string; fontSize: number }[] = [];
+    const selectedRadioIds = new Set<string>((data.selectedRadioIds || []).map((id) => String(id)));
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+
+      interface TextItem { str: string; transform: number[]; width: number; height: number; }
+      const items = textContent.items.filter((item): item is TextItem => "str" in item && item.str.length > 0);
+
+      const lines: TextItem[][] = [];
+      for (const item of items) {
+        const y = item.transform[5];
+        let foundLine = false;
+        for (const line of lines) {
+          if (Math.abs(y - line[0].transform[5]) < 3) { line.push(item); foundLine = true; break; }
+        }
+        if (!foundLine) lines.push([item]);
+      }
+
+      const allPageText = items.map(i => i.str.trim().toLowerCase()).join(" ");
+      if (/pet\s*photo\s*here/i.test(allPageText)) {
+        const photoItems = items.filter(i => /^(pet|photo|here)$/i.test(i.str.trim()));
+        if (photoItems.length >= 1) {
+          const xs = photoItems.map(i => i.transform[4]);
+          const ys = photoItems.map(i => i.transform[5]);
+          const widths = photoItems.map(i => (i as any).width || 100);
+          const fontSizes = photoItems.map(i => Math.abs(i.transform[0]) || 40);
+          const minX = Math.min(...xs);
+          const maxRight = Math.max(...xs.map((x, idx) => x + widths[idx]));
+          const minY = Math.min(...ys);
+          const maxTop = Math.max(...ys.map((y, idx) => y + fontSizes[idx]));
+          const padX = 35; const padY = 20;
+          setPetPhotoMarker({
+            x: minX - padX - 5, y: viewport.height - maxTop - padY + 10,
+            width: (maxRight - minX) + padX * 2, height: (maxTop - minY) + padY * 2,
+            pageIndex: pageNum - 1,
+          });
+        }
+      }
+
+      interface PendingField { token: string; mapping: { source: "patient" | "doctor" | "meta"; key: string }; x: number; y: number; pageIndex: number; measuredWidth?: number; }
+      const pendingFields: PendingField[] = [];
+
+      for (const line of lines) {
+        line.sort((a, b) => a.transform[4] - b.transform[4]);
+        for (const item of line) {
+          if (!/\{[a-zA-Z]+\}/.test(item.str)) continue;
+          const itemX = item.transform[4];
+          const itemY = item.transform[5];
+          const totalWidth = item.width;
+          const totalChars = item.str.length;
+          const fontSize = Math.abs(item.transform[3]) || item.height || 12;
+
+          const hasKnownPlaceholder = item.str.match(/\{([a-zA-Z]+)\}/g)?.some(tok => PLACEHOLDER_MAP[tok]);
+          if (hasKnownPlaceholder) {
+            const firstPlaceholderIdx = item.str.search(/\{[a-zA-Z]+\}/);
+            const prefixFraction = totalChars > 0 ? firstPlaceholderIdx / totalChars : 0;
+            const coverX = itemX + prefixFraction * totalWidth;
+            const coverWidth = totalWidth - prefixFraction * totalWidth;
+            rects.push({ x: coverX, y: itemY, width: coverWidth + 2, height: fontSize + 4, pageIndex: pageNum - 1, nonPlaceholderPrefix: firstPlaceholderIdx > 0 ? item.str.substring(0, firstPlaceholderIdx) : "", fontSize });
+          }
+
+          const placeholderRegex = /\{([a-zA-Z]+)\}/g;
+          let match;
+          while ((match = placeholderRegex.exec(item.str)) !== null) {
+            const token = match[0];
+            const mapping = PLACEHOLDER_MAP[token];
+            if (!mapping) continue;
+            const charsBefore = match.index;
+            const xFraction = totalChars > 0 ? charsBefore / totalChars : 0;
+            const x = itemX + xFraction * totalWidth;
+            const tokenFraction = totalChars > 0 ? token.length / totalChars : 1;
+            pendingFields.push({ token, mapping, x, y: itemY, pageIndex: pageNum - 1, measuredWidth: tokenFraction * totalWidth });
+          }
+        }
+
+        const fullText = line.map((i) => i.str).join("");
+        const radioRegex = /\{radio_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)\}/g;
+        let radioMatch;
+        while ((radioMatch = radioRegex.exec(fullText)) !== null) {
+          const rawGroup = radioMatch[1].toLowerCase();
+          const option = radioMatch[2].toLowerCase();
+          const group = rawGroup === "id" ? getRadioGroup(option) : rawGroup;
+          let charPos = 0;
+          let anchorItem: TextItem | null = null;
+          for (const item of line) {
+            if (charPos + item.str.length > radioMatch.index) { anchorItem = item; break; }
+            charPos += item.str.length;
+          }
+          if (anchorItem) {
+            const optNum = parseInt(option, 10);
+            const radioOffsetX = (optNum >= 6 && optNum <= 16) ? 1 : 0;
+            const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -5 : 0;
+            const x = anchorItem.transform[4] + offsets.x + radioOffsetX;
+            const y = viewport.height - anchorItem.transform[5] + offsets.y + radioOffsetY;
+            const fontSize = anchorItem.height || 12;
+            let selected = selectedRadioIds.has(option);
+            if (!selected) {
+              const autoFill = RADIO_AUTO_FILL[group];
+              if (autoFill) {
+                const patientVal = data.patientData[autoFill.sourceField] || "";
+                const expectedOption = autoFill.valueMap[patientVal];
+                if (expectedOption === option) selected = true;
+                else if (!patientVal && autoFill.defaultOption === option) selected = true;
+              }
+            }
+            radios.push({ token: radioMatch[0], group, option, x, y, pageIndex: pageNum - 1, selected, fontSize });
+          }
+        }
+      }
+
+      for (const pf of pendingFields) {
+        const autoValue = resolveValue(pf.mapping.source, pf.mapping.key, data);
+        const fieldWidth = pf.measuredWidth ? Math.max(pf.measuredWidth, 60) : Math.max(pf.token.length * 7 + 20, 60);
+        fields.push({ token: pf.token, key: pf.mapping.key, source: pf.mapping.source, dataKey: pf.mapping.key, x: pf.x + offsets.x, y: viewport.height - pf.y + offsets.y, width: fieldWidth, pageIndex: pf.pageIndex, value: autoValue });
+      }
+
+      const idItemRegex = /^[_\s]*id[_\s]*(\d{1,2})\s*\}?\s*$/i;
+      const combinedRadioRegex = /\{?\s*radio\s*_?\s*id\s*_?\s*(\d{1,2})\s*\}?/i;
+      const seenRadioOptions = new Set(radios.filter(r => r.pageIndex === pageNum - 1).map(r => r.option));
+
+      const addRadioFromItem = (option: string, itemX: number, itemY: number, itemHeight: number) => {
+        if (seenRadioOptions.has(option)) return;
+        seenRadioOptions.add(option);
+        const group = getRadioGroup(option);
+        const optNum = parseInt(option, 10);
+        const radioOffsetX = (optNum >= 6 && optNum <= 16) ? 1 : 0;
+        const radioOffsetY = (optNum >= 6 && optNum <= 16) ? -5 : 0;
+        const x = itemX + offsets.x + radioOffsetX;
+        const y = viewport.height - itemY + offsets.y + radioOffsetY;
+        const fontSize = itemHeight || 12;
+        let selected = selectedRadioIds.has(option);
+        if (!selected) {
+          const autoFill = RADIO_AUTO_FILL[group];
+          if (autoFill) {
+            const patientVal = data.patientData[autoFill.sourceField] || "";
+            const expectedOption = autoFill.valueMap[patientVal];
+            if (expectedOption === option) selected = true;
+            else if (!patientVal && autoFill.defaultOption === option) selected = true;
+          }
+        }
+        radios.push({ token: `{radio_id_${option}}`, group, option, x, y, pageIndex: pageNum - 1, selected, fontSize });
+      };
+
+      for (const item of items) {
+        const trimmed = item.str.trim();
+        const combined = combinedRadioRegex.exec(trimmed);
+        if (combined) { addRadioFromItem(combined[1], item.transform[4], item.transform[5], item.height); continue; }
+        const idMatch = idItemRegex.exec(trimmed);
+        if (idMatch) addRadioFromItem(idMatch[1], item.transform[4], item.transform[5], item.height);
+      }
+
+      const radioOnlyRegex = /^\{?\s*radio\s*$/i;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!radioOnlyRegex.test(item.str.trim())) continue;
+        for (let j = 0; j < items.length; j++) {
+          if (j === i) continue;
+          const other = items[j];
+          if (Math.abs(other.transform[4] - item.transform[4]) > 60 || Math.abs(other.transform[5] - item.transform[5]) > 20) continue;
+          const otherMatch = idItemRegex.exec(other.str.trim());
+          if (!otherMatch) continue;
+          addRadioFromItem(otherMatch[1], Math.min(item.transform[4], other.transform[4]), Math.max(item.transform[5], other.transform[5]), other.height || item.height);
+        }
+      }
+    }
+    setPlaceholderFields(fields);
+    setRadioFields(radios);
+  };
+
+  const loadPdf = useCallback(async () => {
+    if (!data.gizmoFormUrl) { setError("No PDF template URL provided"); setLoading(false); return; }
+    try {
+      setLoading(true); setError(null);
+      const fetchUrl = data.gizmoFormUrl.startsWith("/") ? data.gizmoFormUrl : `/api/forms/proxy-pdf?url=${encodeURIComponent(data.gizmoFormUrl)}`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error("Failed to fetch PDF template");
+      const originalBytes = await response.arrayBuffer();
+      const bytes = originalBytes.slice(0);
+      setPdfBytes(bytes);
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(originalBytes.slice(0)) }).promise;
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+      const hasPlaceholders = await checkForPlaceholderTokens(pdf);
+      if (hasPlaceholders) {
+        setMode("placeholder");
+        await extractPlaceholdersFromPdf(pdf);
+        try {
+          const token = await auth.currentUser?.getIdToken();
+          const fillResponse = await fetch("/api/forms/fill-letter", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            credentials: "include",
+            body: JSON.stringify({ pdfUrl: data.gizmoFormUrl, patientData: data.patientData || {}, doctorData: data.doctorData || {}, generatedDate: data.generatedDate || new Date().toLocaleDateString() }),
+          });
+          if (fillResponse.ok) {
+            const filledBytes = await fillResponse.arrayBuffer();
+            setPdfBytes(filledBytes);
+            const filledPdf = await pdfjsLib.getDocument({ data: new Uint8Array(filledBytes.slice(0)) }).promise;
+            setPdfDoc(filledPdf);
+            setTotalPages(filledPdf.numPages);
+            setLoading(false);
+            return;
+          }
+        } catch (err) { console.error("Server-side fill failed, falling back:", err); }
+        setLoading(false);
+        return;
+      }
+      const { PDFDocument } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(originalBytes.slice(0));
+      const form = pdfLibDoc.getForm();
+      const fields = form.getFields();
+      if (fields.length > 0) {
+        let matchCount = 0;
+        const acroFields = fields.map((f) => {
+          const name = f.getName();
+          const normalized = normalizeFieldName(name);
+          const mapping = FIELD_NAME_MAP[normalized];
+          let value = "";
+          let matched = false;
+          if (mapping) { value = resolveValue(mapping.source, mapping.key, data); matched = true; matchCount++; }
+          return { name, normalizedName: normalized, value, matched };
+        });
+        if (matchCount > 0) {
+          setMode("acroform");
+          setAcroFormFields(acroFields);
+          for (const af of acroFields) {
+            if (af.matched && af.value) {
+              try { const field = form.getTextField(af.name); field.setText(af.value); field.setFontSize(10); field.updateAppearances(); } catch {}
+            }
+          }
+          const previewDoc = await PDFDocument.load(originalBytes.slice(0));
+          const previewForm = previewDoc.getForm();
+          for (const af of acroFields) {
+            if (af.matched && af.value) {
+              try { const pf = previewForm.getTextField(af.name); pf.setText(af.value); pf.setFontSize(10); pf.updateAppearances(); } catch {}
+            }
+          }
+          previewForm.flatten();
+          const previewBytes = await previewDoc.save();
+          const editableBytes = await pdfLibDoc.save();
+          setPdfBytes((editableBytes.buffer as ArrayBuffer).slice(0));
+          const filledPdf = await pdfjsLib.getDocument({ data: new Uint8Array((previewBytes.buffer as ArrayBuffer).slice(0)) }).promise;
+          setPdfDoc(filledPdf);
+          setLoading(false);
+          return;
+        }
+      }
+      setMode("placeholder");
+      await extractPlaceholdersFromPdf(pdf);
+      setLoading(false);
+    } catch (err: any) {
+      console.error("GizmoForm load error:", err);
+      setError(err.message || "Failed to load PDF");
+      setLoading(false);
+    }
+  }, [data]);
+
+  useEffect(() => { loadPdf(); }, [loadPdf]);
+
+  const renderTaskRef = useRef<any>(null);
+
+  const renderPage = useCallback(async () => {
+    if (!pdfDoc) return;
+    if (renderTaskRef.current) { try { renderTaskRef.current.cancel(); } catch (_) {} renderTaskRef.current = null; }
+    const tryRender = async (retries = 5): Promise<void> => {
+      const canvas = canvasRef.current;
+      if (!canvas) { if (retries > 0) { await new Promise((r) => setTimeout(r, 100)); return tryRender(retries - 1); } return; }
+      let page;
+      try { page = await pdfDoc.getPage(currentPage); } catch { return; }
+      if (!page) return;
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext("2d")!;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const task = page.render({ canvasContext: ctx, viewport });
+      renderTaskRef.current = task;
+      try { await task.promise; } catch (err: any) { if (err?.name === "RenderingCancelledException") return; throw err; }
+      renderTaskRef.current = null;
+    };
+    try { await tryRender(); } catch {}
+  }, [pdfDoc, currentPage, scale, mode]);
+
+  useEffect(() => { renderPage(); }, [renderPage]);
+
+  const updateFieldValue = (index: number, value: string) => {
+    setPlaceholderFields((prev) => { const updated = [...prev]; updated[index] = { ...updated[index], value }; return updated; });
+  };
+
+  const toggleRadio = (index: number) => {
+    setRadioFields((prev) => {
+      const updated = [...prev];
+      const clicked = updated[index];
+      for (let i = 0; i < updated.length; i++) { if (updated[i].group === clicked.group) updated[i] = { ...updated[i], selected: i === index }; }
+      return updated;
+    });
+  };
+
+  const updateAcroFieldValue = (index: number, value: string) => {
+    setAcroFormFields((prev) => { const updated = [...prev]; updated[index] = { ...updated[index], value }; return updated; });
+  };
+
+  const embedPetPhoto = async (pdfLibDoc: any) => {
+    if (!petPhotoMarker || !data.petPhotoUrl) return;
+    try {
+      const { rgb } = await import("pdf-lib");
+      const fetchUrl = data.petPhotoUrl.startsWith("/") ? data.petPhotoUrl : `/api/forms/proxy-image?url=${encodeURIComponent(data.petPhotoUrl)}`;
+      const photoResponse = await fetch(fetchUrl);
+      if (!photoResponse.ok) return;
+      const photoBytes = await photoResponse.arrayBuffer();
+      const contentType = photoResponse.headers.get("content-type") || "";
+      const image = contentType.includes("png") ? await pdfLibDoc.embedPng(photoBytes) : await pdfLibDoc.embedJpg(photoBytes);
+      const pages = pdfLibDoc.getPages();
+      const page = pages[petPhotoMarker.pageIndex];
+      if (!page) return;
+      const pageHeight = page.getHeight();
+      const imgDims = image.scaleToFit(petPhotoMarker.width, petPhotoMarker.height);
+      const boxBottomY = pageHeight - petPhotoMarker.y - petPhotoMarker.height;
+      page.drawRectangle({ x: petPhotoMarker.x - 2, y: boxBottomY - 2, width: petPhotoMarker.width + 4, height: petPhotoMarker.height + 4, color: rgb(1, 1, 1) });
+      page.drawImage(image, { x: petPhotoMarker.x + (petPhotoMarker.width - imgDims.width) / 2, y: boxBottomY + (petPhotoMarker.height - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
+    } catch (err) { console.error("Failed to embed pet photo:", err); }
+  };
+
+  const handleDownload = async () => {
+    if (!pdfBytes) return;
+    try {
+      setDownloading(true);
+      const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(pdfBytes.slice(0));
+      const font = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+      if (mode === "acroform") {
+        const form = pdfLibDoc.getForm();
+        for (const af of acroFormFields) { if (af.value) { try { form.getTextField(af.name).setText(af.value); } catch {} } }
+        form.flatten();
+      } else if (mode === "placeholder") {
+        const pages = pdfLibDoc.getPages();
+        for (const field of placeholderFields) {
+          if (!field.value) continue;
+          const page = pages[field.pageIndex];
+          if (!page) continue;
+          page.drawText(field.value, { x: field.x, y: page.getHeight() - field.y, size: 10, font, color: rgb(0, 0, 0) });
+        }
+        for (const radio of radioFields) {
+          if (!radio.selected) continue;
+          const page = pages[radio.pageIndex];
+          if (!page) continue;
+          const sz = 8;
+          page.drawRectangle({ x: radio.x, y: page.getHeight() - radio.y - sz + 2, width: sz, height: sz, color: rgb(0, 0, 0) });
+        }
+      }
+      await embedPetPhoto(pdfLibDoc);
+      const finalBytes = await pdfLibDoc.save();
+      const blob = new Blob([finalBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const dateStr = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-${now.getFullYear()}`;
+      const filename = `${sanitizeFilename(data.patientData.firstName || "Patient")}_${sanitizeFilename(data.patientData.lastName || "")}_Physician_Recommendation_${dateStr}.pdf`;
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Downloaded", description: `${filename} saved successfully.` });
+    } catch (err: any) {
+      console.error("Download error:", err);
+      toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+    } finally { setDownloading(false); }
+  };
+
+  const handlePrint = async () => {
+    if (!pdfBytes) return;
+    try {
+      const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+      const pdfLibDoc = await PDFDocument.load(pdfBytes.slice(0));
+      const font = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
+      if (mode === "acroform") {
+        const form = pdfLibDoc.getForm();
+        for (const af of acroFormFields) { if (af.value) { try { form.getTextField(af.name).setText(af.value); } catch {} } }
+        form.flatten();
+      } else if (mode === "placeholder") {
+        const pages = pdfLibDoc.getPages();
+        for (const field of placeholderFields) {
+          if (!field.value) continue;
+          const page = pages[field.pageIndex];
+          if (!page) continue;
+          page.drawText(field.value, { x: field.x, y: page.getHeight() - field.y, size: 10, font, color: rgb(0, 0, 0) });
+        }
+        for (const radio of radioFields) {
+          if (!radio.selected) continue;
+          const page = pages[radio.pageIndex];
+          if (!page) continue;
+          const sz = 8;
+          page.drawRectangle({ x: radio.x, y: page.getHeight() - radio.y - sz + 2, width: sz, height: sz, color: rgb(0, 0, 0) });
+        }
+      }
+      await embedPetPhoto(pdfLibDoc);
+      const finalBytes = await pdfLibDoc.save();
+      const blob = new Blob([finalBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) printWindow.addEventListener("load", () => printWindow.print());
+    } catch (err: any) {
+      toast({ title: "Print Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-3 text-muted-foreground">Loading PDF...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-4">
+        <p className="text-destructive text-sm">{error}</p>
+        <Button variant="outline" onClick={loadPdf} data-testid="button-retry-pdf">Retry</Button>
+      </div>
+    );
+  }
+
+  const pageFields = placeholderFields.filter((f) => f.pageIndex === currentPage - 1);
+  const pageRadios = radioFields.filter((r) => r.pageIndex === currentPage - 1);
+
+  return (
+    <div className="flex flex-col h-full p-4 gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2" data-testid="gizmo-toolbar">
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <Button variant="outline" size="sm" onClick={onClose} data-testid="button-close-form">
+              <ChevronLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          )}
+          <Badge variant="secondary" data-testid="badge-form-mode">
+            {mode === "acroform" ? "AcroForm Mode" : "Placeholder Mode"}
+          </Badge>
+          <Badge variant="outline">
+            {mode === "acroform"
+              ? `${acroFormFields.filter((f) => f.matched).length} fields matched`
+              : `${placeholderFields.length} fields, ${radioFields.length} radios`}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setScale((s) => Math.max(0.5, s - 0.25))} data-testid="button-zoom-out"><ZoomOut className="h-4 w-4" /></Button>
+          <span className="text-sm text-muted-foreground w-12 text-center">{Math.round(scale * 100)}%</span>
+          <Button variant="outline" size="sm" onClick={() => setScale((s) => Math.min(3, s + 0.25))} data-testid="button-zoom-in"><ZoomIn className="h-4 w-4" /></Button>
+          {totalPages > 1 && (
+            <>
+              <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)} data-testid="button-prev-page"><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm text-muted-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)} data-testid="button-next-page"><ChevronRight className="h-4 w-4" /></Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-pdf"><Printer className="h-4 w-4 mr-1" /> Print</Button>
+          <Button size="sm" onClick={handleDownload} disabled={downloading} data-testid="button-download-pdf">
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+            Download PDF
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex-1 overflow-auto border rounded-lg bg-white" ref={containerRef}>
+          <div className="relative inline-block" style={{ minWidth: "fit-content" }}>
+            <canvas ref={canvasRef} className="block" />
+            {mode === "placeholder" && pageFields.map((field) => {
+              const globalIdx = placeholderFields.indexOf(field);
+              return (
+                <Input
+                  key={`field-${globalIdx}`}
+                  value={field.value}
+                  onChange={(e) => updateFieldValue(globalIdx, e.target.value)}
+                  className="absolute border-0 border-b border-gray-400 rounded-none text-xs px-0 text-black focus:ring-0 focus:border-gray-600"
+                  style={{ left: field.x * scale, top: (field.y - 4) * scale, width: (field.width + 4) * scale, fontSize: 10 * scale, height: 20 * scale, backgroundColor: "transparent", lineHeight: `${20 * scale}px` }}
+                  data-testid={`input-field-${field.dataKey}`}
+                />
+              );
+            })}
+            {mode === "placeholder" && pageRadios.map((radio) => {
+              const globalIdx = radioFields.indexOf(radio);
+              const size = 10 * scale;
+              return (
+                <button
+                  key={`radio-${globalIdx}`}
+                  onClick={() => toggleRadio(globalIdx)}
+                  className="absolute rounded-sm flex items-center justify-center transition-colors"
+                  style={{ left: radio.x * scale, top: (radio.y - 2) * scale, width: size, height: size, backgroundColor: radio.selected ? "#000" : "#fff", border: `${Math.max(1, 1.5 * scale)}px solid ${radio.selected ? "#000" : "#999"}`, zIndex: 10 }}
+                  data-testid={`radio-${radio.group}-${radio.option}`}
+                >
+                  {radio.selected && <Check className="text-white" style={{ width: 7 * scale, height: 7 * scale }} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {mode === "acroform" && (
+          <Card className="w-72 flex-shrink-0">
+            <CardHeader className="py-3 px-4"><CardTitle className="text-sm">Form Fields</CardTitle></CardHeader>
+            <CardContent className="px-4 py-2 space-y-2 max-h-[600px] overflow-y-auto">
+              {acroFormFields.map((af, idx) => (
+                <div key={af.name} className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    {af.matched && <Check className="h-3 w-3 text-green-500" />}{af.name}
+                  </label>
+                  <Input value={af.value} onChange={(e) => updateAcroFieldValue(idx, e.target.value)} className="h-7 text-xs" data-testid={`input-acro-${af.name}`} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 2. PDF System — `client/src/pages/dashboard/applicant/FormViewerPage.tsx`
+
+```tsx
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useSearch } from "wouter";
+import { GizmoForm, type GizmoFormData } from "@/components/shared/GizmoForm";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, FileText, CreditCard, Mail } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface FormDataWithExtras extends GizmoFormData {
+  petIdCardUrl?: string;
+  letterTemplateUrl?: string;
+}
+
+type TabType = "form" | "esaletter" | "idcard";
+
+export default function FormViewerPage() {
+  const params = useParams<{ applicationId: string }>();
+  const applicationId = params.applicationId;
+  const { user } = useAuth();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const tabParam = searchParams.get("tab") as TabType | null;
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam || "form");
+
+  const { data, isLoading, error } = useQuery<FormDataWithExtras>({
+    queryKey: ["/api/forms/data", applicationId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/forms/data/${applicationId}`);
+      return res.json();
+    },
+    enabled: !!applicationId && !!user,
+  });
+
+  const hasForm = !!data?.gizmoFormUrl;
+  const hasLetter = !!data?.letterTemplateUrl;
+  const hasIdCard = !!data?.petIdCardUrl && !!data?.patientData?.petName;
+  const hasMultipleTabs = [hasForm, hasLetter, hasIdCard].filter(Boolean).length > 1;
+
+  useEffect(() => {
+    if (!data) return;
+    if (activeTab === "form" && hasForm) return;
+    if (activeTab === "esaletter" && hasLetter) return;
+    if (activeTab === "idcard" && hasIdCard) return;
+    if (hasForm) setActiveTab("form");
+    else if (hasLetter) setActiveTab("esaletter");
+    else if (hasIdCard) setActiveTab("idcard");
+  }, [data, hasForm, hasLetter, hasIdCard]);
+
+  const idCardData: GizmoFormData | null = data && hasIdCard ? { ...data, gizmoFormUrl: data.petIdCardUrl! } : null;
+  const letterData: GizmoFormData | null = data && hasLetter ? { ...data, gizmoFormUrl: data.letterTemplateUrl! } : null;
+
+  return (
+    <DashboardLayout>
+      {isLoading && (
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-[600px] w-full" />
+        </div>
+      )}
+      {error && (
+        <div className="p-6 border rounded-lg text-center space-y-3">
+          <AlertCircle className="h-12 w-12 mx-auto text-destructive" />
+          <p className="text-destructive font-medium">Failed to load form data</p>
+          <p className="text-sm text-muted-foreground">{(error as any)?.message || "Please try again later."}</p>
+        </div>
+      )}
+      {data && (
+        <>
+          {hasMultipleTabs && (
+            <div className="flex gap-2 mb-4 flex-wrap" data-testid="form-viewer-tabs">
+              {hasForm && (
+                <Button variant={activeTab === "form" ? "default" : "outline"} size="sm" onClick={() => setActiveTab("form")} data-testid="button-tab-form">
+                  <FileText className="h-4 w-4 mr-2" />PDF Form
+                </Button>
+              )}
+              {hasLetter && (
+                <Button variant={activeTab === "esaletter" ? "default" : "outline"} size="sm" onClick={() => setActiveTab("esaletter")} data-testid="button-tab-esaletter">
+                  <Mail className="h-4 w-4 mr-2" />ESA Letter
+                </Button>
+              )}
+              {hasIdCard && (
+                <Button variant={activeTab === "idcard" ? "default" : "outline"} size="sm" onClick={() => setActiveTab("idcard")} data-testid="button-tab-idcard">
+                  <CreditCard className="h-4 w-4 mr-2" />Pet ID Card
+                </Button>
+              )}
+            </div>
+          )}
+          {activeTab === "form" && hasForm && <GizmoForm data={data} onClose={() => window.history.back()} />}
+          {activeTab === "form" && !hasForm && (
+            <div className="p-6 border rounded-lg text-center space-y-3">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
+              <p className="font-medium">No PDF Form Available</p>
+              <p className="text-sm text-muted-foreground">A PDF template has not been assigned for this application yet.</p>
+            </div>
+          )}
+          {activeTab === "esaletter" && letterData && <GizmoForm data={letterData} onClose={() => window.history.back()} />}
+          {activeTab === "idcard" && idCardData && <GizmoForm data={idCardData} onClose={() => window.history.back()} />}
+        </>
+      )}
+    </DashboardLayout>
+  );
+}
+```
+
+---
+
+## 3. PDF System — Two Server Routes in `server/routes.ts`
+
+Add both routes. Import `requireAuth` is already there. Find the forms section or add near other `/api/forms/` routes:
+
+```typescript
+app.get("/api/forms/proxy-pdf", async (req, res) => {
+  try {
+    const url = req.query.url as string;
+    if (!url) { res.status(400).json({ error: "url required" }); return; }
+    const response = await fetch(url);
+    if (!response.ok) { res.status(502).json({ error: "Failed to fetch PDF" }); return; }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(Buffer.from(await response.arrayBuffer()));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Proxy fetch failed" });
+  }
+});
+
+app.post("/api/forms/fill-letter", requireAuth, async (req, res) => {
+  try {
+    const { pdfUrl, patientData, doctorData, generatedDate } = req.body;
+    if (!pdfUrl) { res.status(400).json({ error: "pdfUrl required" }); return; }
+    const pdfResponse = await fetch(pdfUrl);
+    if (!pdfResponse.ok) { res.status(502).json({ error: "Failed to fetch letter PDF" }); return; }
+    const originalBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+    const { PDFDocument } = await import("pdf-lib");
+    const placeholderMap: Record<string, string> = {
+      "{firstName}": patientData?.firstName || "",
+      "{middleName}": patientData?.middleName || "",
+      "{lastName}": patientData?.lastName || "",
+      "{suffix}": patientData?.suffix || "",
+      "{dateOfBirth}": patientData?.dateOfBirth || "",
+      "{address}": patientData?.address || "",
+      "{apt}": patientData?.apt || "",
+      "{city}": patientData?.city || "",
+      "{state}": patientData?.state || "",
+      "{zipCode}": patientData?.zipCode || "",
+      "{zip}": patientData?.zipCode || "",
+      "{phone}": patientData?.phone || "",
+      "{email}": patientData?.email || "",
+      "{medicalCondition}": patientData?.medicalCondition || "",
+      "{petName}": patientData?.petName || "",
+      "{petBreed}": patientData?.petBreed || "",
+      "{petType}": patientData?.petType || "",
+      "{petWeight}": patientData?.petWeight || "",
+      "{registrationId}": patientData?.registrationId || "",
+      "{idNumber}": patientData?.idNumber || "",
+      "{driverLicenseNumber}": patientData?.driverLicenseNumber || "",
+      "{dlNumber}": patientData?.driverLicenseNumber || "",
+      "{idExpirationDate}": patientData?.idExpirationDate || "",
+      "{date}": generatedDate || new Date().toLocaleDateString(),
+      "{doctorFirstName}": doctorData?.firstName || "",
+      "{doctorMiddleName}": doctorData?.middleName || "",
+      "{doctorLastName}": doctorData?.lastName || "",
+      "{doctorPhone}": doctorData?.phone || "",
+      "{doctorAddress}": doctorData?.address || "",
+      "{doctorCity}": doctorData?.city || "",
+      "{doctorState}": doctorData?.state || "",
+      "{doctorZipCode}": doctorData?.zipCode || "",
+      "{doctorLicenseNumber}": doctorData?.licenseNumber || "",
+      "{doctorNpiNumber}": doctorData?.npiNumber || "",
+    };
+    let rawStr = Buffer.from(originalBytes).toString("binary");
+    for (const [placeholder, value] of Object.entries(placeholderMap)) {
+      while (rawStr.includes(placeholder)) rawStr = rawStr.replace(placeholder, value);
+    }
+    const modifiedBytes = Buffer.from(rawStr, "binary");
+    const pdfDoc = await PDFDocument.load(modifiedBytes, { updateMetadata: false });
+    const fixedBytes = await pdfDoc.save();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(Buffer.from(fixedBytes));
+  } catch (error: any) {
+    console.error("Fill letter error:", error);
+    res.status(500).json({ error: error.message || "Failed to fill letter" });
+  }
+});
+```
+
+---
+
+## 4. Email Notification — New User Registration
+
+### In `server/email.ts` — Add this function and its type:
+
+```typescript
+interface NewRegistrationEmailData {
+  adminEmail: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  userState: string;
+  dashboardUrl: string;
+}
+
+export async function sendNewRegistrationEmail(data: NewRegistrationEmailData): Promise<boolean> {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#1a365d;color:white;padding:20px;text-align:center;">
+        <h1 style="margin:0;">YOUR SITE NAME</h1>
+        <p style="margin:5px 0 0;">New Registration</p>
+      </div>
+      <div style="padding:20px;background:#f9fafb;">
+        <h2>New User Registered</h2>
+        <p>A new user has created an account on the platform.</p>
+        <div style="background:white;padding:15px;border-radius:8px;margin:16px 0;">
+          <p><strong>Name:</strong> ${data.userName}</p>
+          <p><strong>Email:</strong> ${data.userEmail}</p>
+          <p><strong>Phone:</strong> ${data.userPhone || "Not provided"}</p>
+          <p><strong>State:</strong> ${data.userState || "Not provided"}</p>
+        </div>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${data.dashboardUrl}" style="background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:6px;font-size:16px;font-weight:bold;">
+            View in Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (!SENDGRID_API_KEY) {
+    console.log(`[email] Would send new registration notification to ${data.adminEmail} for user ${data.userEmail}`);
+    return true;
+  }
+
+  try {
+    await sgMail.send({
+      to: data.adminEmail,
+      from: SENDGRID_FROM_EMAIL,
+      subject: `[Admin] New Registration: ${data.userName}`,
+      html,
+    });
+    console.log(`New registration email sent to ${data.adminEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error("Failed to send new registration email:", error?.response?.body || error.message);
+    return false;
+  }
+}
+```
+
+### In `server/routes.ts` — Add to the import line at the top:
+
+```typescript
+// Find the existing email import line and add sendNewRegistrationEmail to it:
+import { ..., sendNewRegistrationEmail } from "./email";
+```
+
+### In `server/routes.ts` — Inside the registration route (`app.post("/api/users/register", ...)`), after `storage.createUser` succeeds, add:
+
+```typescript
+const adminSettings = await storage.getAdminSettings();
+const notificationEmail = adminSettings?.notificationEmail;
+if (notificationEmail) {
+  const protocol = "https";
+  const host = req.get("host") || "localhost:5000";
+  sendNewRegistrationEmail({
+    adminEmail: notificationEmail,
+    userName: `${firstName} ${lastName}`,
+    userEmail: email,
+    userPhone: phone || "",
+    userState: state || "",
+    dashboardUrl: `${protocol}://${host}/dashboard/admin/users`,
+  }).catch(err => console.error("Registration admin notification error:", err));
+}
+```
+
+The `notificationEmail` comes from Admin Settings → Notification Email field. No new env vars required.
+
+---
+
+## 5. Security — DevTools Deterrents in `client/src/main.tsx`
+
+Replace the entire file:
+
+```tsx
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./index.css";
+
+if (import.meta.env.PROD) {
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F12") { e.preventDefault(); return; }
+    if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C")) { e.preventDefault(); return; }
+    if (e.ctrlKey && e.key === "u") { e.preventDefault(); return; }
+  });
+
+  const devToolsCheck = setInterval(() => {
+    const threshold = 160;
+    if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
+      document.body.innerHTML = "<div style='display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#e2e8f0;'><h1>Access Denied</h1></div>";
+      clearInterval(devToolsCheck);
+    }
+  }, 2000);
+
+  (function () {
+    const el = new Image();
+    Object.defineProperty(el, "id", {
+      get: function () {
+        document.body.innerHTML = "<div style='display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#e2e8f0;'><h1>Access Denied</h1></div>";
+      },
+    });
+  })();
+}
+
+createRoot(document.getElementById("root")!).render(<App />);
+```
+
+Note: All deterrents are wrapped in `if (import.meta.env.PROD)` so they only fire in the deployed app, not in development.
+
+---
+
+## 6. Paused Doctors Badge — `client/src/pages/dashboard/admin/UsersManagement.tsx`
+
+Find the status cell in the users table (where Active/Inactive badge is rendered) and add the Paused badge immediately after it:
+
+```tsx
+<TableCell>
+  <div className="flex items-center gap-1.5">
+    <Badge variant={user.isActive ? "default" : "destructive"}>
+      {user.isActive ? "Active" : "Inactive"}
+    </Badge>
+    {user.userLevel === 2 && user.excludeFromRotation && (
+      <Badge variant="outline" className="text-amber-500 border-amber-500/50" data-testid={`badge-paused-${user.id}`}>
+        Paused
+      </Badge>
+    )}
+  </div>
+</TableCell>
+```
+
+`excludeFromRotation` is already a field on the user/doctor profile. This just displays it visually in the user list.
+
+---
+
+## 7. Footer — `client/src/components/layout/Footer.tsx`
+
+The key thing here is the "Website created by Oraginal Concepts" credit line at the bottom. Replace your footer's bottom copyright section with:
+
+```tsx
+<div className="mt-10 pt-6 border-t flex flex-col md:flex-row items-center justify-between gap-4">
+  <p className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
+    {config.footerText || `© ${currentYear} ${config.siteName}. All rights reserved.`}
+  </p>
+  <p className="text-xs text-muted-foreground" data-testid="text-footer-tagline">
+    Website created by{" "}
+    <a
+      href="https://oraginalconcepts.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline hover:text-primary transition-colors"
+      data-testid="link-footer-creator"
+    >
+      Oraginal Concepts
+    </a>
+  </p>
+</div>
+```
+
+**Important:** `Oraginal` is the correct spelling — do not autocorrect it to "Original".
