@@ -49,6 +49,7 @@ const SharedReferralsPage = lazy(() => import("@/pages/dashboard/shared/Referral
 
 // Generic placeholder for pages not yet implemented
 const PlaceholderPage = lazy(() => import("@/pages/dashboard/placeholders/PlaceholderPage"));
+const PromoRedirect = lazy(() => import("@/pages/PromoRedirect"));
 
 function PageLoader() {
   return (
@@ -287,6 +288,11 @@ function App() {
                   {/* Public Doctor Review Portal (no auth needed) */}
                   <Route path="/review/:token">
                     <DoctorReviewPortal />
+                  </Route>
+
+                  {/* Promo/referral code capture — e.g. pawcredentials.com/DEANA */}
+                  <Route path="/:promoCode">
+                    <AppShell><PromoRedirect /></AppShell>
                   </Route>
 
                   {/* Fallback */}

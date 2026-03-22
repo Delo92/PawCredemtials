@@ -12,6 +12,7 @@ import { sendDoctorApprovalEmail, sendAdminNotificationEmail, sendPatientApprova
 import { chargeCard, isAuthorizeNetConfigured, getAcceptJsUrl, getApiLoginId } from "./authorizenet";
 import { logError, getErrorLogs, createErrorContext } from "./services/errorLogger";
 import { getGA4Report } from "./services/ga4Analytics";
+import { trackPromoRedemption } from "./services/chronicBrands";
 
 function getContactEmail(user: Record<string, any>): string {
   return user.contactEmail || user.email;
@@ -1318,7 +1319,7 @@ export async function registerRoutes(
 
   app.post("/api/payment/charge", requireAuth, async (req, res) => {
     try {
-      const { opaqueDataDescriptor, opaqueDataValue, packageId, formData } = req.body;
+      const { opaqueDataDescriptor, opaqueDataValue, packageId, formData, promoCode } = req.body;
 
       if (!opaqueDataDescriptor || !opaqueDataValue) {
         res.status(400).json({ message: "Payment token is required" });
@@ -1380,6 +1381,18 @@ export async function registerRoutes(
           name: workflowSteps[i],
           status: i === 0 ? "in-progress" : "pending",
         });
+      }
+
+      if (promoCode) {
+        trackPromoRedemption({
+          code: promoCode,
+          orderNumber: application.id,
+          orderValue: (Number(pkg.price) / 100).toFixed(2),
+          discountAmount: "0.00",
+          customerName: patientName,
+          customerEmail: patient.email,
+          notes: `ESA application - ${pkg.name}`,
+        }).catch((err) => console.error("CHRONIC_BRANDS: tracking error:", err.message));
       }
 
       const adminSettings = await storage.getAdminSettings();
@@ -1555,7 +1568,7 @@ export async function registerRoutes(
 
   app.post("/api/applications", requireAuth, async (req, res) => {
     try {
-      const { packageId, formData, paymentStatus: reqPaymentStatus, autoSendToDoctor } = req.body;
+      const { packageId, formData, paymentStatus: reqPaymentStatus, autoSendToDoctor, promoCode } = req.body;
 
       const pkg = await storage.getPackage(packageId);
       if (!pkg) {
@@ -1586,6 +1599,19 @@ export async function registerRoutes(
           name: workflowSteps[i],
           status: i === 0 ? "in-progress" : "pending",
         });
+      }
+
+      if (promoCode && effectivePaymentStatus === "paid") {
+        const patient = req.user!;
+        trackPromoRedemption({
+          code: promoCode,
+          orderNumber: application.id,
+          orderValue: (Number(pkg.price) / 100).toFixed(2),
+          discountAmount: "0.00",
+          customerName: `${patient.firstName} ${patient.lastName}`,
+          customerEmail: patient.email,
+          notes: `ESA application - ${pkg.name}`,
+        }).catch((err) => console.error("CHRONIC_BRANDS: tracking error:", err.message));
       }
 
       if (reqPaymentStatus === "paid" || autoSendToDoctor) {

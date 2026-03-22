@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Package } from "@shared/schema";
-import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User, CreditCard, Lock, Home, Plane, PawPrint, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, User, CreditCard, Lock, Home, Plane, PawPrint, Info, Tag, X } from "lucide-react";
 
 const applicationSchema = z.object({
   packageId: z.string().min(1, "Please select a registration type"),
@@ -91,6 +91,7 @@ export default function NewApplication() {
   const [expMonth, setExpMonth] = useState("");
   const [expYear, setExpYear] = useState("");
   const [cvv, setCvv] = useState("");
+  const [promoCode, setPromoCode] = useState(() => localStorage.getItem("promoCode") || "");
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [acceptJsLoaded, setAcceptJsLoaded] = useState(false);
   const draftLoaded = useRef(false);
@@ -272,9 +273,11 @@ export default function NewApplication() {
             opaqueDataValue: response.opaqueData.dataValue,
             packageId: selectedPackage.id,
             formData: buildFormData(),
+            promoCode: promoCode || undefined,
           });
           const result = await chargeRes.json();
 
+          if (promoCode) localStorage.removeItem("promoCode");
           await apiRequest("PUT", "/api/profile/draft-form", { draftFormData: {} }).catch(() => {});
 
           queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
@@ -301,8 +304,10 @@ export default function NewApplication() {
           formData: buildFormData(),
           autoSendToDoctor: true,
           paymentStatus: "paid",
+          promoCode: promoCode || undefined,
         });
         const application = await response.json();
+        if (promoCode) localStorage.removeItem("promoCode");
         await apiRequest("PUT", "/api/profile/draft-form", { draftFormData: {} }).catch(() => {});
 
         queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
@@ -934,6 +939,49 @@ export default function NewApplication() {
                         {movingSoon && <div className="mb-1"><span className="text-sm text-muted-foreground">Moving soon: </span><span className="text-sm capitalize">{movingSoon}</span></div>}
                         {travelPlanned && <div className="mb-1"><span className="text-sm text-muted-foreground">Travel planned: </span><span className="text-sm capitalize">{travelPlanned}</span></div>}
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-promo-code">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Tag className="h-4 w-4" />
+                      Promo / Referral Code
+                    </CardTitle>
+                    <CardDescription>
+                      Have a referral or promo code? It will be applied to your order.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g., DEANA"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                        className="uppercase font-mono tracking-wider"
+                        data-testid="input-promo-code"
+                      />
+                      {promoCode && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setPromoCode("");
+                            localStorage.removeItem("promoCode");
+                          }}
+                          data-testid="button-clear-promo"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {promoCode && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1" data-testid="text-promo-applied">
+                        <Check className="h-3 w-3" />
+                        Code <span className="font-semibold">{promoCode}</span> will be applied to your order
+                      </p>
                     )}
                   </CardContent>
                 </Card>
