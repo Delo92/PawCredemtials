@@ -10,7 +10,7 @@ interface PromoRedemptionData {
 }
 
 export async function trackPromoRedemption(data: PromoRedemptionData): Promise<void> {
-  const apiKey = process.env.CHRONIC_BRANDS_API_KEY;
+  const apiKey = process.env.PROMO_API_KEY || process.env.CHRONIC_BRANDS_API_KEY;
   if (!apiKey) {
     console.warn("CHRONIC_BRANDS: API key not configured — skipping promo redemption tracking");
     return;
