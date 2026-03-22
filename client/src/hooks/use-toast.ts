@@ -4,6 +4,7 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import { logClientError } from "@/lib/clientErrorLogger"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -141,6 +142,19 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+
+  if (props.variant === "destructive") {
+    const title = typeof props.title === "string" ? props.title : "Error";
+    const description = typeof props.description === "string" ? props.description : undefined;
+    const message = description ? `${title}: ${description}` : title;
+    logClientError({
+      errorType: "client",
+      severity: "error",
+      message,
+      wasShownToUser: true,
+      context: { toastTitle: title, toastDescription: description },
+    }).catch(() => {});
+  }
 
   const update = (props: ToasterToast) =>
     dispatch({
