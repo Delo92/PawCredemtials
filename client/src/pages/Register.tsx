@@ -77,7 +77,7 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
-  const referralCode = params.get("ref") || "";
+  const referralCode = params.get("ref") || localStorage.getItem("promoCode") || "";
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
